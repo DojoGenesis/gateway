@@ -119,12 +119,7 @@ func (s *Server) handleAdminConfig(c *gin.Context) {
 // handleAdminConfigReload reloads YAML configuration from disk.
 // POST /admin/config/reload
 func (s *Server) handleAdminConfigReload(c *gin.Context) {
-	// TODO: Implement config reload logic
-	// For now, return not implemented
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error":   "config reload not yet implemented",
-		"message": "configuration reload requires service restart in v0.2.0",
-	})
+	s.errorResponse(c, http.StatusNotImplemented, "not_implemented", "Configuration reload not yet implemented; requires service restart")
 }
 
 // handleAdminMetrics returns Prometheus-format metrics.

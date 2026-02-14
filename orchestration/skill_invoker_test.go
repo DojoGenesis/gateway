@@ -24,6 +24,10 @@ func (m *mockSkillExecutor) Execute(ctx context.Context, skillName string, args 
 	return map[string]interface{}{"status": "success"}, nil
 }
 
+func (m *mockSkillExecutor) ExecuteAsSubtask(ctx context.Context, skillName string, args map[string]interface{}) (map[string]interface{}, error) {
+	return m.Execute(ctx, skillName, args)
+}
+
 type mockBaseInvoker struct {
 	invokeFn func(ctx context.Context, toolName string, params map[string]interface{}) (map[string]interface{}, error)
 }

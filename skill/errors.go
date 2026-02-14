@@ -24,6 +24,7 @@ var (
 	ErrScriptNotAllowed      = errors.New("script not in allowlist")
 	ErrScriptExecutionFailed = errors.New("script execution failed")
 	ErrMaxDepthExceeded      = errors.New("max call depth exceeded")
+	ErrBudgetExhausted       = errors.New("token budget exhausted")
 
 	// Version errors
 	ErrVersionMismatch = errors.New("gateway version does not meet skill requirements")

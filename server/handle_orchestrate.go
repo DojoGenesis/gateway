@@ -45,6 +45,7 @@ type OrchestrationState struct {
 	EventChan   chan events.StreamEvent
 	FinalOutput interface{}
 	Error       string
+	Plan        *orchestrationpkg.Plan // Store the plan for DAG retrieval
 	mu          sync.Mutex
 }
 
@@ -168,6 +169,7 @@ func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestra
 	}
 	state.mu.Lock()
 	state.Status = "executing"
+	state.Plan = plan // Store plan for DAG retrieval
 	state.Events = append(state.Events, planEvent)
 	state.mu.Unlock()
 	eventChan <- planEvent

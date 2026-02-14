@@ -107,13 +107,13 @@ func (s *Server) handleInvokeTool(c *gin.Context) {
 	durationMs := time.Since(start).Milliseconds()
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ToolInvokeResponse{
-			ToolName:   toolName,
-			Inputs:     req.Inputs,
-			Output:     err.Error(),
-			DurationMs: durationMs,
-			Status:     "error",
-		})
+		s.errorResponseWithDetails(c, http.StatusInternalServerError, "tool_execution_failed",
+			"Tool execution failed: "+err.Error(),
+			gin.H{
+				"tool_name":   toolName,
+				"inputs":      req.Inputs,
+				"duration_ms": durationMs,
+			})
 		return
 	}
 

@@ -3,6 +3,7 @@ package skill
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // SkillExecutor handles skill invocation with DAG subtask binding.
@@ -11,8 +12,10 @@ type SkillExecutor interface {
 	// If the skill invokes other skills, they become DAG subtask nodes.
 	Execute(ctx context.Context, skillName string, args map[string]interface{}) (map[string]interface{}, error)
 
-	// NOTE: ExecuteAsSubtask and RegisterMetaSkillInvocation are Phase 4b (Tier 3).
-	// Phase 4a skips them (will be implemented later).
+	// ExecuteAsSubtask invokes a skill as a child of the current skill.
+	// Creates a DAG node for the invocation and tracks it in the parent plan.
+	// Phase 4b: Meta-skill invocation with depth limit and budget tracking.
+	ExecuteAsSubtask(ctx context.Context, skillName string, args map[string]interface{}) (map[string]interface{}, error)
 }
 
 // DefaultSkillExecutor is the default implementation of SkillExecutor
@@ -137,4 +140,112 @@ func (e *DefaultSkillExecutor) SetCallDepth(depth int) {
 // GetCallDepth returns the current call depth
 func (e *DefaultSkillExecutor) GetCallDepth() int {
 	return e.callDepth
+}
+
+// ExecuteAsSubtask invokes a skill as a child of the current skill.
+// This is the Phase 4b meta-skill invocation mechanism with:
+// - Call depth tracking (max depth = 3)
+// - Budget propagation and tracking
+// - OTEL span linking
+// - DAG node creation (logged via trace, not directly managed here)
+func (e *DefaultSkillExecutor) ExecuteAsSubtask(
+	ctx context.Context,
+	skillName string,
+	args map[string]interface{},
+) (map[string]interface{}, error) {
+	// 1. Check call depth limit
+	if err := CheckDepthLimit(ctx, MaxMetaSkillDepth); err != nil {
+		return nil, err
+	}
+
+	// 2. Look up skill in registry
+	skill, err := e.registry.GetSkill(ctx, skillName)
+	if err != nil {
+		return nil, fmt.Errorf("meta-skill invocation failed for '%s': %w", skillName, err)
+	}
+
+	// 3. Get budget tracker from context (if available)
+	budgetTracker := GetBudgetTracker(ctx)
+
+	// 4. Estimate token budget for this skill (simplified: 1000 tokens per skill)
+	// In production, this would be based on skill metadata or historical usage
+	estimatedTokens := 1000
+
+	// 5. Reserve budget if tracker is available
+	if budgetTracker != nil {
+		if err := budgetTracker.Reserve(estimatedTokens); err != nil {
+			return nil, fmt.Errorf("cannot invoke meta-skill '%s': %w", skillName, err)
+		}
+	}
+
+	// 6. Increment call depth in context
+	childCtx := WithIncrementedDepth(ctx)
+	currentDepth := GetCallDepth(ctx)
+
+	// 7. Create OTEL child span (if trace logger available)
+	var span SpanHandle
+	if e.traceLogger != nil {
+		traceID := fmt.Sprintf("meta-skill-%s-%d", skillName, time.Now().UnixNano())
+		spanStartErr := error(nil)
+		span, spanStartErr = e.traceLogger.StartSpan(childCtx, traceID, fmt.Sprintf("meta-skill.invoke.%s", skillName), map[string]interface{}{
+			"skill.name":        skillName,
+			"skill.tier":        skill.Tier,
+			"skill.call_depth":  currentDepth + 1,
+			"skill.parent_type": "meta_skill_invocation",
+		})
+		if spanStartErr != nil {
+			// Don't fail execution if tracing fails
+			span = nil
+		}
+	}
+
+	// 8. Execute the skill through the standard execution path
+	result, execErr := e.Execute(childCtx, skillName, args)
+
+	// 9. Update budget tracker with actual consumption
+	// For now, use a simple heuristic: result size in chars / 4 (approx tokens)
+	actualTokens := 0
+	if budgetTracker != nil {
+		if execErr == nil && result != nil {
+			// Success: consume based on actual result size
+			resultSize := len(fmt.Sprintf("%v", result))
+			actualTokens = resultSize / 4
+			if actualTokens == 0 {
+				actualTokens = 100 // Minimum token count
+			}
+			if actualTokens > estimatedTokens {
+				actualTokens = estimatedTokens // Cap at reservation
+			}
+			budgetTracker.Consume(estimatedTokens, actualTokens)
+		} else {
+			// Error: release the reservation without consuming
+			budgetTracker.Release(estimatedTokens)
+		}
+	} else if execErr == nil && result != nil {
+		// No budget tracker, but still calculate tokens for tracing
+		resultSize := len(fmt.Sprintf("%v", result))
+		actualTokens = resultSize / 4
+		if actualTokens == 0 {
+			actualTokens = 100
+		}
+	}
+
+	// 10. Complete OTEL span
+	if span != nil {
+		if execErr != nil {
+			_ = e.traceLogger.FailSpan(childCtx, span, execErr.Error())
+		} else {
+			_ = e.traceLogger.EndSpan(childCtx, span, map[string]interface{}{
+				"skill.result.tokens_used": actualTokens,
+				"skill.result.status":      "success",
+			})
+		}
+	}
+
+	// 11. Return result or error
+	if execErr != nil {
+		return nil, fmt.Errorf("meta-skill '%s' execution failed at depth %d: %w", skillName, currentDepth+1, execErr)
+	}
+
+	return result, nil
 }

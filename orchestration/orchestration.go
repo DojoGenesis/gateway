@@ -1,4 +1,16 @@
-// Package orchestration provides DAG-based task planning and execution.
-// The full implementation is in server/orchestration/ for Track 0.
-// It will be extracted into this standalone module in Track 1.
+// Package orchestration provides DAG-based task planning and execution for the
+// Agentic Gateway.
+//
+// It models work as a Plan (a directed acyclic graph of PlanNodes), where each
+// node represents a tool invocation with typed parameters and explicit
+// dependencies. The Engine executes these plans with:
+//
+//   - Parallel node execution (respecting dependency edges)
+//   - Disposition-driven pacing (deliberate → rapid)
+//   - Automatic retry with exponential backoff and jitter
+//   - Circuit breaker per tool for persistent failures
+//   - Auto-replanning when transient errors occur
+//   - Budget-aware execution with token cost estimation
+//
+// Key types: Task, Plan, PlanNode, Engine, EngineConfig.
 package orchestration

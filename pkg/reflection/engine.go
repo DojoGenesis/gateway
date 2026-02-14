@@ -125,7 +125,7 @@ func (e *Engine) GetEventLog() []ReflectionEvent {
 // GenerateReflection produces a reflection artifact in the configured format.
 func (e *Engine) GenerateReflection(ctx context.Context, sessionData SessionData) (*ReflectionOutput, error) {
 	if e.disp == nil {
-		return nil, fmt.Errorf("no disposition configured")
+		return nil, fmt.Errorf("reflection engine requires a disposition configuration: call NewEngine(WithDisposition(cfg)) to provide one")
 	}
 
 	format := strings.ToLower(e.disp.Reflection.Format)

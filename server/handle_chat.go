@@ -335,13 +335,30 @@ func (s *Server) resolveProvider(model string) (provider.ModelProvider, error) {
 }
 
 // errorResponse sends a consistent error response.
+// All HTTP endpoints MUST use this function for error responses to ensure
+// integrators see a uniform JSON shape:
+//
+//	{"error": {"code": "string", "message": "string", "details": {}}}
 func (s *Server) errorResponse(c *gin.Context, status int, code, message string) {
 	requestID, _ := c.Get("request_id")
 	c.JSON(status, gin.H{
 		"error": gin.H{
-			"message":    message,
-			"type":       code,
 			"code":       code,
+			"message":    message,
+			"details":    gin.H{},
+			"request_id": requestID,
+		},
+	})
+}
+
+// errorResponseWithDetails sends a consistent error response with additional details.
+func (s *Server) errorResponseWithDetails(c *gin.Context, status int, code, message string, details gin.H) {
+	requestID, _ := c.Get("request_id")
+	c.JSON(status, gin.H{
+		"error": gin.H{
+			"code":       code,
+			"message":    message,
+			"details":    details,
 			"request_id": requestID,
 		},
 	})

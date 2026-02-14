@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// EventType identifies the kind of server-sent event emitted by the gateway.
+// See catalog.go for the full list of types and their documented payload schemas.
 type EventType string
 
 const (
@@ -33,6 +35,9 @@ const (
 	OrchestrationFailed      EventType = "orchestration_failed"
 )
 
+// StreamEvent is the envelope for all SSE events sent by the gateway.
+// It contains the event type, a data payload (schema varies by type —
+// see catalog.go), and a timestamp.
 type StreamEvent struct {
 	Type      EventType              `json:"type"`
 	Data      map[string]interface{} `json:"data"`
