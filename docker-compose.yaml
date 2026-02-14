@@ -2,7 +2,6 @@ version: '3.8'
 
 # Production Docker Compose Configuration
 # Includes: Gateway, MCPByDojoGenesis, OTEL Collector, Langfuse observability stack
-# Phase 3: MCP Server Wiring
 
 services:
   # ─── AgenticGateway (Main Service) ─────────────────────────────────────

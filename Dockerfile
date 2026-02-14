@@ -1,3 +1,5 @@
+# Dockerfile — local development builds (builds from source, single-arch)
+# For production multi-arch images, Goreleaser uses Dockerfile.goreleaser
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
@@ -13,6 +15,8 @@ COPY memory/go.mod memory/go.sum* ./memory/
 COPY server/go.mod server/go.sum* ./server/
 COPY mcp/go.mod mcp/go.sum* ./mcp/
 COPY orchestration/go.mod orchestration/go.sum* ./orchestration/
+COPY disposition/go.mod disposition/go.sum* ./disposition/
+COPY skill/go.mod skill/go.sum* ./skill/
 
 # Download dependencies for all modules
 RUN cd shared && go mod download && \
@@ -22,7 +26,9 @@ RUN cd shared && go mod download && \
     cd ../memory && go mod download && \
     cd ../server && go mod download && \
     cd ../mcp && go mod download && \
-    cd ../orchestration && go mod download
+    cd ../orchestration && go mod download && \
+    cd ../disposition && go mod download && \
+    cd ../skill && go mod download
 
 # Copy source code
 COPY . .

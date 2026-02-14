@@ -1,7 +1,6 @@
 # Gateway MCP Configuration (Production)
 # MCP Host Configuration per gateway-mcp-contract.md specification
 # Version: 1.0.0
-# Target: Phase 3 — MCP Server Wiring
 
 version: "1.0"
 
@@ -71,47 +70,42 @@ mcp:
         backoff_multiplier: 2.0
         max_backoff_ms: 5000
 
-    # ─── Composio Integration (Commented Out — Future Use) ──────────────
-    # Uncomment and configure when Composio API key is available
-    # See docs/composio-setup.md for detailed setup instructions
+    # ─── Example: Remote MCP Server via SSE ──────────────────────────────
+    # Example configuration for a remote MCP server using SSE transport
+    # Uncomment and configure with your server details
     #
     # - id: "composio"
-    #   display_name: "Composio Integration"
+    #   display_name: "Composio MCP"
     #   namespace_prefix: "composio"
     #
-    #   # Transport: SSE over HTTP
+    #   # Transport: SSE (Server-Sent Events)
     #   transport:
     #     type: "sse"
-    #     # Composio SSE endpoint
-    #     url: "https://api.composio.dev/v1/mcp/sse"
-    #     # Authentication headers (use environment variable for API key)
+    #     url: "https://mcp.composio.dev/sse"
+    #     # Headers support environment variable expansion with ${VAR}
     #     headers:
     #       Authorization: "Bearer ${COMPOSIO_API_KEY}"
-    #       X-Client-ID: "agentic-gateway-prod"
     #
-    #   # Tool filtering
+    #   # Tool filtering (optional)
     #   tools:
-    #     allowlist: []   # Empty = allow all
-    #     blocklist:
-    #       # Block dangerous operations
-    #       - "composio:admin:delete_org"
-    #       - "composio:admin:modify_config"
+    #     allowlist: []
+    #     blocklist: []
     #
-    #   # Timeouts for remote service
+    #   # Connection timeouts
     #   timeouts:
     #     startup: 15
     #     tool_default: 30
     #     health_check: 10
     #
-    #   # Health checks (less frequent for remote service)
+    #   # Health check configuration
     #   health_check:
     #     enabled: true
-    #     interval_sec: 120
+    #     interval_sec: 30
     #
     #   # Retry policy
     #   retry_policy:
     #     max_attempts: 3
-    #     backoff_multiplier: 1.5
+    #     backoff_multiplier: 2.0
     #     max_backoff_ms: 10000
 
   # ─── Observability Configuration ──────────────────────────────────────
@@ -126,7 +120,7 @@ mcp:
     attributes:
       service.name: "agentic-gateway"
       mcp.host.enabled: "true"
-      mcp.host.version: "v0.2.0"
+      mcp.host.version: "v1.0.0"
 
     # Log level for MCP events
     log_level: "info"
