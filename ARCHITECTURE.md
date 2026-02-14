@@ -1,7 +1,7 @@
 # AgenticGateway Architecture
 
-**Version:** v0.2.0 (Phase 3: MCP Server Wiring)
-**Last Updated:** 2026-02-13
+**Version:** v1.0.0
+**Last Updated:** 2026-02-14
 
 ---
 
@@ -22,7 +22,7 @@ AgenticGateway is a unified API gateway for agentic systems, providing:
 
 - **OpenAI-compatible chat API** (`/v1/chat/completions`)
 - **Tool registry and orchestration** (DAG-based execution)
-- **Multi-provider routing** (Anthropic, OpenAI, local models)
+- **Multi-provider routing** (8 providers: Anthropic, OpenAI, Google, Groq, Mistral, Kimi, DeepSeek, Ollama)
 - **MCP integration** (dynamic tool discovery from external servers)
 - **Memory management** (SQLite-based persistence + garden metaphor)
 - **OTEL observability** (distributed tracing to Langfuse/OTEL collector)
@@ -96,14 +96,17 @@ AgenticGateway is a unified API gateway for agentic systems, providing:
 - `/v1/gateway/*` — Gateway-specific APIs (tools, agents, orchestration)
 - `/admin/*` — Admin endpoints (health, config, MCP status)
 
-### 2. Orchestration Engine (`server/orchestration/`)
+### 2. Orchestration Engine (`orchestration/`)
 
-**Responsibility:** DAG planning and execution
+**Responsibility:** DAG planning and execution (standalone module since v0.3.0)
+
+The orchestration engine was extracted from `server/orchestration/` into a standalone Go module in v0.3.0. The server layer communicates with it via adapter interfaces in `server/orchestration/`, which delegate to the standalone module.
 
 **Key components:**
 - `Planner` — Converts tool calls into dependency DAGs
 - `Engine` — Executes DAG with parallelism + error handling
 - `ExecutionContext` — Tracks state during execution
+- `GatewayExecutor` — Server-side adapter (`server/orchestration/gateway_executor.go`)
 
 **DAG Example:**
 
@@ -121,7 +124,56 @@ AgenticGateway is a unified API gateway for agentic systems, providing:
 └─────────────┘
 ```
 
-### 3. Tool Registry (`tools/`)
+### 3. Skill Executor (`skill/`)
+
+**Added in:** v0.3.0 (Phase 4a + 4b)
+
+**Responsibility:** Tiered skill lifecycle — loading, validation, and execution
+
+The skill module implements the 4-tier skill system (Tier 0: prompt-only, Tier 1: tool-augmented, Tier 2: scripted, Tier 3: meta-skills with DAG). Phase 4a ported 44 skills from the orchestration repo and implemented Tiers 0-2. Phase 4b completed Tier 3 meta-skill DAG integration (commit df59ec5, 2026-02-14).
+
+**Key files:**
+- `skill/executor.go` — Skill execution engine with tool dependency validation and meta-skill invocation
+- `skill/loader.go` — Skill discovery and loading from YAML definitions
+- `skill/registry.go` — Skill registration and lookup
+- `skill/budget.go` — Token budget tracking for meta-skill chains (Phase 4b)
+- `skill/context.go` — Call depth tracking with max depth=3 enforcement (Phase 4b)
+- `skill/errors.go` — Skill-specific error types including `ErrMaxDepthExceeded`, `ErrBudgetExhausted`
+
+**Meta-Skill Invocation (Phase 4b):**
+
+When a Tier 3 skill invokes another skill via `ExecuteAsSubtask`, the following flow occurs:
+
+1. **Depth Check:** Current call depth checked against `MaxMetaSkillDepth = 3`. If exceeded, return `ErrMaxDepthExceeded`.
+2. **Budget Reservation:** Estimated tokens reserved from parent's budget via `BudgetTracker.Reserve()`. If insufficient, return `ErrBudgetExhausted`.
+3. **Context Increment:** Call depth incremented via `WithIncrementedDepth(ctx)`.
+4. **OTEL Span Creation:** Child span created with attributes: `skill.name`, `skill.tier`, `skill.call_depth`, `skill.parent_type`.
+5. **Skill Execution:** Child skill executed through standard `Execute` path.
+6. **Budget Consumption:** Actual token usage recorded via `BudgetTracker.Consume(reserved, actual)`. Unused tokens released.
+7. **Span Completion:** OTEL span ended with result status and token usage metadata.
+
+**Example Call Chain:**
+```
+parent-skill (depth 0)
+  → ExecuteAsSubtask("child-skill-1", args) (depth 1)
+    → ExecuteAsSubtask("child-skill-2", args) (depth 2)
+      → ExecuteAsSubtask("child-skill-3", args) (depth 3, MAX)
+        → ExecuteAsSubtask("child-skill-4", args) → ErrMaxDepthExceeded
+```
+
+**Observability:** All meta-skill invocations are observable via OTEL traces. Parent → child relationships are explicitly linked through span context propagation.
+
+### 4. Disposition (`disposition/`)
+
+**Added in:** v0.3.0 (Phase 4a)
+
+**Responsibility:** Agent personality and behavior configuration (ADA contract)
+
+Defines agent dispositions — personality traits, communication style, and behavioral constraints — that shape how the agent responds. Extracted from `server/` into a standalone module.
+
+### 5. Tool Registry (`tools/`)
+
+> *Note: Previously numbered §3 — renumbered after skill and disposition modules were added in v0.3.0.*
 
 **Responsibility:** Tool registration, lookup, invocation
 
@@ -141,21 +193,26 @@ type ToolRegistry interface {
 }
 ```
 
-### 4. Provider Layer (`provider/`)
+### 6. Provider Layer (`provider/`)
 
 **Responsibility:** Multi-provider LLM routing
 
-**Supported providers:**
+**Supported providers (8):**
 - **Anthropic** (Claude models)
 - **OpenAI** (GPT models)
-- **Local models** (Ollama, LM Studio)
+- **Google** (Gemini models)
+- **Groq** (fast inference)
+- **Mistral** (Mistral models)
+- **Kimi** (K2.5 models)
+- **DeepSeek** (DeepSeek models)
+- **Ollama** (local models)
 
 **Plugin architecture:**
 - Providers register via plugin system
 - Gateway routes requests based on model ID
 - Provider-specific context injection
 
-### 5. Memory Manager (`memory/`)
+### 7. Memory Manager (`memory/`)
 
 **Responsibility:** Persistent memory storage with garden metaphor
 
@@ -554,4 +611,6 @@ curl http://localhost:8080/admin/mcp/status
 
 **Version History:**
 - v0.1.0 — Initial release (provider abstraction, memory, orchestration)
-- v0.2.0 — MCP integration (Phase 3: MCP Server Wiring)
+- v0.2.0 — MCP integration, disposition-aware behavior, OTEL observability
+- v0.3.0 — Orchestration extraction to standalone module, 44 skills port (Tiers 0-3), meta-skill invocation
+- v1.0.0 — 8-provider layer, MCP SSE + streamable_http transport, multi-arch Docker, E2E CI, pre-v1 hardening
