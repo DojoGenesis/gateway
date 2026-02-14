@@ -10,6 +10,11 @@ bin/
 # Build artifacts
 *.out
 coverage.*
+dist/
+
+# Certificates and keys
+*.pem
+*.key
 
 # Databases
 *.db
