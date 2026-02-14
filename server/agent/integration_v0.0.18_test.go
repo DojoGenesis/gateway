@@ -188,7 +188,7 @@ func TestConcurrentRequestsWithDifferentProjects(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test-concurrent.db")
 
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
@@ -263,13 +263,14 @@ func TestConcurrentRequestsWithDifferentProjects(t *testing.T) {
 			return
 		}
 
-		artifact, ok := artifactData.(*artifacts.Artifact)
+		artifactMap, ok := artifactData.(map[string]interface{})
 		if !ok {
 			results <- result{projectID: project1.ID, err: fmt.Errorf("artifact is not of correct type")}
 			return
 		}
 
-		results <- result{projectID: project1.ID, artifactID: artifact.ID, err: nil}
+		artifactID, _ := artifactMap["id"].(string)
+		results <- result{projectID: project1.ID, artifactID: artifactID, err: nil}
 	}()
 
 	// Simulate Request 2: Create artifact in project 2
@@ -296,13 +297,14 @@ func TestConcurrentRequestsWithDifferentProjects(t *testing.T) {
 			return
 		}
 
-		artifact, ok := artifactData.(*artifacts.Artifact)
+		artifactMap, ok := artifactData.(map[string]interface{})
 		if !ok {
 			results <- result{projectID: project2.ID, err: fmt.Errorf("artifact is not of correct type")}
 			return
 		}
 
-		results <- result{projectID: project2.ID, artifactID: artifact.ID, err: nil}
+		artifactID, _ := artifactMap["id"].(string)
+		results <- result{projectID: project2.ID, artifactID: artifactID, err: nil}
 	}()
 
 	// Collect results (order is non-deterministic)

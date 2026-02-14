@@ -24,7 +24,11 @@ func setupMigrationHandlerTest(t *testing.T) (*sql.DB, *database.MigrationManage
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test_migration_handler.db")
 
-	db, err := sql.Open("sqlite", dbPath)
+	// Use WAL mode and busy timeout to prevent SQLITE_BUSY during concurrent access.
+	// The migration handler spawns background goroutines that need concurrent DB access,
+	// so MaxOpenConns must remain >1 to avoid deadlocks.
+	dsn := dbPath + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+	db, err := sql.Open("sqlite", dsn)
 	require.NoError(t, err)
 
 	migrationSQL, err := os.ReadFile("../migrations/20260207_v0.0.30_local_auth.sql")
@@ -39,7 +43,6 @@ func setupMigrationHandlerTest(t *testing.T) (*sql.DB, *database.MigrationManage
 
 	cleanup := func() {
 		db.Close()
-		os.RemoveAll(tmpDir)
 	}
 
 	return db, manager, handlers, cleanup

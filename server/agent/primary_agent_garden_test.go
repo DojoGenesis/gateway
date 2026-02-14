@@ -85,6 +85,16 @@ func (m *MockPluginManagerForGarden) GetProviders() map[string]providerpkg.Model
 	}
 }
 
+func (m *MockPluginManagerForGarden) CompressHistory(ctx context.Context, sessionID string, memories []memory.Memory) (*memory.CompressedHistory, error) {
+	return &memory.CompressedHistory{
+		CompressedContent: "mock compressed history",
+	}, nil
+}
+
+func (m *MockPluginManagerForGarden) ExtractSeeds(ctx context.Context, memories []memory.Memory) ([]*memory.MemorySeed, error) {
+	return nil, nil
+}
+
 func setupGardenTest(t *testing.T) (*PrimaryAgent, *memory.MemoryManager, *memory.GardenManager, func()) {
 	tmpDir, err := os.MkdirTemp("", "garden-test-*")
 	if err != nil {

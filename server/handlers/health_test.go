@@ -38,7 +38,7 @@ func TestHandleHealthCheck(t *testing.T) {
 
 	// Assert response structure
 	assert.Equal(t, "ok", response.Status, "Status should be 'ok'")
-	assert.Equal(t, "0.2.4", response.Version, "Version should be '0.2.4'")
+	assert.Equal(t, "1.0.0", response.Version, "Version should be '1.0.0'")
 }
 
 func TestHealthCheckResponseTime(t *testing.T) {

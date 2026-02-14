@@ -250,7 +250,7 @@ func TestTruncateContent(t *testing.T) {
 }
 
 func TestMessageType(t *testing.T) {
-	msg := Message{
+	msg := ContextMessage{
 		Role:    "user",
 		Content: "Hello",
 	}
@@ -260,7 +260,7 @@ func TestMessageType(t *testing.T) {
 
 func TestContextBuildResultType(t *testing.T) {
 	result := &ContextBuildResult{
-		Messages:        []Message{{Role: "user", Content: "test"}},
+		Messages:        []ContextMessage{{Role: "user", Content: "test"}},
 		TiersUsed:       map[ContextTier]int{Tier1AlwaysOn: 10},
 		TotalTokens:     10,
 		CapacityPercent: 0.5,

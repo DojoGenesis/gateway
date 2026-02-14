@@ -4,9 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
+	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -20,42 +19,36 @@ func createTestAgentWithOrchestration(t *testing.T) *PrimaryAgent {
 
 	agent := NewPrimaryAgent(pm)
 
-	eventChan := make(chan events.StreamEvent, 10)
-	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(1000, 5000, 10000)
 
 	mockPlanner := &mockPlanner{
-		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
-			plan := orchestration.NewPlan(task.ID)
-			plan.Nodes = []*orchestration.PlanNode{
+		generatePlanFunc: func(ctx context.Context, task *orchestrationpkg.Task) (*orchestrationpkg.Plan, error) {
+			plan := orchestrationpkg.NewPlan(task.ID)
+			plan.Nodes = []*orchestrationpkg.PlanNode{
 				{
 					ID:           uuid.New().String(),
 					ToolName:     "test_tool",
 					Parameters:   map[string]interface{}{"param1": "value1"},
 					Dependencies: []string{},
-					State:        orchestration.NodeStatePending,
+					State:        orchestrationpkg.NodeStatePending,
 				},
 			}
 			return plan, nil
 		},
 	}
 
-	engine := orchestration.NewEngine(
-		orchestration.DefaultEngineConfig(),
+	engine := orchestrationpkg.NewEngine(
+		orchestrationpkg.DefaultEngineConfig(),
 		mockPlanner,
+		&testToolInvoker{},
 		nil,
-		eventChan,
-		costTracker,
+		nil,
 		budgetTracker,
 	)
 
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
 	agent.EnableOrchestration(true)
-
-	t.Cleanup(func() {
-		close(eventChan)
-	})
 
 	return agent
 }

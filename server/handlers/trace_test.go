@@ -311,24 +311,25 @@ func TestTraceHandlersWithoutInitialization(t *testing.T) {
 	r := gin.New()
 
 	tests := []struct {
-		name     string
-		method   string
-		path     string
-		handler  gin.HandlerFunc
-		expected int
+		name       string
+		method     string
+		routePath  string // path used for route registration (no query string)
+		requestURL string // full URL used for the HTTP request (may include query string)
+		handler    gin.HandlerFunc
+		expected   int
 	}{
-		{"ListTraces", "GET", "/api/v1/traces?session_id=test", h.ListTraces, http.StatusInternalServerError},
-		{"GetTrace", "GET", "/api/v1/traces/trace-1", h.GetTrace, http.StatusInternalServerError},
-		{"GetTraceReplay", "GET", "/api/v1/traces/trace-1/replay", h.GetTraceReplay, http.StatusInternalServerError},
-		{"GetTraceStats", "GET", "/api/v1/traces/trace-1/stats", h.GetTraceStats, http.StatusInternalServerError},
-		{"GetSpan", "GET", "/api/v1/spans/span-1", h.GetSpan, http.StatusInternalServerError},
+		{"ListTraces", "GET", "/api/v1/traces", "/api/v1/traces?session_id=test", h.ListTraces, http.StatusInternalServerError},
+		{"GetTrace", "GET", "/api/v1/traces/:trace_id", "/api/v1/traces/trace-1", h.GetTrace, http.StatusInternalServerError},
+		{"GetTraceReplay", "GET", "/api/v1/traces/:trace_id/replay", "/api/v1/traces/trace-1/replay", h.GetTraceReplay, http.StatusInternalServerError},
+		{"GetTraceStats", "GET", "/api/v1/traces/:trace_id/stats", "/api/v1/traces/trace-1/stats", h.GetTraceStats, http.StatusInternalServerError},
+		{"GetSpan", "GET", "/api/v1/spans/:span_id", "/api/v1/spans/span-1", h.GetSpan, http.StatusInternalServerError},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r.Handle(tt.method, tt.path, tt.handler)
+			r.Handle(tt.method, tt.routePath, tt.handler)
 
-			req, _ := http.NewRequest(tt.method, tt.path, nil)
+			req, _ := http.NewRequest(tt.method, tt.requestURL, nil)
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, req)
 

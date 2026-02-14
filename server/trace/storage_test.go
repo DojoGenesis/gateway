@@ -12,12 +12,21 @@ import (
 )
 
 func setupTraceTestDB(t *testing.T) (*TraceStorage, *sql.DB, string) {
-	tmpfile := "/tmp/test_trace_" + time.Now().Format("20060102150405") + ".db"
+	t.Helper()
 
-	db, err := sql.Open("sqlite", tmpfile)
+	tmpDir := t.TempDir()
+	tmpfile := tmpDir + "/test_trace.db"
+
+	// Use connection string parameters for WAL mode and busy timeout.
+	// modernc.org/sqlite supports _pragma parameters in the DSN.
+	dsn := tmpfile + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
+
+	// Limit to one open connection to serialize SQLite writes and avoid SQLITE_BUSY.
+	db.SetMaxOpenConns(1)
 
 	ts, err := NewTraceStorage(db)
 	if err != nil {
@@ -28,12 +37,12 @@ func setupTraceTestDB(t *testing.T) (*TraceStorage, *sql.DB, string) {
 }
 
 func teardownTraceTestDB(t *testing.T, db *sql.DB, dbPath string) {
+	t.Helper()
 	if err := db.Close(); err != nil {
 		t.Errorf("failed to close database: %v", err)
 	}
-	if err := os.Remove(dbPath); err != nil {
-		t.Errorf("failed to remove test database: %v", err)
-	}
+	// dbPath is inside t.TempDir() which is auto-cleaned, but remove explicitly too
+	os.Remove(dbPath)
 }
 
 func TestTraceStorage_TraceOperations(t *testing.T) {

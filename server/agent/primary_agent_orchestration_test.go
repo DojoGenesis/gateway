@@ -8,10 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
+	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
@@ -47,29 +46,36 @@ func init() {
 	registerTestTools()
 }
 
-type mockPlanner struct {
-	generatePlanFunc   func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error)
-	regeneratePlanFunc func(ctx context.Context, task *orchestration.Task, failedPlan *orchestration.Plan, errorContext string) (*orchestration.Plan, error)
+// testToolInvoker delegates tool invocations to the global tools registry.
+type testToolInvoker struct{}
+
+func (t *testToolInvoker) InvokeTool(ctx context.Context, toolName string, parameters map[string]interface{}) (map[string]interface{}, error) {
+	return tools.InvokeTool(ctx, toolName, parameters)
 }
 
-func (m *mockPlanner) GeneratePlan(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
+type mockPlanner struct {
+	generatePlanFunc   func(ctx context.Context, task *orchestrationpkg.Task) (*orchestrationpkg.Plan, error)
+	regeneratePlanFunc func(ctx context.Context, task *orchestrationpkg.Task, failedPlan *orchestrationpkg.Plan, errorContext string) (*orchestrationpkg.Plan, error)
+}
+
+func (m *mockPlanner) GeneratePlan(ctx context.Context, task *orchestrationpkg.Task) (*orchestrationpkg.Plan, error) {
 	if m.generatePlanFunc != nil {
 		return m.generatePlanFunc(ctx, task)
 	}
-	plan := orchestration.NewPlan(task.ID)
-	plan.Nodes = []*orchestration.PlanNode{
+	plan := orchestrationpkg.NewPlan(task.ID)
+	plan.Nodes = []*orchestrationpkg.PlanNode{
 		{
 			ID:           uuid.New().String(),
 			ToolName:     "test_tool",
 			Parameters:   map[string]interface{}{"param1": "value1"},
 			Dependencies: []string{},
-			State:        orchestration.NodeStatePending,
+			State:        orchestrationpkg.NodeStatePending,
 		},
 	}
 	return plan, nil
 }
 
-func (m *mockPlanner) RegeneratePlan(ctx context.Context, task *orchestration.Task, failedPlan *orchestration.Plan, errorContext string) (*orchestration.Plan, error) {
+func (m *mockPlanner) RegeneratePlan(ctx context.Context, task *orchestrationpkg.Task, failedPlan *orchestrationpkg.Plan, errorContext string) (*orchestrationpkg.Plan, error) {
 	if m.regeneratePlanFunc != nil {
 		return m.regeneratePlanFunc(ctx, task, failedPlan, errorContext)
 	}
@@ -77,15 +83,15 @@ func (m *mockPlanner) RegeneratePlan(ctx context.Context, task *orchestration.Ta
 }
 
 type mockEngine struct {
-	executeFunc func(ctx context.Context, plan *orchestration.Plan, task *orchestration.Task, userID string) error
+	executeFunc func(ctx context.Context, plan *orchestrationpkg.Plan, task *orchestrationpkg.Task, userID string) error
 }
 
-func (m *mockEngine) Execute(ctx context.Context, plan *orchestration.Plan, task *orchestration.Task, userID string) error {
+func (m *mockEngine) Execute(ctx context.Context, plan *orchestrationpkg.Plan, task *orchestrationpkg.Task, userID string) error {
 	if m.executeFunc != nil {
 		return m.executeFunc(ctx, plan, task, userID)
 	}
 	for _, node := range plan.Nodes {
-		node.State = orchestration.NodeStateSuccess
+		node.State = orchestrationpkg.NodeStateSuccess
 		node.Result = map[string]interface{}{"output": "success"}
 		now := time.Now()
 		node.StartTime = &now
@@ -133,18 +139,16 @@ func TestSetOrchestrationComponents(t *testing.T) {
 		t.Error("Orchestration planner should be nil by default")
 	}
 
-	eventChan := make(chan events.StreamEvent)
-	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(1000, 5000, 10000)
 
 	mockPlanner := &mockPlanner{}
 
-	engine := orchestration.NewEngine(
-		orchestration.DefaultEngineConfig(),
+	engine := orchestrationpkg.NewEngine(
+		orchestrationpkg.DefaultEngineConfig(),
 		mockPlanner,
+		&testToolInvoker{},
 		nil,
-		eventChan,
-		costTracker,
+		nil,
 		budgetTracker,
 	)
 
@@ -195,43 +199,41 @@ func TestHandleQueryWithOrchestration_Success(t *testing.T) {
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
 
-	eventChan := make(chan events.StreamEvent, 10)
-	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
 
 	mockPlanner := &mockPlanner{
-		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
-			plan := orchestration.NewPlan(task.ID)
+		generatePlanFunc: func(ctx context.Context, task *orchestrationpkg.Task) (*orchestrationpkg.Plan, error) {
+			plan := orchestrationpkg.NewPlan(task.ID)
 			plan.Metadata["reasoning"] = "Test reasoning"
-			plan.Nodes = []*orchestration.PlanNode{
+			plan.Nodes = []*orchestrationpkg.PlanNode{
 				{
 					ID:           "node1",
 					ToolName:     "test_tool",
 					Parameters:   map[string]interface{}{"param1": "value1"},
 					Dependencies: []string{},
-					State:        orchestration.NodeStatePending,
+					State:        orchestrationpkg.NodeStatePending,
 				},
 				{
 					ID:           "node2",
 					ToolName:     "test_tool2",
 					Parameters:   map[string]interface{}{"param2": "value2"},
 					Dependencies: []string{"node1"},
-					State:        orchestration.NodeStatePending,
+					State:        orchestrationpkg.NodeStatePending,
 				},
 			}
 			return plan, nil
 		},
 	}
 
-	config := orchestration.DefaultEngineConfig()
+	config := orchestrationpkg.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
 
-	engine := orchestration.NewEngine(
+	engine := orchestrationpkg.NewEngine(
 		config,
 		mockPlanner,
+		&testToolInvoker{},
 		nil,
-		eventChan,
-		costTracker,
+		nil,
 		budgetTracker,
 	)
 
@@ -283,22 +285,20 @@ func TestHandleQueryWithOrchestration_PlanGenerationFailure(t *testing.T) {
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
 
-	eventChan := make(chan events.StreamEvent, 10)
-	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
 
 	mockPlanner := &mockPlanner{
-		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
+		generatePlanFunc: func(ctx context.Context, task *orchestrationpkg.Task) (*orchestrationpkg.Plan, error) {
 			return nil, errors.New("plan generation failed")
 		},
 	}
 
-	engine := orchestration.NewEngine(
-		orchestration.DefaultEngineConfig(),
+	engine := orchestrationpkg.NewEngine(
+		orchestrationpkg.DefaultEngineConfig(),
 		mockPlanner,
+		&testToolInvoker{},
 		nil,
-		eventChan,
-		costTracker,
+		nil,
 		budgetTracker,
 	)
 
@@ -330,35 +330,33 @@ func TestHandleQueryWithOrchestration_ExecutionFailure(t *testing.T) {
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
 
-	eventChan := make(chan events.StreamEvent, 10)
-	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
 
 	mockPlanner := &mockPlanner{
-		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
-			plan := orchestration.NewPlan(task.ID)
-			plan.Nodes = []*orchestration.PlanNode{
+		generatePlanFunc: func(ctx context.Context, task *orchestrationpkg.Task) (*orchestrationpkg.Plan, error) {
+			plan := orchestrationpkg.NewPlan(task.ID)
+			plan.Nodes = []*orchestrationpkg.PlanNode{
 				{
 					ID:           "node1",
 					ToolName:     "nonexistent_tool",
 					Parameters:   map[string]interface{}{"param1": "value1"},
 					Dependencies: []string{},
-					State:        orchestration.NodeStatePending,
+					State:        orchestrationpkg.NodeStatePending,
 				},
 			}
 			return plan, nil
 		},
 	}
 
-	config := orchestration.DefaultEngineConfig()
+	config := orchestrationpkg.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
 
-	engine := orchestration.NewEngine(
+	engine := orchestrationpkg.NewEngine(
 		config,
 		mockPlanner,
+		&testToolInvoker{},
 		nil,
-		eventChan,
-		costTracker,
+		nil,
 		budgetTracker,
 	)
 
@@ -385,19 +383,19 @@ func TestBuildResponseFromPlan(t *testing.T) {
 
 	agent := NewPrimaryAgent(pm)
 
-	task := orchestration.NewTask("user1", "Test task description")
-	plan := orchestration.NewPlan(task.ID)
+	task := orchestrationpkg.NewTask("user1", "Test task description")
+	plan := orchestrationpkg.NewPlan(task.ID)
 	plan.Metadata["reasoning"] = "This is the reasoning"
 
 	now := time.Now()
 	end := now.Add(500 * time.Millisecond)
 
-	plan.Nodes = []*orchestration.PlanNode{
+	plan.Nodes = []*orchestrationpkg.PlanNode{
 		{
 			ID:         "node1",
 			ToolName:   "tool1",
 			Parameters: map[string]interface{}{"key": "value"},
-			State:      orchestration.NodeStateSuccess,
+			State:      orchestrationpkg.NodeStateSuccess,
 			Result:     map[string]interface{}{"output": "result1"},
 			StartTime:  &now,
 			EndTime:    &end,
@@ -406,7 +404,7 @@ func TestBuildResponseFromPlan(t *testing.T) {
 			ID:         "node2",
 			ToolName:   "tool2",
 			Parameters: map[string]interface{}{"key2": "value2"},
-			State:      orchestration.NodeStateFailed,
+			State:      orchestrationpkg.NodeStateFailed,
 			Error:      "Tool error",
 			StartTime:  &now,
 			EndTime:    &end,
@@ -485,25 +483,22 @@ func TestHandleQueryWithOrchestration_WithTraceLogger(t *testing.T) {
 		t.Fatalf("Failed to create trace storage: %v", err)
 	}
 
-	eventChan2 := make(chan events.StreamEvent, 10)
-	traceLogger := trace.NewTraceLogger(traceStorage, eventChan2)
+	traceLogger := trace.NewTraceLoggerWithoutEvents(traceStorage)
 	agent.SetTraceLogger(traceLogger)
 
-	eventChan := make(chan events.StreamEvent, 10)
-	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
 
 	mockPlanner := &mockPlanner{}
 
-	config := orchestration.DefaultEngineConfig()
+	config := orchestrationpkg.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
 
-	engine := orchestration.NewEngine(
+	engine := orchestrationpkg.NewEngine(
 		config,
 		mockPlanner,
+		&testToolInvoker{},
 		nil,
-		eventChan,
-		costTracker,
+		nil,
 		budgetTracker,
 	)
 
@@ -543,21 +538,19 @@ func TestHandleQueryWithOrchestration_WithMemory(t *testing.T) {
 	}
 	agent.SetMemoryManager(memManager)
 
-	eventChan := make(chan events.StreamEvent, 10)
-	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
 
 	mockPlanner := &mockPlanner{}
 
-	config := orchestration.DefaultEngineConfig()
+	config := orchestrationpkg.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
 
-	engine := orchestration.NewEngine(
+	engine := orchestrationpkg.NewEngine(
 		config,
 		mockPlanner,
+		&testToolInvoker{},
 		nil,
-		eventChan,
-		costTracker,
+		nil,
 		budgetTracker,
 	)
 
@@ -604,28 +597,26 @@ func TestHandleQueryWithOrchestration_EmptyPlan(t *testing.T) {
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
 
-	eventChan := make(chan events.StreamEvent, 10)
-	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
 
 	mockPlanner := &mockPlanner{
-		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
-			plan := orchestration.NewPlan(task.ID)
+		generatePlanFunc: func(ctx context.Context, task *orchestrationpkg.Task) (*orchestrationpkg.Plan, error) {
+			plan := orchestrationpkg.NewPlan(task.ID)
 			// Empty plan with no nodes
-			plan.Nodes = []*orchestration.PlanNode{}
+			plan.Nodes = []*orchestrationpkg.PlanNode{}
 			return plan, nil
 		},
 	}
 
-	config := orchestration.DefaultEngineConfig()
+	config := orchestrationpkg.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
 
-	engine := orchestration.NewEngine(
+	engine := orchestrationpkg.NewEngine(
 		config,
 		mockPlanner,
+		&testToolInvoker{},
 		nil,
-		eventChan,
-		costTracker,
+		nil,
 		budgetTracker,
 	)
 
@@ -662,42 +653,40 @@ func TestHandleQueryWithOrchestration_AllNodesFailed(t *testing.T) {
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
 
-	eventChan := make(chan events.StreamEvent, 10)
-	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
 
 	mockPlanner := &mockPlanner{
-		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
-			plan := orchestration.NewPlan(task.ID)
-			plan.Nodes = []*orchestration.PlanNode{
+		generatePlanFunc: func(ctx context.Context, task *orchestrationpkg.Task) (*orchestrationpkg.Plan, error) {
+			plan := orchestrationpkg.NewPlan(task.ID)
+			plan.Nodes = []*orchestrationpkg.PlanNode{
 				{
 					ID:           "node1",
 					ToolName:     "nonexistent_tool1",
 					Parameters:   map[string]interface{}{},
 					Dependencies: []string{},
-					State:        orchestration.NodeStatePending,
+					State:        orchestrationpkg.NodeStatePending,
 				},
 				{
 					ID:           "node2",
 					ToolName:     "nonexistent_tool2",
 					Parameters:   map[string]interface{}{},
 					Dependencies: []string{},
-					State:        orchestration.NodeStatePending,
+					State:        orchestrationpkg.NodeStatePending,
 				},
 			}
 			return plan, nil
 		},
 	}
 
-	config := orchestration.DefaultEngineConfig()
+	config := orchestrationpkg.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
 
-	engine := orchestration.NewEngine(
+	engine := orchestrationpkg.NewEngine(
 		config,
 		mockPlanner,
+		&testToolInvoker{},
 		nil,
-		eventChan,
-		costTracker,
+		nil,
 		budgetTracker,
 	)
 
@@ -728,35 +717,33 @@ func TestHandleQueryWithOrchestration_ContextCancellation(t *testing.T) {
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
 
-	eventChan := make(chan events.StreamEvent, 10)
-	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
 
 	mockPlanner := &mockPlanner{
-		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
-			plan := orchestration.NewPlan(task.ID)
-			plan.Nodes = []*orchestration.PlanNode{
+		generatePlanFunc: func(ctx context.Context, task *orchestrationpkg.Task) (*orchestrationpkg.Plan, error) {
+			plan := orchestrationpkg.NewPlan(task.ID)
+			plan.Nodes = []*orchestrationpkg.PlanNode{
 				{
 					ID:           "node1",
 					ToolName:     "test_tool",
 					Parameters:   map[string]interface{}{},
 					Dependencies: []string{},
-					State:        orchestration.NodeStatePending,
+					State:        orchestrationpkg.NodeStatePending,
 				},
 			}
 			return plan, nil
 		},
 	}
 
-	config := orchestration.DefaultEngineConfig()
+	config := orchestrationpkg.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
 
-	engine := orchestration.NewEngine(
+	engine := orchestrationpkg.NewEngine(
 		config,
 		mockPlanner,
+		&testToolInvoker{},
 		nil,
-		eventChan,
-		costTracker,
+		nil,
 		budgetTracker,
 	)
 
