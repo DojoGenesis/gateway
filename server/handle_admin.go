@@ -201,7 +201,7 @@ func (s *Server) handleAdminMCPServers(c *gin.Context) {
 
 // handleAdminMCPStatus returns MCP server connection status and overall health.
 // GET /admin/mcp/status
-// Response format per Phase 3 spec (§4.2):
+// Response format:
 //
 //	{
 //	  "servers": { "server_id": { "server_id": "...", "state": "connected", "tool_count": 14, ... } },

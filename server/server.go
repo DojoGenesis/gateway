@@ -23,7 +23,7 @@ import (
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
 )
 
-const Version = "0.1.0"
+const Version = "1.0.0"
 
 // MCPStatusProvider is the interface used by the server to query MCP status.
 // *mcp.MCPHostManager satisfies this interface.
@@ -60,19 +60,19 @@ type Server struct {
 	budgetTracker       *services.BudgetTracker
 	memoryMaintenance   *maintenance.MemoryMaintenance
 
-	// Phase 2 dependencies (v0.2.0)
+	// Gateway interface dependencies
 	toolRegistry     gateway.ToolRegistry
 	agentInitializer gateway.AgentInitializer
 	mcpHostManager   MCPStatusProvider
 
-	// Phase 3 gateway interface implementations
+	// Orchestration and memory interfaces
 	orchestrationExecutor gateway.OrchestrationExecutor
 	memoryStore           gateway.MemoryStore
 
 	// Orchestration state
 	orchestrations *OrchestrationStore
 
-	// Agent state (in-memory for v0.2.0)
+	// Agent state (in-memory for v1.0.0)
 	agents  map[string]*gateway.AgentConfig
 	agentMu sync.RWMutex
 

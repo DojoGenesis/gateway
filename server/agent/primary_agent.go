@@ -191,9 +191,9 @@ func (pa *PrimaryAgent) EnableOrchestration(enabled bool) {
 //   - modelID: Specific model ID to use (empty string uses first available)
 //   - userID: User identifier for routing and budget tracking
 //
-// NOTE: userID parameter is reserved for Phase 3 user-based routing implementation.
-// Currently unused, but will enable routing between guest (embedded-qwen3) and
-// authenticated users (deepseek-api) based on tier and budget.
+// NOTE: userID parameter is reserved for post-v1 user-based routing implementation.
+// Currently unused, but will enable routing between guest (ollama) and
+// authenticated users (cloud providers) based on tier and budget.
 func (pa *PrimaryAgent) HandleQuery(ctx context.Context, query string, providerName string, modelID string, userID string) (*Response, error) {
 	if providerName == "" {
 		providerName = pa.defaultProvider
@@ -291,7 +291,7 @@ func (pa *PrimaryAgent) HandleQuery(ctx context.Context, query string, providerN
 //
 // Returns a channel of StreamChunk that must be consumed until closed.
 //
-// NOTE: userID parameter is reserved for Phase 3 user-based routing implementation.
+// NOTE: userID parameter is reserved for post-v1 user-based routing implementation.
 func (pa *PrimaryAgent) HandleStreamingQuery(ctx context.Context, query string, providerName string, modelID string, userID string) (<-chan StreamChunk, error) {
 	if providerName == "" {
 		providerName = pa.defaultProvider
@@ -405,7 +405,7 @@ func (pa *PrimaryAgent) HandleStreamingQuery(ctx context.Context, query string, 
 // GetCostEstimate calculates the estimated cost for a query with the given token counts.
 // Returns 0 for providers with free models (cost == 0).
 //
-// TODO(Phase 3): Enhance to support per-model cost estimation instead of using first model.
+// TODO(post-v1): Enhance to support per-model cost estimation instead of using first model.
 func (pa *PrimaryAgent) GetCostEstimate(ctx context.Context, providerName string, inputTokens, outputTokens int) (float64, error) {
 	provider, err := pa.pluginManager.GetProvider(providerName)
 	if err != nil {

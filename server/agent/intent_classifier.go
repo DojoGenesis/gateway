@@ -2,7 +2,7 @@
 // is being superseded by the new Planner-based orchestration system.
 // This classifier will be maintained for backward compatibility but new
 // development should use the orchestration engine for complex multi-step tasks.
-// Expected removal: v0.1.0
+// Expected removal: v1.0.0
 package agent
 
 import (
@@ -56,7 +56,7 @@ type IntentClassifier struct {
 // The classifier uses word-boundary matching to prevent false positives and
 // maintains separate lists for greetings, question patterns, and action indicators.
 //
-// TODO(Phase 3): Make keyword lists configurable via config.yaml to allow:
+// TODO(post-v1): Make keyword lists configurable via config.yaml to allow:
 //   - Custom domain-specific keywords
 //   - Multilingual support
 //   - Tunable word count thresholds
@@ -159,7 +159,7 @@ func NewIntentClassifier() *IntentClassifier {
 // Classify determines whether a query is Simple or Complex based on keyword
 // matching, question patterns, and word count heuristics.
 //
-// DEPRECATED (v0.0.30): This method is deprecated and will be removed in v0.1.0.
+// DEPRECATED (v0.0.30): This method is deprecated and will be removed in v1.0.0.
 // Use the new orchestration engine (go_backend/orchestration) for complex multi-step tasks
 // that require planning and execution coordination. This method is maintained for
 // backward compatibility with simple single-step queries.
@@ -184,7 +184,7 @@ func (ic *IntentClassifier) Classify(query string) QueryType {
 // ClassifyWithConfidence determines query type with confidence score and reasoning.
 // This provides more detailed classification information for debugging and monitoring.
 //
-// DEPRECATED (v0.0.30): This method is deprecated and will be removed in v0.1.0.
+// DEPRECATED (v0.0.30): This method is deprecated and will be removed in v1.0.0.
 // Use the new orchestration engine (go_backend/orchestration) for complex multi-step tasks
 // that require planning and execution coordination. For simple routing decisions, use Route()
 // instead. This method is maintained for backward compatibility and internally uses the Route() method.
