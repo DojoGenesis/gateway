@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/collaboration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
 	pkgerrors "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/errors"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/intelligence"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/reflection"

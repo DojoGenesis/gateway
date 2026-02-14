@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -77,7 +78,7 @@ func TestTypesHaveStructTags(t *testing.T) {
 
 // TestErrorTypes verifies that all error values are correctly typed and distinct.
 func TestErrorTypes(t *testing.T) {
-	errors := []struct {
+	errorTests := []struct {
 		name  string
 		err   error
 		errIs error
@@ -89,7 +90,7 @@ func TestErrorTypes(t *testing.T) {
 		{"ErrInvalidPlan", ErrInvalidPlan, ErrInvalidPlan},
 	}
 
-	for _, tt := range errors {
+	for _, tt := range errorTests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.err == nil {
 				t.Error("error value is nil")
@@ -97,8 +98,8 @@ func TestErrorTypes(t *testing.T) {
 			if tt.err.Error() == "" {
 				t.Error("error message is empty")
 			}
-			// Verify error identity
-			if tt.err != tt.errIs {
+			// Verify error identity using errors.Is for wrapped errors
+			if !errors.Is(tt.err, tt.errIs) {
 				t.Errorf("error identity check failed: %v != %v", tt.err, tt.errIs)
 			}
 		})
@@ -106,7 +107,7 @@ func TestErrorTypes(t *testing.T) {
 
 	// Verify errors are distinct
 	distinctErrors := make(map[error]bool)
-	for _, tt := range errors {
+	for _, tt := range errorTests {
 		if distinctErrors[tt.err] {
 			t.Errorf("duplicate error found: %v", tt.err)
 		}

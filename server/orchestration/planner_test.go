@@ -1,4 +1,5 @@
 package orchestration
+
 import orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 
 import (
@@ -13,11 +14,11 @@ import (
 )
 
 type mockProvider struct {
-	response      string
-	shouldError   bool
-	errorMessage  string
-	callCount     int
-	lastRequest   *provider.CompletionRequest
+	response     string
+	shouldError  bool
+	errorMessage string
+	callCount    int
+	lastRequest  *provider.CompletionRequest
 }
 
 func (m *mockProvider) GenerateCompletion(ctx context.Context, req *provider.CompletionRequest) (*provider.CompletionResponse, error) {
@@ -94,7 +95,7 @@ func (m *mockPluginManager) GetProviders() map[string]provider.ModelProvider {
 
 func setupTestTools() {
 	tools.ClearRegistry()
-	
+
 	_ = tools.RegisterTool(&tools.ToolDefinition{
 		Name:        "fetch_article",
 		Description: "Fetches an article from a URL",
@@ -949,7 +950,7 @@ func TestBuildReplanningPrompt(t *testing.T) {
 
 	planner := &Planner{}
 	task := orchestrationpkg.NewTask("user-1", "Original task")
-	
+
 	failedPlan := orchestrationpkg.NewPlan(task.ID)
 	failedPlan.Nodes = []*orchestrationpkg.PlanNode{
 		{

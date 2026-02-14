@@ -3,7 +3,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -11,10 +11,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var seedManager *memory.SeedManager
+// SeedHandler handles memory seed-related HTTP requests.
+type SeedHandler struct {
+	manager *memory.SeedManager
+}
 
-func InitializeMemorySeedHandlers(sm *memory.SeedManager) {
-	seedManager = sm
+// NewSeedHandler creates a new SeedHandler.
+func NewSeedHandler(sm *memory.SeedManager) *SeedHandler {
+	return &SeedHandler{manager: sm}
 }
 
 type MemorySeedResponse struct {
@@ -48,8 +52,8 @@ type GetMemorySeedsResponse struct {
 	Count int                  `json:"count"`
 }
 
-func HandleGetMemorySeeds(c *gin.Context) {
-	if seedManager == nil {
+func (h *SeedHandler) GetMemorySeeds(c *gin.Context) {
+	if h.manager == nil {
 		respondError(c, http.StatusInternalServerError, "seed manager not initialized")
 		return
 	}
@@ -60,13 +64,13 @@ func HandleGetMemorySeeds(c *gin.Context) {
 		return
 	}
 
-	seeds, err := seedManager.GetSeeds(c.Request.Context(), &projectID, map[string]interface{}{})
+	seeds, err := h.manager.GetSeeds(c.Request.Context(), &projectID, map[string]interface{}{})
 	if err != nil {
 		if errors.Is(err, memory.ErrProjectNotFound) {
 			respondError(c, http.StatusNotFound, "Project not found")
 			return
 		}
-		log.Printf("ERROR [MemorySeedHandler]: Failed to get seeds for project %s: %v", projectID, err)
+		slog.Error("failed to get seeds", "project_id", projectID, "error", err)
 		respondError(c, http.StatusInternalServerError, "Failed to retrieve memory seeds")
 		return
 	}
@@ -82,8 +86,8 @@ func HandleGetMemorySeeds(c *gin.Context) {
 	})
 }
 
-func HandleGetMemorySeed(c *gin.Context) {
-	if seedManager == nil {
+func (h *SeedHandler) GetMemorySeed(c *gin.Context) {
+	if h.manager == nil {
 		respondError(c, http.StatusInternalServerError, "seed manager not initialized")
 		return
 	}
@@ -94,13 +98,13 @@ func HandleGetMemorySeed(c *gin.Context) {
 		return
 	}
 
-	seed, err := seedManager.GetSeedByID(c.Request.Context(), seedID)
+	seed, err := h.manager.GetSeedByID(c.Request.Context(), seedID)
 	if err != nil {
 		if errors.Is(err, memory.ErrSeedNotFound) {
 			respondError(c, http.StatusNotFound, "Seed not found")
 			return
 		}
-		log.Printf("ERROR [MemorySeedHandler]: Failed to get seed %s: %v", seedID, err)
+		slog.Error("failed to get seed", "seed_id", seedID, "error", err)
 		respondError(c, http.StatusInternalServerError, "Failed to retrieve seed")
 		return
 	}
@@ -118,8 +122,8 @@ type SeedOperationResponse struct {
 	Message string              `json:"message,omitempty"`
 }
 
-func HandleUpdateMemorySeed(c *gin.Context) {
-	if seedManager == nil {
+func (h *SeedHandler) UpdateMemorySeed(c *gin.Context) {
+	if h.manager == nil {
 		respondError(c, http.StatusInternalServerError, "seed manager not initialized")
 		return
 	}
@@ -132,7 +136,7 @@ func HandleUpdateMemorySeed(c *gin.Context) {
 
 	var req UpdateMemorySeedRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, http.StatusBadRequest, "Invalid request", err.Error())
+		respondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -141,7 +145,7 @@ func HandleUpdateMemorySeed(c *gin.Context) {
 		userID = "default"
 	}
 
-	seed, err := seedManager.UpdateSeed(c.Request.Context(), seedID, req.Content, &userID)
+	seed, err := h.manager.UpdateSeed(c.Request.Context(), seedID, req.Content, &userID)
 	if err != nil {
 		if errors.Is(err, memory.ErrSeedNotEditable) {
 			respondError(c, http.StatusForbidden, "This seed is not editable")
@@ -152,7 +156,7 @@ func HandleUpdateMemorySeed(c *gin.Context) {
 			return
 		}
 		if errors.Is(err, memory.ErrInvalidContent) {
-			respondError(c, http.StatusBadRequest, "Invalid seed content", err.Error())
+			respondError(c, http.StatusBadRequest, "Invalid seed content")
 			return
 		}
 		if errors.Is(err, memory.ErrSeedNotFound) {
@@ -160,12 +164,12 @@ func HandleUpdateMemorySeed(c *gin.Context) {
 			return
 		}
 
-		log.Printf("ERROR [MemorySeedHandler]: Failed to update seed %s: %v", seedID, err)
+		slog.Error("failed to update seed", "seed_id", seedID, "error", err)
 		respondError(c, http.StatusInternalServerError, "Failed to update seed")
 		return
 	}
 
-	log.Printf("INFO [MemorySeedHandler]: Updated seed %s: user=%s", seedID, userID)
+	slog.Info("updated seed", "seed_id", seedID, "user_id", userID)
 
 	seedResponse := convertToSeedResponse(seed)
 	c.JSON(http.StatusOK, SeedOperationResponse{
@@ -179,8 +183,8 @@ type CreateMemorySeedRequest struct {
 	SeedType string `json:"seed_type" binding:"required"`
 }
 
-func HandleCreateMemorySeed(c *gin.Context) {
-	if seedManager == nil {
+func (h *SeedHandler) CreateMemorySeed(c *gin.Context) {
+	if h.manager == nil {
 		respondError(c, http.StatusInternalServerError, "seed manager not initialized")
 		return
 	}
@@ -193,7 +197,7 @@ func HandleCreateMemorySeed(c *gin.Context) {
 
 	var req CreateMemorySeedRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, http.StatusBadRequest, "Invalid request", err.Error())
+		respondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -202,7 +206,7 @@ func HandleCreateMemorySeed(c *gin.Context) {
 		userID = "default"
 	}
 
-	seed, err := seedManager.CreateUserSeed(
+	seed, err := h.manager.CreateUserSeed(
 		c.Request.Context(),
 		&projectID,
 		req.Content,
@@ -216,17 +220,16 @@ func HandleCreateMemorySeed(c *gin.Context) {
 			return
 		}
 		if errors.Is(err, memory.ErrInvalidContent) {
-			respondError(c, http.StatusBadRequest, "Invalid seed content", err.Error())
+			respondError(c, http.StatusBadRequest, "Invalid seed content")
 			return
 		}
 
-		log.Printf("ERROR [MemorySeedHandler]: Failed to create seed: project=%s, user=%s, error=%v",
-			projectID, userID, err)
-		respondError(c, http.StatusBadRequest, err.Error())
+		slog.Error("failed to create seed", "project_id", projectID, "user_id", userID, "error", err)
+		respondError(c, http.StatusInternalServerError, "Failed to create seed")
 		return
 	}
 
-	log.Printf("INFO [MemorySeedHandler]: Created seed %s: project=%s, user=%s", seed.ID, projectID, userID)
+	slog.Info("created seed", "seed_id", seed.ID, "project_id", projectID, "user_id", userID)
 
 	seedResponse := convertToSeedResponse(seed)
 	c.Header("Location", fmt.Sprintf("/api/v1/memory/seeds/%s", seed.ID))
@@ -236,8 +239,8 @@ func HandleCreateMemorySeed(c *gin.Context) {
 	})
 }
 
-func HandleDeleteMemorySeed(c *gin.Context) {
-	if seedManager == nil {
+func (h *SeedHandler) DeleteMemorySeed(c *gin.Context) {
+	if h.manager == nil {
 		respondError(c, http.StatusInternalServerError, "seed manager not initialized")
 		return
 	}
@@ -253,7 +256,7 @@ func HandleDeleteMemorySeed(c *gin.Context) {
 		userID = "default"
 	}
 
-	err := seedManager.DeleteSeed(c.Request.Context(), seedID, &userID)
+	err := h.manager.DeleteSeed(c.Request.Context(), seedID, &userID)
 	if err != nil {
 		if errors.Is(err, memory.ErrCannotDeleteSystemSeed) {
 			respondError(c, http.StatusForbidden, "Cannot delete system seeds")
@@ -268,12 +271,12 @@ func HandleDeleteMemorySeed(c *gin.Context) {
 			return
 		}
 
-		log.Printf("ERROR [MemorySeedHandler]: Failed to delete seed %s: user=%s, error=%v", seedID, userID, err)
+		slog.Error("failed to delete seed", "seed_id", seedID, "user_id", userID, "error", err)
 		respondError(c, http.StatusInternalServerError, "Failed to delete seed")
 		return
 	}
 
-	log.Printf("INFO [MemorySeedHandler]: Deleted seed %s: user=%s", seedID, userID)
+	slog.Info("deleted seed", "seed_id", seedID, "user_id", userID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -293,15 +296,15 @@ type BulkDeleteSeedsResponse struct {
 }
 
 // HandleBulkDeleteMemorySeeds handles bulk deletion of memory seeds
-func HandleBulkDeleteMemorySeeds(c *gin.Context) {
-	if seedManager == nil {
+func (h *SeedHandler) BulkDeleteMemorySeeds(c *gin.Context) {
+	if h.manager == nil {
 		respondError(c, http.StatusInternalServerError, "seed manager not initialized")
 		return
 	}
 
 	var req BulkDeleteSeedsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, http.StatusBadRequest, "Invalid request", err.Error())
+		respondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -314,9 +317,9 @@ func HandleBulkDeleteMemorySeeds(c *gin.Context) {
 	failed := make(map[string]string)
 
 	for _, seedID := range req.SeedIDs {
-		if err := seedManager.DeleteSeed(c.Request.Context(), seedID, &userID); err != nil {
-			failed[seedID] = err.Error()
-			log.Printf("WARNING [MemorySeedHandler]: Failed to delete seed %s in bulk operation: %v", seedID, err)
+		if err := h.manager.DeleteSeed(c.Request.Context(), seedID, &userID); err != nil {
+			failed[seedID] = "operation failed"
+			slog.Warn("failed to delete seed in bulk operation", "seed_id", seedID, "error", err)
 		} else {
 			deleted = append(deleted, seedID)
 		}
@@ -329,7 +332,7 @@ func HandleBulkDeleteMemorySeeds(c *gin.Context) {
 		statusCode = http.StatusMultiStatus // 207
 	}
 
-	log.Printf("INFO [MemorySeedHandler]: Bulk delete completed: deleted=%d, failed=%d", len(deleted), len(failed))
+	slog.Info("bulk delete completed", "deleted", len(deleted), "failed", len(failed))
 
 	c.JSON(statusCode, BulkDeleteSeedsResponse{
 		Deleted: deleted,
@@ -344,8 +347,8 @@ type SearchSeedsRequest struct {
 }
 
 // HandleSearchMemorySeeds handles full-text search on memory seeds
-func HandleSearchMemorySeeds(c *gin.Context) {
-	if seedManager == nil {
+func (h *SeedHandler) SearchMemorySeeds(c *gin.Context) {
+	if h.manager == nil {
 		respondError(c, http.StatusInternalServerError, "seed manager not initialized")
 		return
 	}
@@ -358,7 +361,7 @@ func HandleSearchMemorySeeds(c *gin.Context) {
 
 	var req SearchSeedsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		respondError(c, http.StatusBadRequest, "Invalid request", err.Error())
+		respondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -366,9 +369,9 @@ func HandleSearchMemorySeeds(c *gin.Context) {
 		req.Limit = 20
 	}
 
-	seeds, err := seedManager.SearchSeeds(c.Request.Context(), &projectID, req.Query, req.Limit)
+	seeds, err := h.manager.SearchSeeds(c.Request.Context(), &projectID, req.Query, req.Limit)
 	if err != nil {
-		log.Printf("ERROR [MemorySeedHandler]: Failed to search seeds: %v", err)
+		slog.Error("failed to search seeds", "error", err)
 		respondError(c, http.StatusInternalServerError, "Failed to search seeds")
 		return
 	}

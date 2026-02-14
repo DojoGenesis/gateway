@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -37,6 +37,25 @@ func NewMemoryManager(dbPath string) (*MemoryManager, error) {
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
+
+	// SQLite performance tuning
+	pragmas := []string{
+		"PRAGMA journal_mode=WAL",   // Better concurrent read/write performance
+		"PRAGMA synchronous=NORMAL", // Safe with WAL, faster than FULL
+		"PRAGMA cache_size=-64000",  // 64MB cache (negative = KiB)
+		"PRAGMA foreign_keys=ON",    // Enforce referential integrity
+		"PRAGMA busy_timeout=5000",  // Wait 5s on lock instead of failing immediately
+	}
+	for _, pragma := range pragmas {
+		if _, err := db.Exec(pragma); err != nil {
+			return nil, fmt.Errorf("failed to set %s: %w", pragma, err)
+		}
+	}
+
+	// Connection pool tuning for SQLite (single-writer, many readers)
+	db.SetMaxOpenConns(1)    // SQLite only supports one writer
+	db.SetMaxIdleConns(1)    // Keep one idle connection warm
+	db.SetConnMaxLifetime(0) // Don't expire connections
 
 	mm := &MemoryManager{db: db}
 	if err := mm.initSchema(); err != nil {
@@ -268,7 +287,7 @@ func (m *MemoryManager) SearchMemories(ctx context.Context, query string, limit 
 	for rows.Next() {
 		memory, err := m.scanMemory(rows)
 		if err != nil {
-			log.Printf("warning: failed to scan memory row: %v", err)
+			slog.Warn("failed to scan memory row", "error", err)
 			continue
 		}
 
@@ -327,7 +346,7 @@ func (m *MemoryManager) ListMemories(ctx context.Context, filter MemoryFilter) (
 	for rows.Next() {
 		memory, err := m.scanMemory(rows)
 		if err != nil {
-			log.Printf("warning: failed to scan memory row: %v", err)
+			slog.Warn("failed to scan memory row", "error", err)
 			continue
 		}
 		memories = append(memories, memory)

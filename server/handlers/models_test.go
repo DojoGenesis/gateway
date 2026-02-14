@@ -134,12 +134,10 @@ func TestHandleListModels_Success(t *testing.T) {
 	mockPM.AddProvider("embedded-qwen3", mockProvider1)
 	mockPM.AddProvider("deepseek-api", mockProvider2)
 
-	oldPM := pluginManager
-	pluginManager = PluginManagerInterface(mockPM)
-	defer func() { pluginManager = oldPM }()
+	h := NewModelHandler(mockPM)
 
 	router := gin.New()
-	router.GET("/api/v1/models", HandleListModels)
+	router.GET("/api/v1/models", h.ListModels)
 
 	req, _ := http.NewRequest("GET", "/api/v1/models", nil)
 	w := httptest.NewRecorder()
@@ -169,12 +167,10 @@ func TestHandleListModels_ProviderError(t *testing.T) {
 
 	mockPM.AddProvider("failing-provider", mockProvider)
 
-	oldPM := pluginManager
-	pluginManager = PluginManagerInterface(mockPM)
-	defer func() { pluginManager = oldPM }()
+	h := NewModelHandler(mockPM)
 
 	router := gin.New()
-	router.GET("/api/v1/models", HandleListModels)
+	router.GET("/api/v1/models", h.ListModels)
 
 	req, _ := http.NewRequest("GET", "/api/v1/models", nil)
 	w := httptest.NewRecorder()
@@ -186,7 +182,7 @@ func TestHandleListModels_ProviderError(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, "failed to list models", response["error"])
-	assert.Equal(t, "failing-provider", response["provider"])
+	assert.Equal(t, "provider: failing-provider", response["details"])
 
 	mockProvider.AssertExpectations(t)
 }
@@ -194,12 +190,10 @@ func TestHandleListModels_ProviderError(t *testing.T) {
 func TestHandleListModels_NoPluginManager(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	oldPM := pluginManager
-	pluginManager = nil
-	defer func() { pluginManager = oldPM }()
+	h := NewModelHandler(nil)
 
 	router := gin.New()
-	router.GET("/api/v1/models", HandleListModels)
+	router.GET("/api/v1/models", h.ListModels)
 
 	req, _ := http.NewRequest("GET", "/api/v1/models", nil)
 	w := httptest.NewRecorder()
@@ -218,12 +212,10 @@ func TestHandleListModels_EmptyProviders(t *testing.T) {
 
 	mockPM := NewMockPluginManager()
 
-	oldPM := pluginManager
-	pluginManager = PluginManagerInterface(mockPM)
-	defer func() { pluginManager = oldPM }()
+	h := NewModelHandler(mockPM)
 
 	router := gin.New()
-	router.GET("/api/v1/models", HandleListModels)
+	router.GET("/api/v1/models", h.ListModels)
 
 	req, _ := http.NewRequest("GET", "/api/v1/models", nil)
 	w := httptest.NewRecorder()
@@ -264,12 +256,10 @@ func TestHandleListProviders_Success(t *testing.T) {
 	mockPM.AddProvider("embedded-qwen3", mockProvider1)
 	mockPM.AddProvider("deepseek-api", mockProvider2)
 
-	oldPM := pluginManager
-	pluginManager = PluginManagerInterface(mockPM)
-	defer func() { pluginManager = oldPM }()
+	h := NewModelHandler(mockPM)
 
 	router := gin.New()
-	router.GET("/api/v1/providers", HandleListProviders)
+	router.GET("/api/v1/providers", h.ListProviders)
 
 	req, _ := http.NewRequest("GET", "/api/v1/providers", nil)
 	w := httptest.NewRecorder()
@@ -305,12 +295,10 @@ func TestHandleListProviders_ProviderError(t *testing.T) {
 
 	mockPM.AddProvider("failing-provider", mockProvider)
 
-	oldPM := pluginManager
-	pluginManager = PluginManagerInterface(mockPM)
-	defer func() { pluginManager = oldPM }()
+	h := NewModelHandler(mockPM)
 
 	router := gin.New()
-	router.GET("/api/v1/providers", HandleListProviders)
+	router.GET("/api/v1/providers", h.ListProviders)
 
 	req, _ := http.NewRequest("GET", "/api/v1/providers", nil)
 	w := httptest.NewRecorder()
@@ -336,12 +324,10 @@ func TestHandleListProviders_ProviderError(t *testing.T) {
 func TestHandleListProviders_NoPluginManager(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	oldPM := pluginManager
-	pluginManager = nil
-	defer func() { pluginManager = oldPM }()
+	h := NewModelHandler(nil)
 
 	router := gin.New()
-	router.GET("/api/v1/providers", HandleListProviders)
+	router.GET("/api/v1/providers", h.ListProviders)
 
 	req, _ := http.NewRequest("GET", "/api/v1/providers", nil)
 	w := httptest.NewRecorder()
@@ -360,12 +346,10 @@ func TestHandleListProviders_EmptyProviders(t *testing.T) {
 
 	mockPM := NewMockPluginManager()
 
-	oldPM := pluginManager
-	pluginManager = PluginManagerInterface(mockPM)
-	defer func() { pluginManager = oldPM }()
+	h := NewModelHandler(mockPM)
 
 	router := gin.New()
-	router.GET("/api/v1/providers", HandleListProviders)
+	router.GET("/api/v1/providers", h.ListProviders)
 
 	req, _ := http.NewRequest("GET", "/api/v1/providers", nil)
 	w := httptest.NewRecorder()
@@ -399,12 +383,10 @@ func TestHandleListProviders_MixedStatuses(t *testing.T) {
 	mockPM.AddProvider("working", mockProvider1)
 	mockPM.AddProvider("crashed", mockProvider2)
 
-	oldPM := pluginManager
-	pluginManager = PluginManagerInterface(mockPM)
-	defer func() { pluginManager = oldPM }()
+	h := NewModelHandler(mockPM)
 
 	router := gin.New()
-	router.GET("/api/v1/providers", HandleListProviders)
+	router.GET("/api/v1/providers", h.ListProviders)
 
 	req, _ := http.NewRequest("GET", "/api/v1/providers", nil)
 	w := httptest.NewRecorder()

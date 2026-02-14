@@ -101,10 +101,10 @@ func TestHandleCreateArtifact(t *testing.T) {
 	ctx := context.Background()
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.POST("/api/v1/artifacts", HandleCreateArtifact)
+	router.POST("/api/v1/artifacts", h.CreateArtifact)
 
 	reqBody := CreateArtifactRequest{
 		ProjectID: project.ID,
@@ -156,10 +156,10 @@ func TestHandleListArtifacts(t *testing.T) {
 	am.CreateArtifact(ctx, project.ID, "", artifacts.ArtifactType("document"), "Doc 1", "", "Content 1")
 	am.CreateArtifact(ctx, project.ID, "", artifacts.ArtifactType("document"), "Doc 2", "", "Content 2")
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.GET("/api/v1/artifacts", HandleListArtifacts)
+	router.GET("/api/v1/artifacts", h.ListArtifacts)
 
 	req, _ := http.NewRequest("GET", "/api/v1/artifacts?project_id="+project.ID, nil)
 	w := httptest.NewRecorder()
@@ -203,10 +203,10 @@ func TestHandleGetArtifact(t *testing.T) {
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 	artifact, _ := am.CreateArtifact(ctx, project.ID, "", artifacts.ArtifactType("document"), "Test Doc", "", "Content")
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.GET("/api/v1/artifacts/:id", HandleGetArtifact)
+	router.GET("/api/v1/artifacts/:id", h.GetArtifact)
 
 	req, _ := http.NewRequest("GET", "/api/v1/artifacts/"+artifact.ID, nil)
 	w := httptest.NewRecorder()
@@ -246,10 +246,10 @@ func TestHandleUpdateArtifact(t *testing.T) {
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 	artifact, _ := am.CreateArtifact(ctx, project.ID, "", artifacts.ArtifactType("document"), "Test Doc", "", "Original content")
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.PUT("/api/v1/artifacts/:id", HandleUpdateArtifact)
+	router.PUT("/api/v1/artifacts/:id", h.UpdateArtifact)
 
 	reqBody := UpdateArtifactRequest{
 		Content:       "Updated content",
@@ -303,10 +303,10 @@ func TestHandleListArtifactVersions(t *testing.T) {
 	artifact, _ := am.CreateArtifact(ctx, project.ID, "", artifacts.ArtifactType("document"), "Test Doc", "", "Original content")
 	am.UpdateArtifact(ctx, artifact.ID, "Updated content", "Update 1")
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.GET("/api/v1/artifacts/:id/versions", HandleListArtifactVersions)
+	router.GET("/api/v1/artifacts/:id/versions", h.ListArtifactVersions)
 
 	req, _ := http.NewRequest("GET", "/api/v1/artifacts/"+artifact.ID+"/versions", nil)
 	w := httptest.NewRecorder()
@@ -350,10 +350,10 @@ func TestHandleDeleteArtifact(t *testing.T) {
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 	artifact, _ := am.CreateArtifact(ctx, project.ID, "", artifacts.ArtifactType("document"), "Test Doc", "", "Content")
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.DELETE("/api/v1/artifacts/:id", HandleDeleteArtifact)
+	router.DELETE("/api/v1/artifacts/:id", h.DeleteArtifact)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/artifacts/"+artifact.ID, nil)
 	w := httptest.NewRecorder()
@@ -393,10 +393,10 @@ func TestHandleExportArtifact_JSON(t *testing.T) {
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 	artifact, _ := am.CreateArtifact(ctx, project.ID, "", artifacts.ArtifactType("document"), "Test Doc", "", "Content")
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.GET("/api/v1/artifacts/:id/export", HandleExportArtifact)
+	router.GET("/api/v1/artifacts/:id/export", h.ExportArtifact)
 
 	req, _ := http.NewRequest("GET", "/api/v1/artifacts/"+artifact.ID+"/export?format=json", nil)
 	w := httptest.NewRecorder()
@@ -432,10 +432,10 @@ func TestHandleExportArtifact_Markdown(t *testing.T) {
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 	artifact, _ := am.CreateArtifact(ctx, project.ID, "", artifacts.ArtifactType("markdown"), "Test Doc", "", "# Markdown Content")
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.GET("/api/v1/artifacts/:id/export", HandleExportArtifact)
+	router.GET("/api/v1/artifacts/:id/export", h.ExportArtifact)
 
 	req, _ := http.NewRequest("GET", "/api/v1/artifacts/"+artifact.ID+"/export?format=md", nil)
 	w := httptest.NewRecorder()
@@ -470,10 +470,10 @@ func TestHandleCreateArtifact_EmptyName(t *testing.T) {
 	ctx := context.Background()
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.POST("/api/v1/artifacts", HandleCreateArtifact)
+	router.POST("/api/v1/artifacts", h.CreateArtifact)
 
 	reqBody := CreateArtifactRequest{
 		ProjectID: project.ID,
@@ -522,10 +522,10 @@ func TestHandleCreateArtifact_InvalidType(t *testing.T) {
 	ctx := context.Background()
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.POST("/api/v1/artifacts", HandleCreateArtifact)
+	router.POST("/api/v1/artifacts", h.CreateArtifact)
 
 	reqBody := CreateArtifactRequest{
 		ProjectID: project.ID,
@@ -566,10 +566,10 @@ func TestHandleGetArtifact_NotFound(t *testing.T) {
 		t.Fatalf("Failed to create artifact manager: %v", err)
 	}
 
-	InitializeArtifactHandlers(am)
+	h := NewArtifactHandler(am)
 
 	router := gin.New()
-	router.GET("/api/v1/artifacts/:id", HandleGetArtifact)
+	router.GET("/api/v1/artifacts/:id", h.GetArtifact)
 
 	req, _ := http.NewRequest("GET", "/api/v1/artifacts/nonexistent-id", nil)
 	w := httptest.NewRecorder()

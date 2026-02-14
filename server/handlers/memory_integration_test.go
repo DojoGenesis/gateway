@@ -23,14 +23,14 @@ func setupMemoryIntegrationTestRouter(t *testing.T) (*gin.Engine, *memory.Memory
 		t.Fatalf("Failed to create memory manager: %v", err)
 	}
 
-	InitializeMemoryHandlers(mm)
+	h := NewMemoryHandler(mm, nil, nil)
 
 	router := gin.New()
 
-	router.POST("/api/v1/memory", middleware.AuthMiddleware(), HandleStoreMemory)
-	router.GET("/api/v1/memory/:id", middleware.AuthMiddleware(), HandleRetrieveMemory)
-	router.POST("/api/v1/memory/search", middleware.AuthMiddleware(), HandleSearchMemory)
-	router.DELETE("/api/v1/memory/:id", middleware.AuthMiddleware(), HandleDeleteMemory)
+	router.POST("/api/v1/memory", middleware.AuthMiddleware(), h.StoreMemory)
+	router.GET("/api/v1/memory/:id", middleware.AuthMiddleware(), h.RetrieveMemory)
+	router.POST("/api/v1/memory/search", middleware.AuthMiddleware(), h.SearchMemory)
+	router.DELETE("/api/v1/memory/:id", middleware.AuthMiddleware(), h.DeleteMemory)
 
 	cleanup := func() {
 		mm.Close()

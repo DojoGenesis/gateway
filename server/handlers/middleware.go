@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"log"
+	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -20,7 +21,11 @@ func RequestLoggingMiddleware() gin.HandlerFunc {
 		duration := time.Since(start)
 		statusCode := c.Writer.Status()
 
-		log.Printf("INFO [API]: %s %s - %d (%v)", method, path, statusCode, duration)
+		slog.Info("API request",
+			"method", method,
+			"path", path,
+			"status", statusCode,
+			"duration", duration)
 	}
 }
 
@@ -29,9 +34,7 @@ func ValidateContentType() gin.HandlerFunc {
 		if c.Request.Method == "POST" || c.Request.Method == "PUT" {
 			contentType := c.GetHeader("Content-Type")
 			if !strings.HasPrefix(contentType, "application/json") {
-				c.JSON(415, gin.H{
-					"error": "Content-Type must be application/json",
-				})
+				respondError(c, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
 				c.Abort()
 				return
 			}

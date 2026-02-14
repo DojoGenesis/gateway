@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
 )
 
@@ -11,14 +12,14 @@ import (
 // It loads agent disposition configurations from disk and caches them to avoid
 // repeated file I/O operations.
 type AgentInitializerImpl struct {
-	cache *DispositionCache
+	cache *disposition.DispositionCache
 }
 
 // NewAgentInitializer creates a new AgentInitializer with a cache of the specified TTL.
 // A typical TTL is 5 minutes, which balances freshness with performance.
 func NewAgentInitializer(cacheTTL time.Duration) *AgentInitializerImpl {
 	return &AgentInitializerImpl{
-		cache: NewDispositionCache(cacheTTL),
+		cache: disposition.NewDispositionCache(cacheTTL),
 	}
 }
 
@@ -44,16 +45,16 @@ func (a *AgentInitializerImpl) Initialize(ctx context.Context, workspaceRoot str
 	}
 
 	// Load from disk (note: ResolveDisposition doesn't use context per ADA contract)
-	disposition, err := ResolveDisposition(workspaceRoot, activeMode)
+	disp, err := disposition.ResolveDisposition(workspaceRoot, activeMode)
 	if err != nil {
 		return nil, err
 	}
 
 	// Cache the result
-	a.cache.Set(cacheKey, disposition)
+	a.cache.Set(cacheKey, disp)
 
 	// Convert to gateway.AgentConfig
-	return convertToAgentConfig(disposition), nil
+	return convertToAgentConfig(disp), nil
 }
 
 // ClearCache clears all cached disposition configurations.
@@ -62,36 +63,44 @@ func (a *AgentInitializerImpl) ClearCache() {
 	a.cache.Clear()
 }
 
+// makeCacheKey creates a cache key from workspace root and active mode.
+func makeCacheKey(workspaceRoot, activeMode string) string {
+	if activeMode == "" {
+		return workspaceRoot + ":base"
+	}
+	return workspaceRoot + ":" + activeMode
+}
+
 // convertToAgentConfig converts a DispositionConfig to a gateway.AgentConfig.
 // The gateway.AgentConfig is a simplified view used by the gateway's core logic,
 // while DispositionConfig is the full ADA configuration.
 // This conversion follows the Gateway-ADA Contract v1.0.0.
-func convertToAgentConfig(disposition *DispositionConfig) *gateway.AgentConfig {
+func convertToAgentConfig(disp *disposition.DispositionConfig) *gateway.AgentConfig {
 	return &gateway.AgentConfig{
 		// Core behavioral dimensions
-		Pacing:     disposition.Pacing,
-		Depth:      disposition.Depth,
-		Tone:       disposition.Tone,
-		Initiative: disposition.Initiative,
+		Pacing:     disp.Pacing,
+		Depth:      disp.Depth,
+		Tone:       disp.Tone,
+		Initiative: disp.Initiative,
 
 		// Nested configurations
 		Validation: gateway.ValidationConfig{
-			Strategy:     disposition.Validation.Strategy,
-			RequireTests: disposition.Validation.RequireTests,
-			RequireDocs:  disposition.Validation.RequireDocs,
+			Strategy:     disp.Validation.Strategy,
+			RequireTests: disp.Validation.RequireTests,
+			RequireDocs:  disp.Validation.RequireDocs,
 		},
 		ErrorHandling: gateway.ErrorHandlingConfig{
-			Strategy:   disposition.ErrorHandling.Strategy,
-			RetryCount: disposition.ErrorHandling.RetryCount,
+			Strategy:   disp.ErrorHandling.Strategy,
+			RetryCount: disp.ErrorHandling.RetryCount,
 		},
 		Collaboration: gateway.CollaborationConfig{
-			Style:            disposition.Collaboration.Style,
-			CheckInFrequency: disposition.Collaboration.CheckInFrequency,
+			Style:            disp.Collaboration.Style,
+			CheckInFrequency: disp.Collaboration.CheckInFrequency,
 		},
 		Reflection: gateway.ReflectionConfig{
-			Frequency: disposition.Reflection.Frequency,
-			Format:    disposition.Reflection.Format,
-			Triggers:  disposition.Reflection.Triggers,
+			Frequency: disp.Reflection.Frequency,
+			Format:    disp.Reflection.Format,
+			Triggers:  disp.Reflection.Triggers,
 		},
 	}
 }

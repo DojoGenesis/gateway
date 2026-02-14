@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/models"
@@ -24,16 +24,14 @@ func HandleBroadcast(c *gin.Context) {
 	var req models.BroadcastRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("Broadcast: Invalid request payload: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request - " + err.Error(),
-		})
+		slog.Warn("broadcast: invalid request payload", "error", err)
+		respondBadRequest(c, "Invalid request", err.Error())
 		return
 	}
 
 	err := SendToClient(req.ClientID, req.Event, req.Data)
 	if err != nil {
-		log.Printf("Broadcast: Warning - %v (event=%s)", err, req.Event)
+		slog.Warn("broadcast delivery failed", "error", err, "event", req.Event)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

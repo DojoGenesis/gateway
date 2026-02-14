@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	rpcMetadataTimeout    = getEnvDuration("RPC_METADATA_TIMEOUT", 30*time.Second)
-	rpcCompletionTimeout  = getEnvDuration("RPC_COMPLETION_TIMEOUT", 5*time.Minute)
-	rpcStreamTimeout      = getEnvDuration("RPC_STREAM_TIMEOUT", 10*time.Minute)
-	rpcToolCallTimeout    = getEnvDuration("RPC_TOOL_CALL_TIMEOUT", 2*time.Minute)
+	rpcMetadataTimeout   = getEnvDuration("RPC_METADATA_TIMEOUT", 30*time.Second)
+	rpcCompletionTimeout = getEnvDuration("RPC_COMPLETION_TIMEOUT", 5*time.Minute)
+	rpcStreamTimeout     = getEnvDuration("RPC_STREAM_TIMEOUT", 10*time.Minute)
+	rpcToolCallTimeout   = getEnvDuration("RPC_TOOL_CALL_TIMEOUT", 2*time.Minute)
 )
 
 func getEnvDuration(envKey string, defaultVal time.Duration) time.Duration {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -26,9 +27,15 @@ func setupTraceTestRouter(t *testing.T) (*gin.Engine, *trace.TraceStorage, *sql.
 		t.Fatalf("Failed to create trace storage: %v", err)
 	}
 
-	InitializeTraceHandlers(storage)
+	h := NewTraceHandler(storage)
 
 	r := gin.New()
+	r.GET("/api/v1/traces", h.ListTraces)
+	r.GET("/api/v1/traces/:trace_id", h.GetTrace)
+	r.GET("/api/v1/traces/:trace_id/replay", h.GetTraceReplay)
+	r.GET("/api/v1/traces/:trace_id/stats", h.GetTraceStats)
+	r.GET("/api/v1/spans/:span_id", h.GetSpan)
+
 	return r, storage, db
 }
 
@@ -44,11 +51,9 @@ func TestHandleListTraces(t *testing.T) {
 		Status:    "active",
 	}
 
-	if err := storage.StoreTrace(nil, testTrace); err != nil {
+	if err := storage.StoreTrace(context.Background(), testTrace); err != nil {
 		t.Fatalf("Failed to store test trace: %v", err)
 	}
-
-	r.GET("/api/v1/traces", HandleListTraces)
 
 	req, _ := http.NewRequest("GET", "/api/v1/traces?session_id=session-1&limit=10", nil)
 	w := httptest.NewRecorder()
@@ -73,8 +78,6 @@ func TestHandleListTraces(t *testing.T) {
 func TestHandleListTraces_MissingSessionID(t *testing.T) {
 	r, _, db := setupTraceTestRouter(t)
 	defer db.Close()
-
-	r.GET("/api/v1/traces", HandleListTraces)
 
 	req, _ := http.NewRequest("GET", "/api/v1/traces", nil)
 	w := httptest.NewRecorder()
@@ -104,11 +107,9 @@ func TestHandleGetTrace(t *testing.T) {
 		Status:    "active",
 	}
 
-	if err := storage.StoreTrace(nil, testTrace); err != nil {
+	if err := storage.StoreTrace(context.Background(), testTrace); err != nil {
 		t.Fatalf("Failed to store test trace: %v", err)
 	}
-
-	r.GET("/api/v1/traces/:trace_id", HandleGetTrace)
 
 	req, _ := http.NewRequest("GET", "/api/v1/traces/trace-1", nil)
 	w := httptest.NewRecorder()
@@ -135,8 +136,6 @@ func TestHandleGetTrace_NotFound(t *testing.T) {
 	r, _, db := setupTraceTestRouter(t)
 	defer db.Close()
 
-	r.GET("/api/v1/traces/:trace_id", HandleGetTrace)
-
 	req, _ := http.NewRequest("GET", "/api/v1/traces/nonexistent", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -158,7 +157,7 @@ func TestHandleGetTraceReplay(t *testing.T) {
 		Status:    "active",
 	}
 
-	if err := storage.StoreTrace(nil, testTrace); err != nil {
+	if err := storage.StoreTrace(context.Background(), testTrace); err != nil {
 		t.Fatalf("Failed to store test trace: %v", err)
 	}
 
@@ -170,11 +169,9 @@ func TestHandleGetTraceReplay(t *testing.T) {
 		Status:    "completed",
 	}
 
-	if err := storage.StoreSpan(nil, testSpan); err != nil {
+	if err := storage.StoreSpan(context.Background(), testSpan); err != nil {
 		t.Fatalf("Failed to store test span: %v", err)
 	}
-
-	r.GET("/api/v1/traces/:trace_id/replay", HandleGetTraceReplay)
 
 	req, _ := http.NewRequest("GET", "/api/v1/traces/trace-1/replay", nil)
 	w := httptest.NewRecorder()
@@ -211,7 +208,7 @@ func TestHandleGetTraceStats(t *testing.T) {
 		Status:    "completed",
 	}
 
-	if err := storage.StoreTrace(nil, testTrace); err != nil {
+	if err := storage.StoreTrace(context.Background(), testTrace); err != nil {
 		t.Fatalf("Failed to store test trace: %v", err)
 	}
 
@@ -225,11 +222,9 @@ func TestHandleGetTraceStats(t *testing.T) {
 		Status:    "completed",
 	}
 
-	if err := storage.StoreSpan(nil, testSpan); err != nil {
+	if err := storage.StoreSpan(context.Background(), testSpan); err != nil {
 		t.Fatalf("Failed to store test span: %v", err)
 	}
-
-	r.GET("/api/v1/traces/:trace_id/stats", HandleGetTraceStats)
 
 	req, _ := http.NewRequest("GET", "/api/v1/traces/trace-1/stats", nil)
 	w := httptest.NewRecorder()
@@ -268,7 +263,7 @@ func TestHandleGetSpan(t *testing.T) {
 		Status:    "active",
 	}
 
-	if err := storage.StoreTrace(nil, testTrace); err != nil {
+	if err := storage.StoreTrace(context.Background(), testTrace); err != nil {
 		t.Fatalf("Failed to store test trace: %v", err)
 	}
 
@@ -283,11 +278,9 @@ func TestHandleGetSpan(t *testing.T) {
 		},
 	}
 
-	if err := storage.StoreSpan(nil, testSpan); err != nil {
+	if err := storage.StoreSpan(context.Background(), testSpan); err != nil {
 		t.Fatalf("Failed to store test span: %v", err)
 	}
-
-	r.GET("/api/v1/spans/:span_id", HandleGetSpan)
 
 	req, _ := http.NewRequest("GET", "/api/v1/spans/span-1", nil)
 	w := httptest.NewRecorder()
@@ -312,7 +305,8 @@ func TestHandleGetSpan(t *testing.T) {
 
 func TestTraceHandlersWithoutInitialization(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	traceStorage = nil
+
+	h := NewTraceHandler(nil)
 
 	r := gin.New()
 
@@ -323,11 +317,11 @@ func TestTraceHandlersWithoutInitialization(t *testing.T) {
 		handler  gin.HandlerFunc
 		expected int
 	}{
-		{"ListTraces", "GET", "/api/v1/traces?session_id=test", HandleListTraces, http.StatusInternalServerError},
-		{"GetTrace", "GET", "/api/v1/traces/trace-1", HandleGetTrace, http.StatusInternalServerError},
-		{"GetTraceReplay", "GET", "/api/v1/traces/trace-1/replay", HandleGetTraceReplay, http.StatusInternalServerError},
-		{"GetTraceStats", "GET", "/api/v1/traces/trace-1/stats", HandleGetTraceStats, http.StatusInternalServerError},
-		{"GetSpan", "GET", "/api/v1/spans/span-1", HandleGetSpan, http.StatusInternalServerError},
+		{"ListTraces", "GET", "/api/v1/traces?session_id=test", h.ListTraces, http.StatusInternalServerError},
+		{"GetTrace", "GET", "/api/v1/traces/trace-1", h.GetTrace, http.StatusInternalServerError},
+		{"GetTraceReplay", "GET", "/api/v1/traces/trace-1/replay", h.GetTraceReplay, http.StatusInternalServerError},
+		{"GetTraceStats", "GET", "/api/v1/traces/trace-1/stats", h.GetTraceStats, http.StatusInternalServerError},
+		{"GetSpan", "GET", "/api/v1/spans/span-1", h.GetSpan, http.StatusInternalServerError},
 	}
 
 	for _, tt := range tests {

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 )
 
 func TestRetentionPolicy_Surface(t *testing.T) {

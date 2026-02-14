@@ -251,7 +251,7 @@ func TestValidate_InvalidReflectionFormat(t *testing.T) {
 func TestValidate_MultipleErrors(t *testing.T) {
 	cfg := &DispositionConfig{
 		Pacing:     "lightning-fast", // invalid
-		Depth:      "",                // missing
+		Depth:      "",               // missing
 		Tone:       "professional",
 		Initiative: "responsive",
 		ErrorHandling: ErrorHandlingConfig{

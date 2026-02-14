@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,6 +11,9 @@ import (
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )
+
+// ErrAgentNotFound is returned when a requested agent does not exist.
+var ErrAgentNotFound = errors.New("agent not found")
 
 type AgentManager struct {
 	db *sql.DB
@@ -179,7 +183,7 @@ func (am *AgentManager) GetAgent(ctx context.Context, agentID string) (*Agent, e
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("agent not found")
+		return nil, ErrAgentNotFound
 	}
 
 	if err != nil {
@@ -311,7 +315,7 @@ func (am *AgentManager) GetAgentCapabilities(ctx context.Context, agentID string
 		return nil, fmt.Errorf("failed to check agent existence: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("agent not found")
+		return nil, ErrAgentNotFound
 	}
 
 	query := `SELECT id, agent_id, capability_type, name, description, created_at

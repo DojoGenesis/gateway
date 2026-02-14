@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 )
 
 // ReflectionEvent represents an event that might trigger reflection.
@@ -96,7 +96,7 @@ func (e *Engine) ShouldReflect(ctx context.Context, trigger string) bool {
 	// Check if trigger matches configured triggers
 	triggerMatches := false
 	for _, configuredTrigger := range e.disp.Reflection.Triggers {
-		if strings.ToLower(configuredTrigger) == strings.ToLower(trigger) {
+		if strings.EqualFold(configuredTrigger, trigger) {
 			triggerMatches = true
 			break
 		}

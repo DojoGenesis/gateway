@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,7 +163,7 @@ func (e *Exporter) exportArtifacts(ctx context.Context, projectID string) ([]Art
 
 		err := rows.Scan(&artifact.ID, &artifact.Type, &artifact.Name, &description, &metadataJSON)
 		if err != nil {
-			log.Printf("Warning: failed to scan artifact during export: %v", err)
+			slog.Warn("failed to scan artifact during export", "error", err)
 			continue
 		}
 
@@ -205,7 +205,7 @@ func (e *Exporter) exportArtifactVersions(ctx context.Context, artifactID string
 		err := rows.Scan(&version.Version, &version.Content, &diff, &commitMessage,
 			&version.CreatedAt, &createdBy, &metadataJSON)
 		if err != nil {
-			log.Printf("Warning: failed to scan artifact version during export: %v", err)
+			slog.Warn("failed to scan artifact version during export", "error", err)
 			continue
 		}
 

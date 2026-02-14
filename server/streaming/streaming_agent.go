@@ -3,7 +3,7 @@ package streaming
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -67,7 +67,7 @@ func (sa *StreamingAgent) streamQuery(ctx context.Context, req agent.QueryReques
 	// Retry up to 2 times for transient errors (deadline exceeded, temporary network issues)
 	for attempt := 0; attempt <= 2; attempt++ {
 		if attempt > 0 {
-			log.Printf("[StreamingAgent] Retrying HandleQueryWithTools (attempt %d/2) after error: %v", attempt, err)
+			slog.Warn("retrying query", "component", "streaming_agent", "attempt", attempt, "max_attempts", 2, "error", err)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -206,7 +206,7 @@ func (sa *StreamingAgentWithEvents) streamQueryWithDetailedEvents(ctx context.Co
 	// Retry up to 2 times for transient errors (deadline exceeded, temporary network issues)
 	for attempt := 0; attempt <= 2; attempt++ {
 		if attempt > 0 {
-			log.Printf("[StreamingAgentWithEvents] Retrying HandleQueryWithTools (attempt %d/2) after error: %v", attempt, err)
+			slog.Warn("retrying query", "component", "streaming_agent_with_events", "attempt", attempt, "max_attempts", 2, "error", err)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -304,7 +304,7 @@ func (sa *StreamingAgentWithEvents) streamQueryWithDetailedEvents(ctx context.Co
 func (sa *StreamingAgentWithEvents) emitSpecializedEvent(ctx context.Context, toolName string, result map[string]interface{}, eventChan chan<- StreamEvent) error {
 	success, ok := result["success"].(bool)
 	if !ok || !success {
-		log.Printf("[SSE] Tool %s completed but success=%v, skipping event emission", toolName, success)
+		slog.Warn("tool completed without success", "component", "sse", "tool", toolName, "success", success)
 		return nil
 	}
 
@@ -322,7 +322,7 @@ func (sa *StreamingAgentWithEvents) emitSpecializedEvent(ctx context.Context, to
 				return ctx.Err()
 			}
 		} else {
-			log.Printf("[SSE] create_artifact result missing 'artifact' object, cannot emit ArtifactCreated event")
+			slog.Warn("missing artifact object in tool result", "component", "sse", "tool", "create_artifact", "event", "ArtifactCreated")
 		}
 
 	case "update_artifact":
@@ -338,7 +338,7 @@ func (sa *StreamingAgentWithEvents) emitSpecializedEvent(ctx context.Context, to
 				return ctx.Err()
 			}
 		} else {
-			log.Printf("[SSE] update_artifact result missing 'artifact' object, cannot emit ArtifactUpdated event")
+			slog.Warn("missing artifact object in tool result", "component", "sse", "tool", "update_artifact", "event", "ArtifactUpdated")
 		}
 
 	case "switch_project":
@@ -352,7 +352,7 @@ func (sa *StreamingAgentWithEvents) emitSpecializedEvent(ctx context.Context, to
 				return ctx.Err()
 			}
 		} else {
-			log.Printf("[SSE] switch_project result missing 'project' object, cannot emit ProjectSwitched event")
+			slog.Warn("missing project object in tool result", "component", "sse", "tool", "switch_project", "event", "ProjectSwitched")
 		}
 
 	case "prepare_diagram", "export_diagram":
@@ -367,7 +367,7 @@ func (sa *StreamingAgentWithEvents) emitSpecializedEvent(ctx context.Context, to
 				return ctx.Err()
 			}
 		} else {
-			log.Printf("[SSE] %s result missing 'metadata' object, cannot emit DiagramRendered event", toolName)
+			slog.Warn("missing metadata object in tool result", "component", "sse", "tool", toolName, "event", "DiagramRendered")
 		}
 	}
 

@@ -82,7 +82,7 @@ func (m *MemoryManager) SearchByType(ctx context.Context, memType string, limit 
 	// Use ListMemories filtered by type
 	results, err := m.ListMemories(ctx, MemoryFilter{
 		Type:  memType,
-		Limit:      limit,
+		Limit: limit,
 	})
 	if err != nil {
 		return nil, err
@@ -272,11 +272,11 @@ func (cs *CompressionService) ExtractSeeds(ctx context.Context, memories []Memor
 // CompletionCaller interface for type-safe invocation.
 func callLLMCompletion(ctx context.Context, prov interface{}, prompt string, temperature float64, maxTokens int) (string, error) {
 	type completionRequest struct {
-		Model       string    `json:"model"`
-		Messages    []Message `json:"messages"`
-		Temperature float64   `json:"temperature"`
-		MaxTokens   int       `json:"max_tokens"`
-		Stream      bool      `json:"stream"`
+		Model       string           `json:"model"`
+		Messages    []ContextMessage `json:"messages"`
+		Temperature float64          `json:"temperature"`
+		MaxTokens   int              `json:"max_tokens"`
+		Stream      bool             `json:"stream"`
 	}
 
 	type completionResponse struct {

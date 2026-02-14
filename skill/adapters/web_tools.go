@@ -12,9 +12,9 @@ import (
 // It provides web_search and web_fetch capabilities for Tier 2 skills.
 type WebToolAdapter struct {
 	braveAPIKey  string
-	fallbackMode bool      // Use gateway-native search if Brave API unavailable
+	fallbackMode bool // Use gateway-native search if Brave API unavailable
 	httpClient   *http.Client
-	maxResults   int       // Maximum search results to return
+	maxResults   int // Maximum search results to return
 	timeout      time.Duration
 }
 

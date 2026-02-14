@@ -375,11 +375,11 @@ func TestListByAgent(t *testing.T) {
 
 func TestExtractFrontmatter(t *testing.T) {
 	tests := []struct {
-		name        string
-		content     string
-		wantFront   string
-		wantBody    string
-		wantErr     bool
+		name      string
+		content   string
+		wantFront string
+		wantBody  string
+		wantErr   bool
 	}{
 		{
 			name: "valid frontmatter",

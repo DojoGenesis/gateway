@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,11 +13,12 @@ import (
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+	pkgdisposition "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/config"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/logging"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
@@ -24,30 +27,47 @@ import (
 	srv "github.com/TresPies-source/AgenticGatewayByDojoGenesis/server"
 
 	"go.opentelemetry.io/otel"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	log.Printf("[Main] Agentic Gateway by Dojo Genesis v%s starting...", srv.Version)
+	// ─── Health Check Mode (for Docker HEALTHCHECK in distroless) ────
+	if len(os.Args) > 1 && os.Args[1] == "--health-check" {
+		port := getEnv("PORT", "8080")
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%s/health", port))
+		if err != nil {
+			os.Exit(1)
+		}
+		_ = resp.Body.Close() // Explicitly ignore error in health check
+		if resp.StatusCode != http.StatusOK {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 
 	// ─── Load Configuration ──────────────────────────────────────────
 	cfg := config.Load()
+
+	// Initialize structured logging based on environment
+	logging.Init(cfg.Environment)
+
+	slog.Info("Agentic Gateway starting", "version", srv.Version)
+
 	if err := cfg.Validate(); err != nil {
-		log.Printf("[Main] WARNING: Config validation: %v", err)
+		slog.Warn("config validation issue", "error", err)
 	}
-	log.Printf("[Main] Configuration loaded (port: %s, env: %s)", cfg.Port, cfg.Environment)
+	slog.Info("configuration loaded", "port", cfg.Port, "environment", cfg.Environment)
 
 	// ─── Initialize OTEL (if enabled) ────────────────────────────────
 	var tracerProvider *sdktrace.TracerProvider
 	if cfg.OTEL.Enabled {
-		log.Printf("[Main] OTEL enabled, initializing exporter (endpoint: %s)", cfg.OTEL.Endpoint)
+		slog.Info("initializing OTEL exporter", "endpoint", cfg.OTEL.Endpoint)
 
 		exporter, err := trace.NewOTELExporter(cfg.OTEL.Endpoint)
 		if err != nil {
-			log.Printf("[Main] WARNING: OTEL exporter initialization failed: %v", err)
+			slog.Warn("OTEL exporter initialization failed", "error", err)
 		} else if exporter != nil {
 			// Create resource with service name
 			res, _ := resource.New(context.Background(),
@@ -65,39 +85,40 @@ func main() {
 
 			// Set global tracer provider
 			otel.SetTracerProvider(tracerProvider)
-			log.Printf("[Main] OTEL tracer provider initialized (service: %s, sampling: %.2f)",
-				cfg.OTEL.ServiceName, cfg.OTEL.SamplingRate)
+			slog.Info("OTEL tracer provider initialized",
+				"service", cfg.OTEL.ServiceName,
+				"sampling_rate", cfg.OTEL.SamplingRate)
 		}
 	} else {
-		log.Printf("[Main] OTEL disabled")
+		slog.Info("OTEL disabled")
 	}
 
 	// ─── Initialize Provider Plugin Manager ──────────────────────────
 	pluginManager := provider.NewPluginManager(cfg.PluginDir)
-	log.Printf("[Main] Plugin manager initialized (dir: %s)", cfg.PluginDir)
+	slog.Info("plugin manager initialized", "dir", cfg.PluginDir)
 
 	// ─── Initialize Tool Registry ────────────────────────────────────
 	allTools := tools.GetAllTools()
 	toolRegistry := tools.NewContextAwareRegistry()
-	log.Printf("[Main] Tool registry initialized (%d built-in tools)", len(allTools))
+	slog.Info("tool registry initialized", "builtin_tools", len(allTools))
 
 	// ─── Initialize MCP Host (if configured) ─────────────────────────
 	var mcpHostManager *mcp.MCPHostManager
 	mcpConfigPath := getEnv("MCP_CONFIG_PATH", "config/mcp_servers.yaml")
 	if _, err := os.Stat(mcpConfigPath); err == nil {
-		log.Printf("[Main] Loading MCP configuration from %s", mcpConfigPath)
+		slog.Info("loading MCP configuration", "path", mcpConfigPath)
 
 		mcpHostCfg, err := mcp.LoadConfig(mcpConfigPath)
 		if err != nil {
-			log.Printf("[Main] WARNING: Failed to load MCP config: %v", err)
+			slog.Warn("failed to load MCP config", "error", err)
 		} else {
 			mcpHostManager, err = mcp.NewMCPHostManager(&mcpHostCfg.MCP, toolRegistry)
 			if err != nil {
-				log.Printf("[Main] WARNING: Failed to create MCP host manager: %v", err)
+				slog.Warn("failed to create MCP host manager", "error", err)
 			} else {
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				if err := mcpHostManager.Start(ctx); err != nil {
-					log.Printf("[Main] WARNING: Failed to start MCP host: %v", err)
+					slog.Warn("failed to start MCP host", "error", err)
 					mcpHostManager = nil
 				} else {
 					mcpStatus := mcpHostManager.Status()
@@ -105,37 +126,37 @@ func main() {
 					for _, status := range mcpStatus {
 						totalMCPTools += status.ToolCount
 					}
-					log.Printf("[Main] MCP host started (%d servers, %d tools)", len(mcpStatus), totalMCPTools)
+					slog.Info("MCP host started", "servers", len(mcpStatus), "tools", totalMCPTools)
 				}
 				cancel()
 			}
 		}
 	} else {
-		log.Printf("[Main] MCP configuration not found at %s, skipping MCP initialization", mcpConfigPath)
+		slog.Info("MCP configuration not found, skipping", "path", mcpConfigPath)
 	}
 
 	// ─── Initialize Disposition / Agent Initializer ──────────────────
 	dispositionCacheTTL := 5 * time.Minute
-	agentInitializer := disposition.NewAgentInitializer(dispositionCacheTTL)
-	log.Printf("[Main] Agent initializer created (cache TTL: %v)", dispositionCacheTTL)
+	agentInitializer := pkgdisposition.NewAgentInitializer(dispositionCacheTTL)
+	slog.Info("agent initializer created", "cache_ttl", dispositionCacheTTL)
 
 	// ─── Initialize Memory ───────────────────────────────────────────
 	dbPath := getEnv("MEMORY_DB_PATH", "dojo_memory.db")
 	memoryManager, err := memory.NewMemoryManager(dbPath)
 	if err != nil {
-		log.Printf("[Main] WARNING: Memory manager initialization failed: %v", err)
+		slog.Warn("memory manager initialization failed", "error", err)
 		memoryManager = nil
 	} else {
-		log.Printf("[Main] Memory manager initialized (db: %s)", dbPath)
+		slog.Info("memory manager initialized", "db", dbPath)
 	}
 
 	var gardenManager *memory.GardenManager
 	if memoryManager != nil {
 		gardenManager, err = memory.NewGardenManager(memoryManager, nil)
 		if err != nil {
-			log.Printf("[Main] WARNING: Garden manager initialization failed: %v", err)
+			slog.Warn("garden manager initialization failed", "error", err)
 		} else {
-			log.Printf("[Main] Garden manager initialized")
+			slog.Info("garden manager initialized")
 		}
 	}
 
@@ -147,8 +168,10 @@ func main() {
 		cfg.Budget.MonthlyLimit,
 	)
 	userRouter := services.NewUserRouter(cfg, pluginManager, budgetTracker)
-	log.Printf("[Main] Services initialized (budget: query=%d, session=%d, monthly=%d)",
-		cfg.Budget.QueryLimit, cfg.Budget.SessionLimit, cfg.Budget.MonthlyLimit)
+	slog.Info("services initialized",
+		"query_limit", cfg.Budget.QueryLimit,
+		"session_limit", cfg.Budget.SessionLimit,
+		"monthly_limit", cfg.Budget.MonthlyLimit)
 
 	// ─── Initialize Trace Logger ─────────────────────────────────────
 	traceLogger := trace.NewTraceLoggerWithoutEvents(nil)
@@ -161,8 +184,10 @@ func main() {
 		cfg.Routing.GuestProvider,
 		cfg.Routing.AuthenticatedProvider,
 	)
-	log.Printf("[Main] Agent initialized (default: %s, guest: %s, auth: %s)",
-		cfg.Routing.DefaultProvider, cfg.Routing.GuestProvider, cfg.Routing.AuthenticatedProvider)
+	slog.Info("agent initialized",
+		"default_provider", cfg.Routing.DefaultProvider,
+		"guest_provider", cfg.Routing.GuestProvider,
+		"auth_provider", cfg.Routing.AuthenticatedProvider)
 
 	// ─── Initialize Orchestration ────────────────────────────────────
 	providerName := getEnv("ORCHESTRATION_PROVIDER", cfg.Routing.DefaultProvider)
@@ -188,81 +213,89 @@ func main() {
 		eventEmitter,
 		budgetAdapter,
 	)
-	log.Printf("[Main] Orchestration engine initialized (provider: %s)", providerName)
+	slog.Info("orchestration engine initialized", "provider", providerName)
 
 	// ─── Initialize Gateway Interface Implementations ────────────────
 	// Wrap existing components to implement gateway interfaces
-	var orchestrationExecutor gateway.OrchestrationExecutor
-	orchestrationExecutor = orchestration.NewGatewayOrchestrationExecutor(orchestrationEngine, planner)
+	orchestrationExecutor := orchestration.NewGatewayOrchestrationExecutor(orchestrationEngine, planner)
 
 	var memoryStore gateway.MemoryStore
 	if memoryManager != nil {
 		memoryStore = memory.NewGatewayMemoryStore(memoryManager)
-		log.Printf("[Main] Gateway memory store initialized")
+		slog.Info("gateway memory store initialized")
 	}
 
 	// ─── Create and Start Server ─────────────────────────────────────
-	server := srv.NewFromConfig(
-		cfg,
-		pluginManager,
-		orchestrationEngine,
-		planner,
-		memoryManager,
-		gardenManager,
-		primaryAgent,
-		intentClassifier,
-		userRouter,
-		traceLogger,
-		costTracker,
-		budgetTracker,
-		nil,                   // memory maintenance (optional)
-		toolRegistry,          // Phase 2: Gateway tool registry
-		agentInitializer,      // Phase 2: Agent disposition initializer
-		mcpHostManager,        // Phase 2: MCP host manager (optional)
-		orchestrationExecutor, // Phase 3: Orchestration executor (gateway interface)
-		memoryStore,           // Phase 3: Memory store (gateway interface)
-	)
+	server := srv.New(srv.ServerDeps{
+		Config: &srv.ServerConfig{
+			Port:            cfg.Port,
+			AllowedOrigins:  cfg.AllowedOrigins,
+			AuthMode:        "api_key",
+			Environment:     cfg.Environment,
+			ShutdownTimeout: 30 * time.Second,
+		},
+		PluginManager:       pluginManager,
+		OrchestrationEngine: orchestrationEngine,
+		Planner:             planner,
+		MemoryManager:       memoryManager,
+		GardenManager:       gardenManager,
+		PrimaryAgent:        primaryAgent,
+		IntentClassifier:    intentClassifier,
+		UserRouter:          userRouter,
+		TraceLogger:         traceLogger,
+		CostTracker:         costTracker,
+		BudgetTracker:       budgetTracker,
+		MemoryMaintenance:   nil,
+		ToolRegistry:        toolRegistry,
+		AgentInitializer:    agentInitializer,
+		MCPHostManager:      mcpHostManager,
+		OrchestrationExec:   orchestrationExecutor,
+		MemoryStore:         memoryStore,
+	})
 
 	if err := server.Start(); err != nil {
-		log.Fatalf("[Main] Failed to start server: %v", err)
+		slog.Error("failed to start server", "error", err)
+		os.Exit(1)
 	}
 
-	log.Printf("[Main] Server ready at http://localhost:%s", cfg.Port)
-	log.Printf("[Main] OpenAI-compatible API: http://localhost:%s/v1/chat/completions", cfg.Port)
-	log.Printf("[Main] Health check: http://localhost:%s/health", cfg.Port)
+	slog.Info("server ready",
+		"url", "http://localhost:"+cfg.Port,
+		"api", "http://localhost:"+cfg.Port+"/v1/chat/completions",
+		"health", "http://localhost:"+cfg.Port+"/health")
 
 	// ─── Graceful Shutdown ───────────────────────────────────────────
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	log.Println("\n[Main] Received shutdown signal")
+	slog.Info("received shutdown signal")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Stop MCP host if initialized
 	if mcpHostManager != nil {
-		log.Println("[Main] Stopping MCP host...")
+		slog.Info("stopping MCP host")
 		if err := mcpHostManager.Stop(ctx); err != nil {
-			log.Printf("[Main] WARNING: MCP host shutdown error: %v", err)
+			slog.Warn("MCP host shutdown error", "error", err)
 		}
 	}
 
 	// Stop server
 	if err := server.Stop(ctx); err != nil {
-		log.Fatalf("[Main] Shutdown error: %v", err)
+		slog.Error("shutdown error", "error", err)
+		os.Exit(1)
 	}
 
 	// Shutdown OTEL tracer provider
 	if tracerProvider != nil {
-		log.Println("[Main] Shutting down OTEL tracer provider...")
+		slog.Info("shutting down OTEL tracer provider")
 		if err := tracerProvider.Shutdown(ctx); err != nil {
-			log.Printf("[Main] WARNING: OTEL shutdown error: %v", err)
+			slog.Warn("OTEL shutdown error", "error", err)
 		}
 	}
 
-	log.Printf("[Main] Agentic Gateway shut down cleanly")
+	slog.Info("Agentic Gateway shut down cleanly")
 }
 
 func getEnv(key, defaultValue string) string {

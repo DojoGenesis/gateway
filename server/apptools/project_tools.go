@@ -3,6 +3,7 @@ package apptools
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/projects"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
@@ -35,9 +36,10 @@ func CreateProject(ctx context.Context, params map[string]interface{}) (map[stri
 
 	project, err := projectManager.CreateProject(ctx, name, description, templateID)
 	if err != nil {
+		slog.Error("failed to create project", "error", err)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to create project: %v", err),
+			"error":   "failed to create project",
 		}, nil
 	}
 
@@ -60,9 +62,10 @@ func ListProjects(ctx context.Context, params map[string]interface{}) (map[strin
 
 	projectList, err := projectManager.ListProjects(ctx, status)
 	if err != nil {
+		slog.Error("failed to list projects", "error", err)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to list projects: %v", err),
+			"error":   "failed to list projects",
 		}, nil
 	}
 
@@ -91,9 +94,10 @@ func GetProject(ctx context.Context, params map[string]interface{}) (map[string]
 
 	project, err := projectManager.GetProject(ctx, projectID)
 	if err != nil {
+		slog.Error("failed to get project", "error", err, "project_id", projectID)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to get project: %v", err),
+			"error":   "failed to get project",
 		}, nil
 	}
 
@@ -121,9 +125,10 @@ func SwitchProject(ctx context.Context, params map[string]interface{}) (map[stri
 
 	project, err := projectManager.GetProject(ctx, projectID)
 	if err != nil {
+		slog.Error("failed to switch to project", "error", err, "project_id", projectID)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to switch to project: %v", err),
+			"error":   "failed to switch to project",
 		}, nil
 	}
 
@@ -148,9 +153,10 @@ func ListTemplates(ctx context.Context, params map[string]interface{}) (map[stri
 
 	templates, err := projectManager.ListTemplates(ctx)
 	if err != nil {
+		slog.Error("failed to list templates", "error", err)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to list templates: %v", err),
+			"error":   "failed to list templates",
 		}, nil
 	}
 
@@ -192,9 +198,10 @@ func UpdateProject(ctx context.Context, params map[string]interface{}) (map[stri
 
 	project, err := projectManager.UpdateProject(ctx, projectID, name, description, status, settings, metadata)
 	if err != nil {
+		slog.Error("failed to update project", "error", err, "project_id", projectID)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to update project: %v", err),
+			"error":   "failed to update project",
 		}, nil
 	}
 
@@ -223,9 +230,10 @@ func DeleteProject(ctx context.Context, params map[string]interface{}) (map[stri
 
 	err := projectManager.DeleteProject(ctx, projectID)
 	if err != nil {
+		slog.Error("failed to delete project", "error", err, "project_id", projectID)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to delete project: %v", err),
+			"error":   "failed to delete project",
 		}, nil
 	}
 

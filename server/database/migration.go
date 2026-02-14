@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -326,7 +327,7 @@ func (m *MigrationManager) updateMigrationProgress(ctx context.Context, migratio
 	`
 	_, err := m.localDB.ExecContext(ctx, updateQuery, recordsMigrated, progressPercent, migrationID)
 	if err != nil {
-		fmt.Printf("failed to update migration progress: %v\n", err)
+		slog.Warn("failed to update migration progress", "error", err)
 	}
 }
 
@@ -366,7 +367,7 @@ func (m *MigrationManager) updateMigrationStatusWithMetadata(ctx context.Context
 	`
 	_, err := m.localDB.ExecContext(ctx, updateQuery, status, recordsMigrated, progressPercent, now, errorsJSON, metadataJSON, migrationID)
 	if err != nil {
-		fmt.Printf("failed to update migration status: %v\n", err)
+		slog.Warn("failed to update migration status", "error", err)
 	}
 }
 

@@ -59,12 +59,12 @@ type ReflectionConfig struct {
 
 // ModeOverride represents a mode-specific configuration override
 type ModeOverride struct {
-	Pacing        string                   `json:"pacing,omitempty" yaml:"pacing,omitempty"`
-	Depth         string                   `json:"depth,omitempty" yaml:"depth,omitempty"`
-	Tone          string                   `json:"tone,omitempty" yaml:"tone,omitempty"`
-	Initiative    string                   `json:"initiative,omitempty" yaml:"initiative,omitempty"`
-	Validation    *ValidationConfig        `json:"validation,omitempty" yaml:"validation,omitempty"`
-	ErrorHandling *ErrorHandlingConfig     `json:"error_handling,omitempty" yaml:"error_handling,omitempty"`
-	Collaboration *CollaborationConfig     `json:"collaboration,omitempty" yaml:"collaboration,omitempty"`
-	Reflection    *ReflectionConfig        `json:"reflection,omitempty" yaml:"reflection,omitempty"`
+	Pacing        string               `json:"pacing,omitempty" yaml:"pacing,omitempty"`
+	Depth         string               `json:"depth,omitempty" yaml:"depth,omitempty"`
+	Tone          string               `json:"tone,omitempty" yaml:"tone,omitempty"`
+	Initiative    string               `json:"initiative,omitempty" yaml:"initiative,omitempty"`
+	Validation    *ValidationConfig    `json:"validation,omitempty" yaml:"validation,omitempty"`
+	ErrorHandling *ErrorHandlingConfig `json:"error_handling,omitempty" yaml:"error_handling,omitempty"`
+	Collaboration *CollaborationConfig `json:"collaboration,omitempty" yaml:"collaboration,omitempty"`
+	Reflection    *ReflectionConfig    `json:"reflection,omitempty" yaml:"reflection,omitempty"`
 }

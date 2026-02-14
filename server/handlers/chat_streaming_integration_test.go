@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/streaming"
 	"github.com/stretchr/testify/assert"
 )
@@ -310,6 +310,8 @@ func TestStreamingCancellation(t *testing.T) {
 }
 
 func TestGetUserTier(t *testing.T) {
+	h := NewChatHandler(nil, nil, nil, nil)
+
 	tests := []struct {
 		name     string
 		userID   string
@@ -329,7 +331,7 @@ func TestGetUserTier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getUserTier(tt.userID)
+			result := h.getUserTier(tt.userID)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

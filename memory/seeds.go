@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -70,7 +70,7 @@ func (sm *SeedManager) initSchema() error {
 // Automatically excludes soft-deleted seeds.
 // Returns seeds ordered by creation time (newest first).
 func (sm *SeedManager) GetSeeds(ctx context.Context, projectID *string, filters map[string]interface{}) ([]MemorySeed, error) {
-	log.Printf("INFO [SeedManager]: GetSeeds called (project=%v, filters=%v)", projectID, filters)
+	slog.Info("GetSeeds called", "project_id", projectID, "filters", filters)
 
 	query := `
 		SELECT id, project_id, content, seed_type, source, user_editable, 
@@ -108,7 +108,7 @@ func (sm *SeedManager) GetSeeds(ctx context.Context, projectID *string, filters 
 
 	rows, err := sm.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to query seeds: %v", err)
+		slog.Error("failed to query seeds", "error", err)
 		return nil, fmt.Errorf("failed to query seeds: %w", err)
 	}
 	defer rows.Close()
@@ -118,7 +118,7 @@ func (sm *SeedManager) GetSeeds(ctx context.Context, projectID *string, filters 
 		return nil, err
 	}
 
-	log.Printf("INFO [SeedManager]: Retrieved %d seeds", len(seeds))
+	slog.Info("retrieved seeds", "count", len(seeds))
 	return seeds, nil
 }
 
@@ -129,7 +129,7 @@ func (sm *SeedManager) GetSeedByID(ctx context.Context, id string) (*MemorySeed,
 		return nil, fmt.Errorf("id is required")
 	}
 
-	log.Printf("INFO [SeedManager]: GetSeedByID called (id=%s)", id)
+	slog.Info("GetSeedByID called", "seed_id", id)
 
 	query := `
 		SELECT id, project_id, content, seed_type, source, user_editable, 
@@ -160,11 +160,11 @@ func (sm *SeedManager) GetSeedByID(ctx context.Context, id string) (*MemorySeed,
 	)
 
 	if err == sql.ErrNoRows {
-		log.Printf("WARNING [SeedManager]: Seed not found: %s", id)
+		slog.Warn("seed not found", "seed_id", id)
 		return nil, ErrSeedNotFound
 	}
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to get seed %s: %v", id, err)
+		slog.Error("failed to get seed", "seed_id", id, "error", err)
 		return nil, fmt.Errorf("failed to get seed: %w", err)
 	}
 
@@ -196,24 +196,24 @@ func (sm *SeedManager) UpdateSeed(ctx context.Context, id, content string, userI
 	}
 
 	if err := validateContent(content); err != nil {
-		log.Printf("ERROR [SeedManager]: Invalid content for seed %s: %v", id, err)
+		slog.Error("invalid content for seed", "seed_id", id, "error", err)
 		return nil, err
 	}
 
 	seed, err := sm.GetSeedByID(ctx, id)
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to get seed %s: %v", id, err)
+		slog.Error("failed to get seed for update", "seed_id", id, "error", err)
 		return nil, err
 	}
 
 	if !seed.UserEditable {
-		log.Printf("WARNING [SeedManager]: Attempt to update non-editable seed %s", id)
+		slog.Warn("attempt to update non-editable seed", "seed_id", id)
 		return nil, ErrSeedNotEditable
 	}
 
 	tx, err := sm.db.BeginTx(ctx, nil)
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to begin transaction: %v", err)
+		slog.Error("failed to begin transaction", "error", err)
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
@@ -222,12 +222,12 @@ func (sm *SeedManager) UpdateSeed(ctx context.Context, id, content string, userI
 	var currentVersion int
 	err = tx.QueryRowContext(ctx, "SELECT updated_at, version FROM memory_seeds WHERE id = ?", id).Scan(&currentUpdatedAt, &currentVersion)
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to check current version for seed %s: %v", id, err)
+		slog.Error("failed to check current version", "seed_id", id, "error", err)
 		return nil, fmt.Errorf("failed to check current version: %w", err)
 	}
 
 	if !currentUpdatedAt.Equal(seed.UpdatedAt) || currentVersion != seed.Version {
-		log.Printf("WARNING [SeedManager]: Concurrent modification detected for seed %s", id)
+		slog.Warn("concurrent modification detected", "seed_id", id)
 		return nil, ErrConcurrentModification
 	}
 
@@ -242,18 +242,18 @@ func (sm *SeedManager) UpdateSeed(ctx context.Context, id, content string, userI
 
 	result, err := tx.ExecContext(ctx, query, content, now, SourceUser, newVersion, id)
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to update seed %s: %v", id, err)
+		slog.Error("failed to update seed", "seed_id", id, "error", err)
 		return nil, fmt.Errorf("failed to update seed: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil || rowsAffected == 0 {
-		log.Printf("ERROR [SeedManager]: No rows affected when updating seed %s", id)
+		slog.Error("no rows affected when updating seed", "seed_id", id)
 		return nil, fmt.Errorf("seed update failed")
 	}
 
 	if err := tx.Commit(); err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to commit transaction: %v", err)
+		slog.Error("failed to commit transaction", "error", err)
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -262,7 +262,7 @@ func (sm *SeedManager) UpdateSeed(ctx context.Context, id, content string, userI
 	seed.Source = SourceUser
 	seed.Version = newVersion
 
-	log.Printf("INFO [SeedManager]: Updated seed %s (length=%d, version=%d)", id, len(content), newVersion)
+	slog.Info("updated seed", "seed_id", id, "content_length", len(content), "version", newVersion)
 	return seed, nil
 }
 
@@ -272,7 +272,7 @@ func (sm *SeedManager) UpdateSeed(ctx context.Context, id, content string, userI
 // Returns ErrProjectNotFound if the project doesn't exist.
 func (sm *SeedManager) CreateUserSeed(ctx context.Context, projectID *string, content, seedType, userID string) (*MemorySeed, error) {
 	if err := validateContent(content); err != nil {
-		log.Printf("ERROR [SeedManager]: Invalid content for new seed: %v", err)
+		slog.Error("invalid content for new seed", "error", err)
 		return nil, err
 	}
 
@@ -286,11 +286,11 @@ func (sm *SeedManager) CreateUserSeed(ctx context.Context, projectID *string, co
 	if projectID != nil && *projectID != "" {
 		exists, err := sm.projectExists(ctx, *projectID)
 		if err != nil {
-			log.Printf("ERROR [SeedManager]: Failed to validate project existence: %v", err)
+			slog.Error("failed to validate project existence", "error", err)
 			return nil, err
 		}
 		if !exists {
-			log.Printf("WARNING [SeedManager]: Attempt to create seed for non-existent project %s", *projectID)
+			slog.Warn("attempt to create seed for non-existent project", "project_id", *projectID)
 			return nil, ErrProjectNotFound
 		}
 	}
@@ -341,12 +341,11 @@ func (sm *SeedManager) CreateUserSeed(ctx context.Context, projectID *string, co
 	)
 
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to create seed: %v", err)
+		slog.Error("failed to create seed", "error", err)
 		return nil, fmt.Errorf("failed to create seed: %w", err)
 	}
 
-	log.Printf("INFO [SeedManager]: Created user seed %s (project=%v, type=%s, length=%d)",
-		seed.ID, projectID, seedType, len(content))
+	slog.Info("created user seed", "seed_id", seed.ID, "project_id", projectID, "seed_type", seedType, "content_length", len(content))
 	return seed, nil
 }
 
@@ -362,19 +361,17 @@ func (sm *SeedManager) DeleteSeed(ctx context.Context, id string, userID *string
 
 	seed, err := sm.GetSeedByID(ctx, id)
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to get seed %s for deletion: %v", id, err)
+		slog.Error("failed to get seed for deletion", "seed_id", id, "error", err)
 		return err
 	}
 
 	if seed.Source != SourceUser || !seed.UserEditable {
-		log.Printf("WARNING [SeedManager]: Attempt to delete non-user seed %s (source=%s, editable=%v)",
-			id, seed.Source, seed.UserEditable)
+		slog.Warn("attempt to delete non-user seed", "seed_id", id, "source", seed.Source, "user_editable", seed.UserEditable)
 		return ErrCannotDeleteSystemSeed
 	}
 
 	if userID != nil && seed.CreatedBy != nil && *seed.CreatedBy != *userID {
-		log.Printf("WARNING [SeedManager]: Permission denied for user %s to delete seed %s (owner=%s)",
-			*userID, id, *seed.CreatedBy)
+		slog.Warn("permission denied to delete seed", "user_id", *userID, "seed_id", id, "owner", *seed.CreatedBy)
 		return ErrPermissionDenied
 	}
 
@@ -387,7 +384,7 @@ func (sm *SeedManager) DeleteSeed(ctx context.Context, id string, userID *string
 
 	result, err := sm.db.ExecContext(ctx, query, now, id, SourceUser)
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to soft-delete seed %s: %v", id, err)
+		slog.Error("failed to soft-delete seed", "seed_id", id, "error", err)
 		return fmt.Errorf("failed to delete seed: %w", err)
 	}
 
@@ -397,11 +394,11 @@ func (sm *SeedManager) DeleteSeed(ctx context.Context, id string, userID *string
 	}
 
 	if rowsAffected == 0 {
-		log.Printf("ERROR [SeedManager]: No rows affected when deleting seed %s", id)
+		slog.Error("no rows affected when deleting seed", "seed_id", id)
 		return fmt.Errorf("seed not found: %s", id)
 	}
 
-	log.Printf("INFO [SeedManager]: Soft-deleted seed %s", id)
+	slog.Info("soft-deleted seed", "seed_id", id)
 	return nil
 }
 
@@ -421,7 +418,7 @@ func (sm *SeedManager) IncrementUsage(ctx context.Context, id string) error {
 
 	result, err := sm.db.ExecContext(ctx, query, now, id)
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to increment usage for seed %s: %v", id, err)
+		slog.Error("failed to increment usage", "seed_id", id, "error", err)
 		return fmt.Errorf("failed to increment usage: %w", err)
 	}
 
@@ -431,11 +428,11 @@ func (sm *SeedManager) IncrementUsage(ctx context.Context, id string) error {
 	}
 
 	if rowsAffected == 0 {
-		log.Printf("WARNING [SeedManager]: Seed not found when incrementing usage: %s", id)
+		slog.Warn("seed not found when incrementing usage", "seed_id", id)
 		return fmt.Errorf("seed not found: %s", id)
 	}
 
-	log.Printf("INFO [SeedManager]: Incremented usage for seed %s", id)
+	slog.Info("incremented usage for seed", "seed_id", id)
 	return nil
 }
 
@@ -462,7 +459,7 @@ func (sm *SeedManager) SearchSeeds(ctx context.Context, projectID *string, query
 		limit = 100
 	}
 
-	log.Printf("INFO [SeedManager]: SearchSeeds called (project=%v, query=%s, limit=%d)", projectID, query, limit)
+	slog.Info("SearchSeeds called", "project_id", projectID, "query", query, "limit", limit)
 
 	sqlQuery := `
 		SELECT id, project_id, content, seed_type, source, user_editable, 
@@ -483,7 +480,7 @@ func (sm *SeedManager) SearchSeeds(ctx context.Context, projectID *string, query
 
 	rows, err := sm.db.QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
-		log.Printf("ERROR [SeedManager]: Failed to search seeds: %v", err)
+		slog.Error("failed to search seeds", "error", err)
 		return nil, fmt.Errorf("failed to search seeds: %w", err)
 	}
 	defer rows.Close()
@@ -493,7 +490,7 @@ func (sm *SeedManager) SearchSeeds(ctx context.Context, projectID *string, query
 		return nil, err
 	}
 
-	log.Printf("INFO [SeedManager]: Found %d seeds matching query", len(seeds))
+	slog.Info("found seeds matching query", "count", len(seeds))
 	return seeds, nil
 }
 

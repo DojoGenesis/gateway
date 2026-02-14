@@ -1,16 +1,21 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
 	"github.com/gin-gonic/gin"
 )
 
-var traceStorage *trace.TraceStorage
+// TraceHandler handles trace-related HTTP requests.
+type TraceHandler struct {
+	storage *trace.TraceStorage
+}
 
-func InitializeTraceHandlers(ts *trace.TraceStorage) {
-	traceStorage = ts
+// NewTraceHandler creates a new TraceHandler.
+func NewTraceHandler(ts *trace.TraceStorage) *TraceHandler {
+	return &TraceHandler{storage: ts}
 }
 
 type ListTracesRequest struct {
@@ -18,22 +23,15 @@ type ListTracesRequest struct {
 	Limit     int    `form:"limit"`
 }
 
-func HandleListTraces(c *gin.Context) {
-	if traceStorage == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "trace storage not initialized",
-		})
+func (h *TraceHandler) ListTraces(c *gin.Context) {
+	if h.storage == nil {
+		respondInternalErrorWithSuccess(c, "trace storage not initialized")
 		return
 	}
 
 	var req ListTracesRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid query parameters",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Invalid query parameters")
 		return
 	}
 
@@ -51,20 +49,14 @@ func HandleListTraces(c *gin.Context) {
 	}
 
 	if sessionID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "session_id is required",
-		})
+		respondBadRequestWithSuccess(c, "session_id is required")
 		return
 	}
 
-	traces, err := traceStorage.ListTraces(c.Request.Context(), sessionID, limit)
+	traces, err := h.storage.ListTraces(c.Request.Context(), sessionID, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to list traces",
-			"details": err.Error(),
-		})
+		slog.Error("failed to list traces", "error", err, "session_id", sessionID)
+		respondInternalErrorWithSuccess(c, "Failed to list traces")
 		return
 	}
 
@@ -75,31 +67,21 @@ func HandleListTraces(c *gin.Context) {
 	})
 }
 
-func HandleGetTrace(c *gin.Context) {
-	if traceStorage == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "trace storage not initialized",
-		})
+func (h *TraceHandler) GetTrace(c *gin.Context) {
+	if h.storage == nil {
+		respondInternalErrorWithSuccess(c, "trace storage not initialized")
 		return
 	}
 
 	traceID := c.Param("trace_id")
 	if traceID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "trace_id is required",
-		})
+		respondBadRequestWithSuccess(c, "trace_id is required")
 		return
 	}
 
-	trace, err := traceStorage.RetrieveTrace(c.Request.Context(), traceID)
+	trace, err := h.storage.RetrieveTrace(c.Request.Context(), traceID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Trace not found",
-			"details": err.Error(),
-		})
+		respondNotFoundWithSuccess(c, "Trace not found")
 		return
 	}
 
@@ -109,41 +91,28 @@ func HandleGetTrace(c *gin.Context) {
 	})
 }
 
-func HandleGetTraceReplay(c *gin.Context) {
-	if traceStorage == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "trace storage not initialized",
-		})
+func (h *TraceHandler) GetTraceReplay(c *gin.Context) {
+	if h.storage == nil {
+		respondInternalErrorWithSuccess(c, "trace storage not initialized")
 		return
 	}
 
 	traceID := c.Param("trace_id")
 	if traceID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "trace_id is required",
-		})
+		respondBadRequestWithSuccess(c, "trace_id is required")
 		return
 	}
 
-	trace, err := traceStorage.RetrieveTrace(c.Request.Context(), traceID)
+	trace, err := h.storage.RetrieveTrace(c.Request.Context(), traceID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Trace not found",
-			"details": err.Error(),
-		})
+		respondNotFoundWithSuccess(c, "Trace not found")
 		return
 	}
 
-	spans, err := traceStorage.ListSpansByTrace(c.Request.Context(), traceID)
+	spans, err := h.storage.ListSpansByTrace(c.Request.Context(), traceID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to retrieve spans",
-			"details": err.Error(),
-		})
+		slog.Error("failed to retrieve spans for replay", "error", err, "trace_id", traceID)
+		respondInternalErrorWithSuccess(c, "Failed to retrieve spans")
 		return
 	}
 
@@ -206,7 +175,7 @@ func spanToMap(span *trace.Span) map[string]interface{} {
 
 func attachChildren(spans []map[string]interface{}, childrenMap map[string][]map[string]interface{}) {
 	for _, span := range spans {
-		spanID := span["span_id"].(string)
+		spanID, _ := span["span_id"].(string)
 		if children, ok := childrenMap[spanID]; ok {
 			span["children"] = children
 			attachChildren(children, childrenMap)
@@ -214,31 +183,21 @@ func attachChildren(spans []map[string]interface{}, childrenMap map[string][]map
 	}
 }
 
-func HandleGetSpan(c *gin.Context) {
-	if traceStorage == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "trace storage not initialized",
-		})
+func (h *TraceHandler) GetSpan(c *gin.Context) {
+	if h.storage == nil {
+		respondInternalErrorWithSuccess(c, "trace storage not initialized")
 		return
 	}
 
 	spanID := c.Param("span_id")
 	if spanID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "span_id is required",
-		})
+		respondBadRequestWithSuccess(c, "span_id is required")
 		return
 	}
 
-	span, err := traceStorage.RetrieveSpan(c.Request.Context(), spanID)
+	span, err := h.storage.RetrieveSpan(c.Request.Context(), spanID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Span not found",
-			"details": err.Error(),
-		})
+		respondNotFoundWithSuccess(c, "Span not found")
 		return
 	}
 
@@ -248,41 +207,28 @@ func HandleGetSpan(c *gin.Context) {
 	})
 }
 
-func HandleGetTraceStats(c *gin.Context) {
-	if traceStorage == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "trace storage not initialized",
-		})
+func (h *TraceHandler) GetTraceStats(c *gin.Context) {
+	if h.storage == nil {
+		respondInternalErrorWithSuccess(c, "trace storage not initialized")
 		return
 	}
 
 	traceID := c.Param("trace_id")
 	if traceID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "trace_id is required",
-		})
+		respondBadRequestWithSuccess(c, "trace_id is required")
 		return
 	}
 
-	trace, err := traceStorage.RetrieveTrace(c.Request.Context(), traceID)
+	trace, err := h.storage.RetrieveTrace(c.Request.Context(), traceID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Trace not found",
-			"details": err.Error(),
-		})
+		respondNotFoundWithSuccess(c, "Trace not found")
 		return
 	}
 
-	spans, err := traceStorage.ListSpansByTrace(c.Request.Context(), traceID)
+	spans, err := h.storage.ListSpansByTrace(c.Request.Context(), traceID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to retrieve spans",
-			"details": err.Error(),
-		})
+		slog.Error("failed to retrieve spans for stats", "error", err, "trace_id", traceID)
+		respondInternalErrorWithSuccess(c, "Failed to retrieve spans")
 		return
 	}
 

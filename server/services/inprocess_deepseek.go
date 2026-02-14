@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -31,10 +31,10 @@ type APIKeyResolver func(ctx context.Context) string
 // it will be called at each request to get the current API key. This allows
 // keys added through the Dev Mode UI to be picked up immediately.
 type InProcessDeepSeekProvider struct {
-	apiKey     string
+	apiKey      string
 	keyResolver APIKeyResolver
-	baseURL    string
-	client     *http.Client
+	baseURL     string
+	client      *http.Client
 }
 
 // NewInProcessDeepSeekProvider creates a new in-process DeepSeek API provider.
@@ -118,24 +118,24 @@ func (p *InProcessDeepSeekProvider) ListModels(ctx context.Context) ([]provider.
 
 // deepseekRequest is the API request format for DeepSeek.
 type deepseekRequest struct {
-	Model       string              `json:"model"`
-	Messages    []deepseekMessage   `json:"messages"`
-	Temperature float64             `json:"temperature,omitempty"`
-	MaxTokens   int                 `json:"max_tokens,omitempty"`
-	Stream      bool                `json:"stream"`
-	Tools       []deepseekTool      `json:"tools,omitempty"`
+	Model       string            `json:"model"`
+	Messages    []deepseekMessage `json:"messages"`
+	Temperature float64           `json:"temperature,omitempty"`
+	MaxTokens   int               `json:"max_tokens,omitempty"`
+	Stream      bool              `json:"stream"`
+	Tools       []deepseekTool    `json:"tools,omitempty"`
 }
 
 type deepseekMessage struct {
-	Role       string              `json:"role"`
-	Content    string              `json:"content"`
-	ToolCalls  []deepseekToolCall  `json:"tool_calls,omitempty"`
-	ToolCallID string              `json:"tool_call_id,omitempty"`
+	Role       string             `json:"role"`
+	Content    string             `json:"content"`
+	ToolCalls  []deepseekToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string             `json:"tool_call_id,omitempty"`
 }
 
 type deepseekTool struct {
-	Type     string             `json:"type"`
-	Function deepseekFunction   `json:"function"`
+	Type     string           `json:"type"`
+	Function deepseekFunction `json:"function"`
 }
 
 type deepseekFunction struct {
@@ -161,7 +161,7 @@ type deepseekResponse struct {
 		Message struct {
 			Role      string             `json:"role"`
 			Content   string             `json:"content"`
-			ToolCalls []deepseekToolCall  `json:"tool_calls,omitempty"`
+			ToolCalls []deepseekToolCall `json:"tool_calls,omitempty"`
 		} `json:"message"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
@@ -180,7 +180,7 @@ type deepseekStreamChunk struct {
 		Delta struct {
 			Role      string             `json:"role"`
 			Content   string             `json:"content"`
-			ToolCalls []deepseekToolCall  `json:"tool_calls,omitempty"`
+			ToolCalls []deepseekToolCall `json:"tool_calls,omitempty"`
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 	} `json:"choices"`
@@ -342,7 +342,7 @@ func (p *InProcessDeepSeekProvider) GenerateCompletionStream(ctx context.Context
 
 			var chunk deepseekStreamChunk
 			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-				log.Printf("[InProcessDeepSeek] Failed to decode stream chunk: %v", err)
+				slog.Error("failed to decode stream chunk", "error", err)
 				continue
 			}
 

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

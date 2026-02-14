@@ -4,9 +4,7 @@ linters:
   enable:
     - errcheck
     - govet
-    - staticcheck
-    - unused
-    - gosimple
+    - staticcheck  # includes gosimple and unused checks
     - ineffassign
     - gosec
     - bodyclose

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -310,12 +310,12 @@ func (gm *GardenManager) RetrieveCompressedHistory(ctx context.Context, sessionI
 		)
 
 		if err != nil {
-			log.Printf("warning: failed to scan compressed history row: %v", err)
+			slog.Warn("failed to scan compressed history row", "error", err)
 			continue
 		}
 
 		if err := json.Unmarshal([]byte(originalTurnIDsJSON), &history.OriginalTurnIDs); err != nil {
-			log.Printf("warning: failed to unmarshal original_turn_ids for history %s: %v", history.ID, err)
+			slog.Warn("failed to unmarshal original_turn_ids", "history_id", history.ID, "error", err)
 			continue
 		}
 
@@ -419,12 +419,12 @@ func (gm *GardenManager) ListSnapshots(ctx context.Context, sessionID string) ([
 		)
 
 		if err != nil {
-			log.Printf("warning: failed to scan snapshot row: %v", err)
+			slog.Warn("failed to scan snapshot row", "error", err)
 			continue
 		}
 
 		if err := json.Unmarshal([]byte(snapshotDataJSON), &snapshot.SnapshotData); err != nil {
-			log.Printf("warning: failed to unmarshal snapshot_data for snapshot %s: %v", snapshot.ID, err)
+			slog.Warn("failed to unmarshal snapshot_data", "snapshot_id", snapshot.ID, "error", err)
 			continue
 		}
 
@@ -471,7 +471,7 @@ func (gm *GardenManager) ListSeeds(ctx context.Context, limit int) ([]Seed, erro
 		)
 
 		if err != nil {
-			log.Printf("warning: failed to scan seed row in ListSeeds: %v", err)
+			slog.Warn("failed to scan seed row", "method", "ListSeeds", "error", err)
 			continue
 		}
 
@@ -523,7 +523,7 @@ func (gm *GardenManager) SearchSeedsByTrigger(ctx context.Context, trigger strin
 		)
 
 		if err != nil {
-			log.Printf("warning: failed to scan seed row: %v", err)
+			slog.Warn("failed to scan seed row", "error", err)
 			continue
 		}
 

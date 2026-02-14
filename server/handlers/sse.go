@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -25,7 +25,7 @@ const channelBufferSize = 100
 func HandleSSE(c *gin.Context) {
 	clientID := c.Query("client_id")
 	if clientID == "" {
-		c.JSON(400, gin.H{"error": "client_id query parameter is required"})
+		respondBadRequest(c, "client_id query parameter is required")
 		return
 	}
 
@@ -42,13 +42,13 @@ func HandleSSE(c *gin.Context) {
 
 	clientsMutex.Lock()
 	if existingClient, exists := clients[clientID]; exists {
-		log.Printf("SSE: Client %s already connected, closing old connection", clientID)
+		slog.Warn("SSE client already connected, closing old connection", "client_id", clientID)
 		close(existingClient.Channel)
 	}
 	clients[clientID] = client
 	clientsMutex.Unlock()
 
-	log.Printf("SSE: Client %s connected", clientID)
+	slog.Info("SSE client connected", "client_id", clientID)
 
 	defer func() {
 		clientsMutex.Lock()
@@ -57,13 +57,13 @@ func HandleSSE(c *gin.Context) {
 			close(client.Channel)
 		}
 		clientsMutex.Unlock()
-		log.Printf("SSE: Client %s disconnected", clientID)
+		slog.Info("SSE client disconnected", "client_id", clientID)
 	}()
 
 	c.Writer.WriteHeader(http.StatusOK)
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
-		log.Printf("SSE: Streaming not supported for client %s", clientID)
+		slog.Warn("SSE streaming not supported", "client_id", clientID)
 		return
 	}
 
@@ -77,7 +77,7 @@ func HandleSSE(c *gin.Context) {
 			}
 			_, err := fmt.Fprintf(c.Writer, "%s", msg)
 			if err != nil {
-				log.Printf("SSE: Error writing to client %s: %v", clientID, err)
+				slog.Error("SSE write error", "client_id", clientID, "error", err)
 				return
 			}
 			flusher.Flush()
@@ -149,7 +149,7 @@ func DisconnectClient(clientID string) bool {
 	if client, exists := clients[clientID]; exists {
 		close(client.Channel)
 		delete(clients, clientID)
-		log.Printf("SSE: Client %s forcefully disconnected", clientID)
+		slog.Info("SSE client forcefully disconnected", "client_id", clientID)
 		return true
 	}
 	return false

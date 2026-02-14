@@ -92,10 +92,10 @@ func TestHandleCreateProject(t *testing.T) {
 		t.Fatalf("Failed to create project manager: %v", err)
 	}
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	router := gin.New()
-	router.POST("/api/v1/projects", HandleCreateProject)
+	router.POST("/api/v1/projects", h.CreateProject)
 
 	reqBody := CreateProjectRequest{
 		Name:        "Test Project",
@@ -139,10 +139,10 @@ func TestHandleListProjects(t *testing.T) {
 	pm.CreateProject(ctx, "Project 1", "Description 1", "")
 	pm.CreateProject(ctx, "Project 2", "Description 2", "")
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	router := gin.New()
-	router.GET("/api/v1/projects", HandleListProjects)
+	router.GET("/api/v1/projects", h.ListProjects)
 
 	req, _ := http.NewRequest("GET", "/api/v1/projects", nil)
 	w := httptest.NewRecorder()
@@ -180,10 +180,10 @@ func TestHandleGetProject(t *testing.T) {
 	ctx := context.Background()
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	router := gin.New()
-	router.GET("/api/v1/projects/:id", HandleGetProject)
+	router.GET("/api/v1/projects/:id", h.GetProject)
 
 	req, _ := http.NewRequest("GET", "/api/v1/projects/"+project.ID, nil)
 	w := httptest.NewRecorder()
@@ -217,10 +217,10 @@ func TestHandleUpdateProject(t *testing.T) {
 	ctx := context.Background()
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	router := gin.New()
-	router.PUT("/api/v1/projects/:id", HandleUpdateProject)
+	router.PUT("/api/v1/projects/:id", h.UpdateProject)
 
 	reqBody := UpdateProjectRequest{
 		Description: "Updated description",
@@ -261,10 +261,10 @@ func TestHandleDeleteProject(t *testing.T) {
 	ctx := context.Background()
 	project, _ := pm.CreateProject(ctx, "Test Project", "Description", "")
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	router := gin.New()
-	router.DELETE("/api/v1/projects/:id", HandleDeleteProject)
+	router.DELETE("/api/v1/projects/:id", h.DeleteProject)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/projects/"+project.ID, nil)
 	w := httptest.NewRecorder()
@@ -295,10 +295,10 @@ func TestHandleListProjectTemplates(t *testing.T) {
 		t.Fatalf("Failed to create project manager: %v", err)
 	}
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	router := gin.New()
-	router.GET("/api/v1/projects/templates", HandleListProjectTemplates)
+	router.GET("/api/v1/projects/templates", h.ListProjectTemplates)
 
 	req, _ := http.NewRequest("GET", "/api/v1/projects/templates", nil)
 	w := httptest.NewRecorder()
@@ -336,10 +336,10 @@ func TestHandleExportProject(t *testing.T) {
 	ctx := context.Background()
 	project, _ := pm.CreateProject(ctx, "Export Test Project", "Test export", "")
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	router := gin.New()
-	router.GET("/api/v1/projects/:id/export", HandleExportProject)
+	router.GET("/api/v1/projects/:id/export", h.ExportProject)
 
 	req, _ := http.NewRequest("GET", "/api/v1/projects/"+project.ID+"/export", nil)
 	w := httptest.NewRecorder()
@@ -370,10 +370,10 @@ func TestHandleCreateProject_EmptyName(t *testing.T) {
 		t.Fatalf("Failed to create project manager: %v", err)
 	}
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	router := gin.New()
-	router.POST("/api/v1/projects", HandleCreateProject)
+	router.POST("/api/v1/projects", h.CreateProject)
 
 	reqBody := CreateProjectRequest{
 		Name:        "   ",
@@ -412,10 +412,10 @@ func TestHandleGetProject_NotFound(t *testing.T) {
 		t.Fatalf("Failed to create project manager: %v", err)
 	}
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	router := gin.New()
-	router.GET("/api/v1/projects/:id", HandleGetProject)
+	router.GET("/api/v1/projects/:id", h.GetProject)
 
 	req, _ := http.NewRequest("GET", "/api/v1/projects/nonexistent-id", nil)
 	w := httptest.NewRecorder()

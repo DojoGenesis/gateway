@@ -11,13 +11,13 @@ import (
 
 // AllowedScripts is the security allowlist of scripts that can be executed
 var AllowedScripts = map[string]bool{
-	"init_skill.py":    true,
-	"suggest_seeds.py": true,
-	"diff_tracker.py":  true,
+	"init_skill.py":     true,
+	"suggest_seeds.py":  true,
+	"diff_tracker.py":   true,
 	"context_mapper.py": true,
-	"smart_clone.sh":   true,
-	"apply_seed.py":    true,
-	"lychee":           true,
+	"smart_clone.sh":    true,
+	"apply_seed.py":     true,
+	"lychee":            true,
 	"validate_skill.py": true, // Additional script for skill validation
 }
 

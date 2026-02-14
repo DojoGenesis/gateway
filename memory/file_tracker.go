@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"sort"
 	"time"
 
@@ -200,7 +200,7 @@ func (ft *FileTracker) ListFiles(ctx context.Context, tier int, limit int, offse
 		)
 
 		if err != nil {
-			log.Printf("Warning: failed to scan file row: %v", err)
+			slog.Warn("failed to scan file row", "error", err)
 			continue
 		}
 

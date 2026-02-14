@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 )
 
 func TestPacingDelay_Deliberate(t *testing.T) {

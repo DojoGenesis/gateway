@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	defaultUserAgent        = "DojoGenesis/0.0.16"
-	defaultTimeoutFallback  = 30 * time.Second
-	maxRetries              = 3
-	retryDelay              = 1 * time.Second
+	defaultUserAgent       = "DojoGenesis/0.0.16"
+	defaultTimeoutFallback = 30 * time.Second
+	maxRetries             = 3
+	retryDelay             = 1 * time.Second
 )
 
 var defaultTimeout = getWebTimeout()

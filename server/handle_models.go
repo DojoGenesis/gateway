@@ -10,13 +10,13 @@ import (
 
 // OpenAIModel represents a model in OpenAI format.
 type OpenAIModel struct {
-	ID         string                `json:"id"`
-	Object     string                `json:"object"`
-	Created    int64                 `json:"created"`
-	OwnedBy   string                `json:"owned_by"`
-	Permission []OpenAIModelPerm     `json:"permission"`
-	Root       string                `json:"root"`
-	Parent     interface{}           `json:"parent"`
+	ID         string            `json:"id"`
+	Object     string            `json:"object"`
+	Created    int64             `json:"created"`
+	OwnedBy    string            `json:"owned_by"`
+	Permission []OpenAIModelPerm `json:"permission"`
+	Root       string            `json:"root"`
+	Parent     interface{}       `json:"parent"`
 }
 
 // OpenAIModelPerm represents model permissions in OpenAI format.
@@ -65,9 +65,9 @@ func (s *Server) handleListModels(c *gin.Context) {
 		for _, m := range provModels {
 			now := time.Now().Unix()
 			models = append(models, OpenAIModel{
-				ID:       m.ID,
-				Object:   "model",
-				Created:  now,
+				ID:      m.ID,
+				Object:  "model",
+				Created: now,
 				OwnedBy: provName,
 				Permission: []OpenAIModelPerm{
 					{

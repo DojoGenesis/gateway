@@ -6,20 +6,20 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/artifacts"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/artifacts"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/projects"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
 )
 
 const (
@@ -257,12 +257,13 @@ func (pa *PrimaryAgent) HandleQuery(ctx context.Context, query string, providerN
 
 	resp, err := provider.GenerateCompletion(ctxWithTimeout, req)
 	if err != nil {
-		log.Printf(`{"level":"error","component":"agent_runner","method":"HandleQuery","error":"%s","query_preview":"%s","model":"%s","provider":"%s","timestamp":"%s"}`,
-			err.Error(),
-			truncateQuery(query, 200),
-			req.Model,
-			providerName,
-			time.Now().UTC().Format(time.RFC3339),
+		slog.Error("failed to generate completion",
+			"component", "agent_runner",
+			"method", "HandleQuery",
+			"error", err,
+			"query_preview", truncateQuery(query, 200),
+			"model", req.Model,
+			"provider", providerName,
 		)
 		return nil, fmt.Errorf("failed to generate completion: %w", err)
 	}
@@ -357,12 +358,13 @@ func (pa *PrimaryAgent) HandleStreamingQuery(ctx context.Context, query string, 
 	pluginStream, err := provider.GenerateCompletionStream(ctxWithTimeout, req)
 	if err != nil {
 		cancel()
-		log.Printf(`{"level":"error","component":"agent_runner","method":"HandleStreamingQuery","error":"%s","query_preview":"%s","model":"%s","provider":"%s","timestamp":"%s"}`,
-			err.Error(),
-			truncateQuery(query, 200),
-			req.Model,
-			providerName,
-			time.Now().UTC().Format(time.RFC3339),
+		slog.Error("failed to start streaming completion",
+			"component", "agent_runner",
+			"method", "HandleStreamingQuery",
+			"error", err,
+			"query_preview", truncateQuery(query, 200),
+			"model", req.Model,
+			"provider", providerName,
 		)
 		return nil, fmt.Errorf("failed to start streaming completion: %w", err)
 	}
@@ -930,13 +932,14 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 				if err != nil {
 					pa.traceLogger.FailSpan(ctx, modelSpan, fmt.Sprintf("completion failed: %v", err))
 					ctx = trace.WithSpan(ctx, rootSpan)
-					log.Printf(`{"level":"error","component":"agent_runner","method":"HandleQueryWithTools","error":"%s","query_preview":"%s","model":"%s","provider":"%s","iteration":%d,"timestamp":"%s"}`,
-						err.Error(),
-						truncateQuery(req.Query, 200),
-						modelID,
-						providerName,
-						iteration,
-						time.Now().UTC().Format(time.RFC3339),
+					slog.Error("completion failed",
+						"component", "agent_runner",
+						"method", "HandleQueryWithTools",
+						"error", err,
+						"query_preview", truncateQuery(req.Query, 200),
+						"model", modelID,
+						"provider", providerName,
+						"iteration", iteration,
 					)
 					return nil, fmt.Errorf("completion failed: %w", err)
 				}
@@ -952,13 +955,14 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 			var err error
 			response, err = provider.GenerateCompletion(ctxWithTimeout, completionReq)
 			if err != nil {
-				log.Printf(`{"level":"error","component":"agent_runner","method":"HandleQueryWithTools","error":"%s","query_preview":"%s","model":"%s","provider":"%s","iteration":%d,"timestamp":"%s"}`,
-					err.Error(),
-					truncateQuery(req.Query, 200),
-					modelID,
-					providerName,
-					iteration,
-					time.Now().UTC().Format(time.RFC3339),
+				slog.Error("completion failed",
+					"component", "agent_runner",
+					"method", "HandleQueryWithTools",
+					"error", err,
+					"query_preview", truncateQuery(req.Query, 200),
+					"model", modelID,
+					"provider", providerName,
+					"iteration", iteration,
 				)
 				return nil, fmt.Errorf("completion failed: %w", err)
 			}
@@ -1192,7 +1196,7 @@ func (pa *PrimaryAgent) HandleQueryWithOrchestration(ctx context.Context, req Qu
 		// Create separate timeout context for memory storage (standard timeout)
 		memoryCtx, memoryCancel := context.WithTimeout(ctx, pa.timeout)
 		defer memoryCancel()
-		
+
 		if pa.traceLogger != nil {
 			memorySpan, spanErr := pa.traceLogger.StartSpan(ctx, traceID, "memory_storage", map[string]interface{}{
 				"user_id": req.UserID,
@@ -1202,7 +1206,7 @@ func (pa *PrimaryAgent) HandleQueryWithOrchestration(ctx context.Context, req Qu
 				if err := pa.storeConversation(memoryCtx, req.UserID, req.Query, response); err != nil {
 					// Log the error but don't fail the request since orchestration succeeded
 					pa.traceLogger.FailSpan(ctx, memorySpan, fmt.Sprintf("failed to store conversation: %v", err))
-					log.Printf("Warning: orchestration succeeded but failed to store conversation for user %s: %v", req.UserID, err)
+					slog.Warn("orchestration succeeded but failed to store conversation", "user_id", req.UserID, "error", err)
 					ctx = trace.WithSpan(ctx, rootSpan)
 				} else {
 					pa.traceLogger.EndSpan(ctx, memorySpan, nil)
@@ -1212,7 +1216,7 @@ func (pa *PrimaryAgent) HandleQueryWithOrchestration(ctx context.Context, req Qu
 		} else {
 			if err := pa.storeConversation(memoryCtx, req.UserID, req.Query, response); err != nil {
 				// Log the error but don't fail the request since orchestration succeeded
-				log.Printf("Warning: orchestration succeeded but failed to store conversation for user %s: %v", req.UserID, err)
+				slog.Warn("orchestration succeeded but failed to store conversation", "user_id", req.UserID, "error", err)
 			}
 		}
 	}
@@ -1232,7 +1236,7 @@ func (pa *PrimaryAgent) synthesizePlanSummary(ctx context.Context, plan *orchest
 	var contextBuilder strings.Builder
 	contextBuilder.WriteString(fmt.Sprintf("Original Task: %s\n\n", task.Description))
 	contextBuilder.WriteString("Execution Results:\n")
-	
+
 	for i, node := range plan.Nodes {
 		contextBuilder.WriteString(fmt.Sprintf("%d. Tool: %s (Status: %s)\n", i+1, node.ToolName, node.State))
 		if node.State == orchestrationpkg.NodeStateSuccess && node.Result != nil {
@@ -1242,7 +1246,7 @@ func (pa *PrimaryAgent) synthesizePlanSummary(ctx context.Context, plan *orchest
 			contextBuilder.WriteString(fmt.Sprintf("   Error: %s\n", node.Error))
 		}
 	}
-	
+
 	// Create synthesis prompt
 	synthesisPrompt := fmt.Sprintf(`You are an AI assistant that synthesizes technical execution results into clear, user-friendly summaries.
 
@@ -1255,13 +1259,13 @@ Given the following task execution details, create a natural language summary th
 %s
 
 Provide only the summary, without preamble or meta-commentary.`, contextBuilder.String())
-	
+
 	// Attempt to synthesize using default provider
 	provider, err := pa.pluginManager.GetProvider(pa.defaultProvider)
 	if err != nil {
 		return "" // Fallback to technical response
 	}
-	
+
 	messages := []providerpkg.Message{
 		{Role: "system", Content: "You are a helpful AI assistant that creates clear, concise summaries."},
 		{Role: "user", Content: synthesisPrompt},
@@ -1272,16 +1276,16 @@ Provide only the summary, without preamble or meta-commentary.`, contextBuilder.
 		Messages:    messages,
 		Temperature: 0.3, // Lower temperature for more focused summaries
 	}
-	
+
 	// Use a short timeout for synthesis to avoid delays
 	synthesisCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	
+
 	resp, err := provider.GenerateCompletion(synthesisCtx, req)
 	if err != nil {
 		return "" // Fallback to technical response
 	}
-	
+
 	return resp.Content
 }
 
@@ -1299,15 +1303,15 @@ func (pa *PrimaryAgent) buildResponseFromPlan(plan *orchestrationpkg.Plan, task 
 			failedNodes++
 		}
 	}
-	
+
 	// Try to generate natural language summary if synthesis is enabled
 	enableSynthesis := true // Can be made configurable
 	var naturalSummary string
-	
+
 	if enableSynthesis && pa.pluginManager != nil && successfulNodes > 0 {
 		naturalSummary = pa.synthesizePlanSummary(context.Background(), plan, task)
 	}
-	
+
 	// If we got a natural summary, use it as the primary content
 	if naturalSummary != "" {
 		contentBuilder.WriteString(naturalSummary)
@@ -1378,7 +1382,7 @@ func (pa *PrimaryAgent) buildResponseFromPlan(plan *orchestrationpkg.Plan, task 
 			usage.TotalTokens = int(totalTokens)
 		}
 	}
-	
+
 	// If total_usage not found, try to extract from individual node metadata
 	if usage.TotalTokens == 0 {
 		for _, node := range plan.Nodes {
@@ -1445,7 +1449,7 @@ func (pa *PrimaryAgent) shouldUseOrchestration(intent Intent, confidence float64
 		"step 1", "step 2", "step 3",
 		"1.", "2.", "3.",
 	}
-	
+
 	hasMultiStep := false
 	for _, indicator := range multiStepIndicators {
 		if strings.Contains(queryLower, indicator) {
@@ -1455,16 +1459,16 @@ func (pa *PrimaryAgent) shouldUseOrchestration(intent Intent, confidence float64
 	}
 
 	// Check for research + creation pattern
-	hasResearch := strings.Contains(queryLower, "research") || 
-		strings.Contains(queryLower, "find") || 
+	hasResearch := strings.Contains(queryLower, "research") ||
+		strings.Contains(queryLower, "find") ||
 		strings.Contains(queryLower, "search for")
-	
-	hasCreation := strings.Contains(queryLower, "create") || 
-		strings.Contains(queryLower, "generate") || 
-		strings.Contains(queryLower, "write") || 
+
+	hasCreation := strings.Contains(queryLower, "create") ||
+		strings.Contains(queryLower, "generate") ||
+		strings.Contains(queryLower, "write") ||
 		strings.Contains(queryLower, "make") ||
 		strings.Contains(queryLower, "build")
-	
+
 	hasResearchAndCreation := hasResearch && hasCreation
 
 	// Check for multiple tool-like actions
@@ -1501,21 +1505,21 @@ func (pa *PrimaryAgent) shouldUseOrchestration(intent Intent, confidence float64
 // v0.0.30: Orchestration routing metadata
 func (pa *PrimaryAgent) getOrchestrationReason(intent Intent, confidence float64, query string) string {
 	queryLower := strings.ToLower(query)
-	
+
 	if strings.Contains(queryLower, "and then") || strings.Contains(queryLower, "then") {
 		return "multi_step_sequence_detected"
 	}
-	
+
 	hasResearch := strings.Contains(queryLower, "research") || strings.Contains(queryLower, "find")
 	hasCreation := strings.Contains(queryLower, "create") || strings.Contains(queryLower, "generate")
 	if hasResearch && hasCreation {
 		return "research_and_creation_workflow"
 	}
-	
+
 	if strings.Contains(queryLower, "1.") || strings.Contains(queryLower, "step 1") {
 		return "numbered_steps_detected"
 	}
-	
+
 	actionWords := []string{"analyze", "summarize", "extract", "fetch", "compare"}
 	actionCount := 0
 	for _, action := range actionWords {
@@ -1526,10 +1530,10 @@ func (pa *PrimaryAgent) getOrchestrationReason(intent Intent, confidence float64
 	if actionCount >= 2 {
 		return "multiple_actions_detected"
 	}
-	
+
 	if (intent == IntentThink || intent == IntentBuild) && confidence >= 0.8 {
 		return "complex_intent_high_confidence"
 	}
-	
+
 	return "complex_query_heuristic"
 }

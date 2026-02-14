@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
 	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -17,13 +17,13 @@ func createTestAgentWithOrchestration(t *testing.T) *PrimaryAgent {
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
-	
+
 	eventChan := make(chan events.StreamEvent, 10)
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(1000, 5000, 10000)
-	
+
 	mockPlanner := &mockPlanner{
 		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
 			plan := orchestration.NewPlan(task.ID)
@@ -39,7 +39,7 @@ func createTestAgentWithOrchestration(t *testing.T) *PrimaryAgent {
 			return plan, nil
 		},
 	}
-	
+
 	engine := orchestration.NewEngine(
 		orchestration.DefaultEngineConfig(),
 		mockPlanner,
@@ -48,15 +48,15 @@ func createTestAgentWithOrchestration(t *testing.T) *PrimaryAgent {
 		costTracker,
 		budgetTracker,
 	)
-	
+
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
 	agent.EnableOrchestration(true)
-	
+
 	t.Cleanup(func() {
 		close(eventChan)
 	})
-	
+
 	return agent
 }
 
@@ -144,12 +144,12 @@ func TestShouldUseOrchestration(t *testing.T) {
 			description: "Should not route single action query",
 		},
 		{
-			name:        "no orchestration components",
-			query:       "Research and create a report",
-			intent:      IntentBuild,
-			confidence:  0.9,
-			userTier:    "premium",
-			setupAgent:  func(pa *PrimaryAgent) {
+			name:       "no orchestration components",
+			query:      "Research and create a report",
+			intent:     IntentBuild,
+			confidence: 0.9,
+			userTier:   "premium",
+			setupAgent: func(pa *PrimaryAgent) {
 				pa.orchestrationPlanner = nil
 				pa.orchestrationEngine = nil
 			},
@@ -171,7 +171,7 @@ func TestShouldUseOrchestration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create minimal agent with existing test mocks
 			agent := createTestAgentWithOrchestration(t)
-			
+
 			// Override setup if specified
 			if tt.setupAgent != nil {
 				tt.setupAgent(agent)

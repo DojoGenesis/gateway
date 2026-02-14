@@ -1,13 +1,13 @@
 // Package disposition provides agent disposition configuration management for the Agentic Gateway.
 //
 // The disposition package implements the ADA (Agent Disposition Architecture) contract,
-// which defines how agents are configured, initialized, and adapted at runtime. It provides:
+// which defines how agents are configured and loaded. It provides:
 //
 //   - Configuration parsing from YAML files (agent.yaml)
 //   - Mode-based configuration overrides (debug, prod, etc.)
 //   - Validation of configuration constraints
 //   - TTL-based caching for performance
-//   - Implementation of the gateway.AgentInitializer interface
+//   - Core disposition types and resolution logic
 //
 // # Configuration Structure
 //
@@ -42,21 +42,22 @@
 //
 // # Example Usage
 //
-//	// Create an agent initializer with 5-minute cache TTL
-//	initializer := disposition.NewAgentInitializer(5 * time.Minute)
-//
-//	// Initialize an agent for a workspace in production mode
-//	agentConfig, err := initializer.Initialize(
-//	    ctx,
-//	    "/path/to/workspace",
-//	    "prod",
-//	)
+//	// Load a disposition configuration from disk
+//	config, err := disposition.ResolveDisposition("/path/to/workspace", "prod")
 //	if err != nil {
-//	    log.Fatalf("Failed to initialize agent: %v", err)
+//	    log.Fatalf("Failed to load disposition: %v", err)
 //	}
 //
 //	// Use the configuration
-//	fmt.Printf("Agent: %s (ID: %s)\n", agentConfig.Name, agentConfig.AgentID)
+//	fmt.Printf("Pacing: %s, Depth: %s\n", config.Pacing, config.Depth)
+//
+//	// Or use the default configuration
+//	defaultConfig := disposition.DefaultDisposition()
+//
+//	// Validate a configuration
+//	if err := disposition.Validate(config); err != nil {
+//	    log.Fatalf("Invalid configuration: %v", err)
+//	}
 //
 // # Performance
 //

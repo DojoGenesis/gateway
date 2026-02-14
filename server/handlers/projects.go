@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -13,10 +13,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var projectManager *projects.ProjectManager
+// ProjectHandler handles project-related HTTP requests.
+type ProjectHandler struct {
+	manager *projects.ProjectManager
+}
 
-func InitializeProjectHandlers(pm *projects.ProjectManager) {
-	projectManager = pm
+// NewProjectHandler creates a new ProjectHandler.
+func NewProjectHandler(pm *projects.ProjectManager) *ProjectHandler {
+	return &ProjectHandler{manager: pm}
 }
 
 type CreateProjectRequest struct {
@@ -37,57 +41,38 @@ type ListProjectsRequest struct {
 	Status string `form:"status"`
 }
 
-func HandleCreateProject(c *gin.Context) {
-	if projectManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "project manager not initialized",
-		})
+func (h *ProjectHandler) CreateProject(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "project manager not initialized")
 		return
 	}
 
 	var req CreateProjectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid request body",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "invalid request body")
 		return
 	}
 
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "project name cannot be empty",
-		})
+		respondBadRequestWithSuccess(c, "project name cannot be empty")
 		return
 	}
 
 	if len(req.Name) > 200 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "project name too long (max 200 characters)",
-		})
+		respondBadRequestWithSuccess(c, "project name too long (max 200 characters)")
 		return
 	}
 
 	if len(req.Description) > 5000 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "description too long (max 5000 characters)",
-		})
+		respondBadRequestWithSuccess(c, "description too long (max 5000 characters)")
 		return
 	}
 
-	project, err := projectManager.CreateProject(c.Request.Context(), req.Name, req.Description, req.TemplateID)
+	project, err := h.manager.CreateProject(c.Request.Context(), req.Name, req.Description, req.TemplateID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to create project",
-			"details": err.Error(),
-		})
+		slog.Error("failed to create project", "error", err)
+		respondInternalErrorWithSuccess(c, "failed to create project")
 		return
 	}
 
@@ -97,31 +82,22 @@ func HandleCreateProject(c *gin.Context) {
 	})
 }
 
-func HandleGetProject(c *gin.Context) {
-	if projectManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "project manager not initialized",
-		})
+func (h *ProjectHandler) GetProject(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "project manager not initialized")
 		return
 	}
 
 	projectID := c.Param("id")
 	if projectID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "project ID is required",
-		})
+		respondBadRequestWithSuccess(c, "project ID is required")
 		return
 	}
 
-	project, err := projectManager.GetProject(c.Request.Context(), projectID)
+	project, err := h.manager.GetProject(c.Request.Context(), projectID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "project not found",
-			"details": err.Error(),
-		})
+		slog.Warn("project not found", "project_id", projectID, "error", err)
+		respondNotFoundWithSuccess(c, "project not found")
 		return
 	}
 
@@ -131,32 +107,22 @@ func HandleGetProject(c *gin.Context) {
 	})
 }
 
-func HandleListProjects(c *gin.Context) {
-	if projectManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "project manager not initialized",
-		})
+func (h *ProjectHandler) ListProjects(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "project manager not initialized")
 		return
 	}
 
 	var req ListProjectsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid query parameters",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "invalid query parameters")
 		return
 	}
 
-	projectsList, err := projectManager.ListProjects(c.Request.Context(), req.Status)
+	projectsList, err := h.manager.ListProjects(c.Request.Context(), req.Status)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to list projects",
-			"details": err.Error(),
-		})
+		slog.Error("failed to list projects", "error", err)
+		respondInternalErrorWithSuccess(c, "failed to list projects")
 		return
 	}
 
@@ -167,35 +133,25 @@ func HandleListProjects(c *gin.Context) {
 	})
 }
 
-func HandleUpdateProject(c *gin.Context) {
-	if projectManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "project manager not initialized",
-		})
+func (h *ProjectHandler) UpdateProject(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "project manager not initialized")
 		return
 	}
 
 	projectID := c.Param("id")
 	if projectID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "project ID is required",
-		})
+		respondBadRequestWithSuccess(c, "project ID is required")
 		return
 	}
 
 	var req UpdateProjectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid request body",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "invalid request body")
 		return
 	}
 
-	updatedProject, err := projectManager.UpdateProject(
+	updatedProject, err := h.manager.UpdateProject(
 		c.Request.Context(),
 		projectID,
 		req.Name,
@@ -205,11 +161,8 @@ func HandleUpdateProject(c *gin.Context) {
 		req.Metadata,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to update project",
-			"details": err.Error(),
-		})
+		slog.Error("failed to update project", "project_id", projectID, "error", err)
+		respondInternalErrorWithSuccess(c, "failed to update project")
 		return
 	}
 
@@ -219,30 +172,21 @@ func HandleUpdateProject(c *gin.Context) {
 	})
 }
 
-func HandleDeleteProject(c *gin.Context) {
-	if projectManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "project manager not initialized",
-		})
+func (h *ProjectHandler) DeleteProject(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "project manager not initialized")
 		return
 	}
 
 	projectID := c.Param("id")
 	if projectID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "project ID is required",
-		})
+		respondBadRequestWithSuccess(c, "project ID is required")
 		return
 	}
 
-	if err := projectManager.DeleteProject(c.Request.Context(), projectID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to delete project",
-			"details": err.Error(),
-		})
+	if err := h.manager.DeleteProject(c.Request.Context(), projectID); err != nil {
+		slog.Error("failed to delete project", "project_id", projectID, "error", err)
+		respondInternalErrorWithSuccess(c, "failed to delete project")
 		return
 	}
 
@@ -252,22 +196,16 @@ func HandleDeleteProject(c *gin.Context) {
 	})
 }
 
-func HandleListProjectTemplates(c *gin.Context) {
-	if projectManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "project manager not initialized",
-		})
+func (h *ProjectHandler) ListProjectTemplates(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "project manager not initialized")
 		return
 	}
 
-	templates, err := projectManager.ListTemplates(c.Request.Context())
+	templates, err := h.manager.ListTemplates(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to list templates",
-			"details": err.Error(),
-		})
+		slog.Error("failed to list templates", "error", err)
+		respondInternalErrorWithSuccess(c, "failed to list templates")
 		return
 	}
 
@@ -278,44 +216,32 @@ func HandleListProjectTemplates(c *gin.Context) {
 	})
 }
 
-func HandleExportProject(c *gin.Context) {
-	if projectManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "project manager not initialized",
-		})
+func (h *ProjectHandler) ExportProject(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "project manager not initialized")
 		return
 	}
 
 	projectID := c.Param("id")
 	if projectID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "project ID is required",
-		})
+		respondBadRequestWithSuccess(c, "project ID is required")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Minute)
 	defer cancel()
 
-	zipData, err := projectManager.ExportProject(ctx, projectID)
+	zipData, err := h.manager.ExportProject(ctx, projectID)
 	if err != nil {
-		log.Printf("Failed to export project %s: %v", projectID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to export project",
-		})
+		slog.Error("failed to export project", "project_id", projectID, "error", err)
+		respondInternalErrorWithSuccess(c, "failed to export project")
 		return
 	}
 
-	project, err := projectManager.GetProject(ctx, projectID)
+	project, err := h.manager.GetProject(ctx, projectID)
 	if err != nil {
-		log.Printf("Failed to get project details for %s: %v", projectID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to get project details",
-		})
+		slog.Error("failed to get project details", "project_id", projectID, "error", err)
+		respondInternalErrorWithSuccess(c, "failed to get project details")
 		return
 	}
 
@@ -326,21 +252,15 @@ func HandleExportProject(c *gin.Context) {
 	c.Data(http.StatusOK, "application/zip", zipData)
 }
 
-func HandleImportProject(c *gin.Context) {
-	if projectManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "project manager not initialized",
-		})
+func (h *ProjectHandler) ImportProject(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "project manager not initialized")
 		return
 	}
 
 	file, _, err := c.Request.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "failed to read uploaded file",
-		})
+		respondBadRequestWithSuccess(c, "failed to read uploaded file")
 		return
 	}
 	defer file.Close()
@@ -349,31 +269,22 @@ func HandleImportProject(c *gin.Context) {
 	limitedReader := io.LimitReader(file, maxUploadSize)
 	zipData, err := io.ReadAll(limitedReader)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to read file content",
-		})
+		respondInternalErrorWithSuccess(c, "failed to read file content")
 		return
 	}
 
 	if int64(len(zipData)) == maxUploadSize {
-		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
-			"success": false,
-			"error":   "uploaded file exceeds maximum size (100MB)",
-		})
+		respondErrorWithSuccess(c, http.StatusRequestEntityTooLarge, "uploaded file exceeds maximum size (100MB)")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
 	defer cancel()
 
-	project, err := projectManager.ImportProject(ctx, zipData)
+	project, err := h.manager.ImportProject(ctx, zipData)
 	if err != nil {
-		log.Printf("Failed to import project: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to import project",
-		})
+		slog.Error("failed to import project", "error", err)
+		respondInternalErrorWithSuccess(c, "failed to import project")
 		return
 	}
 

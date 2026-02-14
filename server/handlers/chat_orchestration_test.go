@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/streaming"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -20,9 +20,33 @@ import (
 func TestHandleChat_OrchestrationPlanCreatedEvent(t *testing.T) {
 	t.Skip("Streaming tests require a real HTTP connection; httptest.ResponseRecorder doesn't support CloseNotifier")
 
-	setupTestHandlers()
+	ic := agent.NewIntentClassifier()
+
+	mockProvider := &mockModelProvider{
+		response: &provider.CompletionResponse{
+			ID:      "test-response",
+			Model:   "mock-model",
+			Content: "This is a test response",
+			Usage: provider.Usage{
+				InputTokens:  10,
+				OutputTokens: 20,
+				TotalTokens:  30,
+			},
+		},
+	}
+
+	pm := &mockPluginManager{
+		providers: map[string]provider.ModelProvider{
+			"mock": mockProvider,
+		},
+	}
+
+	pa := agent.NewPrimaryAgent(pm)
+
+	h := NewChatHandler(ic, pa, nil, nil)
+
 	router := setupChatTestRouter()
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	reqBody := ChatRequest{
 		Message:   "orchestration plan test",
@@ -70,9 +94,9 @@ func TestHandleChat_OrchestrationEventsInOrder(t *testing.T) {
 	}
 
 	pa := agent.NewPrimaryAgent(pm)
-	InitializeChatHandlers(ic, pa, nil, nil)
+	h := NewChatHandler(ic, pa, nil, nil)
 
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	reqBody := ChatRequest{
 		Message:   "test orchestration flow",
@@ -234,9 +258,9 @@ func TestHandleStreamingQuery_OrchestrationEventCases(t *testing.T) {
 	}
 
 	pa := agent.NewPrimaryAgent(pm)
-	InitializeChatHandlers(ic, pa, nil, nil)
+	h := NewChatHandler(ic, pa, nil, nil)
 
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	reqBody := ChatRequest{
 		Message:   "complex orchestration task",
@@ -358,9 +382,9 @@ func TestOrchestrationEventStreamingIntegration(t *testing.T) {
 	}
 
 	pa := agent.NewPrimaryAgent(pm)
-	InitializeChatHandlers(ic, pa, nil, nil)
+	h := NewChatHandler(ic, pa, nil, nil)
 
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	reqBody := ChatRequest{
 		Message:   "multi-step task requiring orchestration",

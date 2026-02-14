@@ -8,8 +8,8 @@ import (
 
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
 	"github.com/google/uuid"
 )
 
@@ -165,7 +165,7 @@ func (p *Planner) buildReplanningPrompt(task *orchestrationpkg.Task, failedPlan 
 	var sb strings.Builder
 
 	sb.WriteString("You are an expert orchestration planner performing error recovery. A previous plan failed and you need to generate a corrected plan.\n\n")
-	
+
 	sb.WriteString("Original Task Description:\n")
 	sb.WriteString(task.Description)
 	sb.WriteString("\n\n")
@@ -230,14 +230,14 @@ func (p *Planner) buildReplanningPrompt(task *orchestrationpkg.Task, failedPlan 
 
 func (p *Planner) parsePlanFromLLMResponse(response string, taskID string) (*orchestrationpkg.Plan, error) {
 	response = strings.TrimSpace(response)
-	
+
 	startIdx := strings.Index(response, "{")
 	endIdx := strings.LastIndex(response, "}")
-	
+
 	if startIdx == -1 || endIdx == -1 || startIdx > endIdx {
 		return nil, fmt.Errorf("no valid JSON found in response")
 	}
-	
+
 	jsonStr := response[startIdx : endIdx+1]
 
 	var planData struct {

@@ -221,7 +221,7 @@ func setupAPIKeyTestRouter() (*gin.Engine, *database.DatabaseManager, *mockSecur
 	dbMgr := database.NewDatabaseManager(mockAdapter, nil, false)
 	mockStorage := newMockSecureStorage()
 
-	InitializeAPIKeyHandlers(dbMgr, mockStorage, nil)
+	h := NewAPIKeyHandler(dbMgr, mockStorage, nil)
 
 	router.Use(func(c *gin.Context) {
 		c.Set("user_id", "test-user-123")
@@ -229,11 +229,11 @@ func setupAPIKeyTestRouter() (*gin.Engine, *database.DatabaseManager, *mockSecur
 		c.Next()
 	})
 
-	router.POST("/api/v1/keys", HandleCreateAPIKey)
-	router.GET("/api/v1/keys", HandleListAPIKeys)
-	router.GET("/api/v1/keys/:provider", HandleGetAPIKey)
-	router.PUT("/api/v1/keys/:provider", HandleUpdateAPIKey)
-	router.DELETE("/api/v1/keys/:provider", HandleDeleteAPIKey)
+	router.POST("/api/v1/keys", h.CreateAPIKey)
+	router.GET("/api/v1/keys", h.ListAPIKeys)
+	router.GET("/api/v1/keys/:provider", h.GetAPIKey)
+	router.PUT("/api/v1/keys/:provider", h.UpdateAPIKey)
+	router.DELETE("/api/v1/keys/:provider", h.DeleteAPIKey)
 
 	return router, dbMgr, mockStorage
 }
@@ -624,7 +624,7 @@ func TestGetAPIKeyForProvider(t *testing.T) {
 	dbMgr := database.NewDatabaseManager(mockAdapter, nil, false)
 	mockStorage := newMockSecureStorage()
 
-	InitializeAPIKeyHandlers(dbMgr, mockStorage, nil)
+	h := NewAPIKeyHandler(dbMgr, mockStorage, nil)
 
 	ctx := context.Background()
 	userID := "test-user"
@@ -644,7 +644,7 @@ func TestGetAPIKeyForProvider(t *testing.T) {
 	_ = mockAdapter.StoreAPIKey(ctx, key)
 	_ = mockStorage.Store(ctx, userID, provider, apiKey)
 
-	retrievedKey, err := GetAPIKeyForProvider(ctx, userID, database.UserTypeGuest, provider)
+	retrievedKey, err := h.GetAPIKeyForProvider(ctx, userID, database.UserTypeGuest, provider)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -659,11 +659,11 @@ func TestGetAPIKeyForProviderNotFound(t *testing.T) {
 	dbMgr := database.NewDatabaseManager(mockAdapter, nil, false)
 	mockStorage := newMockSecureStorage()
 
-	InitializeAPIKeyHandlers(dbMgr, mockStorage, nil)
+	h := NewAPIKeyHandler(dbMgr, mockStorage, nil)
 
 	ctx := context.Background()
 
-	_, err := GetAPIKeyForProvider(ctx, "test-user", database.UserTypeGuest, "nonexistent")
+	_, err := h.GetAPIKeyForProvider(ctx, "test-user", database.UserTypeGuest, "nonexistent")
 	if err == nil {
 		t.Errorf("Expected error for nonexistent provider, got nil")
 	}
@@ -674,7 +674,7 @@ func TestGetAPIKeyForProviderInactive(t *testing.T) {
 	dbMgr := database.NewDatabaseManager(mockAdapter, nil, false)
 	mockStorage := newMockSecureStorage()
 
-	InitializeAPIKeyHandlers(dbMgr, mockStorage, nil)
+	h := NewAPIKeyHandler(dbMgr, mockStorage, nil)
 
 	ctx := context.Background()
 	userID := "test-user"
@@ -694,7 +694,7 @@ func TestGetAPIKeyForProviderInactive(t *testing.T) {
 	_ = mockAdapter.StoreAPIKey(ctx, key)
 	_ = mockStorage.Store(ctx, userID, provider, apiKey)
 
-	_, err := GetAPIKeyForProvider(ctx, userID, database.UserTypeGuest, provider)
+	_, err := h.GetAPIKeyForProvider(ctx, userID, database.UserTypeGuest, provider)
 	if err == nil {
 		t.Errorf("Expected error for inactive key, got nil")
 	}
@@ -707,7 +707,7 @@ func TestUserIsolation(t *testing.T) {
 	dbMgr := database.NewDatabaseManager(mockAdapter, nil, false)
 	mockStorage := newMockSecureStorage()
 
-	InitializeAPIKeyHandlers(dbMgr, mockStorage, nil)
+	h := NewAPIKeyHandler(dbMgr, mockStorage, nil)
 
 	router1 := gin.New()
 	router1.Use(func(c *gin.Context) {
@@ -715,8 +715,8 @@ func TestUserIsolation(t *testing.T) {
 		c.Set("user_type", database.UserTypeGuest)
 		c.Next()
 	})
-	router1.POST("/api/v1/keys", HandleCreateAPIKey)
-	router1.GET("/api/v1/keys", HandleListAPIKeys)
+	router1.POST("/api/v1/keys", h.CreateAPIKey)
+	router1.GET("/api/v1/keys", h.ListAPIKeys)
 
 	router2 := gin.New()
 	router2.Use(func(c *gin.Context) {
@@ -724,8 +724,8 @@ func TestUserIsolation(t *testing.T) {
 		c.Set("user_type", database.UserTypeGuest)
 		c.Next()
 	})
-	router2.POST("/api/v1/keys", HandleCreateAPIKey)
-	router2.GET("/api/v1/keys", HandleListAPIKeys)
+	router2.POST("/api/v1/keys", h.CreateAPIKey)
+	router2.GET("/api/v1/keys", h.ListAPIKeys)
 
 	createReq1 := CreateAPIKeyRequest{
 		Provider: "openai",
@@ -905,7 +905,7 @@ func TestHandleListAPIKeysStorageError(t *testing.T) {
 	dbMgr := database.NewDatabaseManager(mockAdapter, nil, false)
 	mockStorage := newMockSecureStorage()
 
-	InitializeAPIKeyHandlers(dbMgr, mockStorage, nil)
+	h := NewAPIKeyHandler(dbMgr, mockStorage, nil)
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -913,8 +913,8 @@ func TestHandleListAPIKeysStorageError(t *testing.T) {
 		c.Set("user_type", database.UserTypeGuest)
 		c.Next()
 	})
-	router.POST("/api/v1/keys", HandleCreateAPIKey)
-	router.GET("/api/v1/keys", HandleListAPIKeys)
+	router.POST("/api/v1/keys", h.CreateAPIKey)
+	router.GET("/api/v1/keys", h.ListAPIKeys)
 
 	createReq := CreateAPIKeyRequest{
 		Provider: "openai",
@@ -955,7 +955,7 @@ func TestHandleDeleteAPIKeyStorageError(t *testing.T) {
 	dbMgr := database.NewDatabaseManager(mockAdapter, nil, false)
 	mockStorage := newMockSecureStorage()
 
-	InitializeAPIKeyHandlers(dbMgr, mockStorage, nil)
+	h := NewAPIKeyHandler(dbMgr, mockStorage, nil)
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -963,8 +963,8 @@ func TestHandleDeleteAPIKeyStorageError(t *testing.T) {
 		c.Set("user_type", database.UserTypeGuest)
 		c.Next()
 	})
-	router.POST("/api/v1/keys", HandleCreateAPIKey)
-	router.DELETE("/api/v1/keys/:provider", HandleDeleteAPIKey)
+	router.POST("/api/v1/keys", h.CreateAPIKey)
+	router.DELETE("/api/v1/keys/:provider", h.DeleteAPIKey)
 
 	createReq := CreateAPIKeyRequest{
 		Provider: "openai",
@@ -988,14 +988,7 @@ func TestHandleDeleteAPIKeyStorageError(t *testing.T) {
 func TestHandlersWithoutInitialization(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	oldDbManager := dbManager
-	oldSecureStorage := secureStorage
-	dbManager = nil
-	secureStorage = nil
-	defer func() {
-		dbManager = oldDbManager
-		secureStorage = oldSecureStorage
-	}()
+	h := NewAPIKeyHandler(nil, nil, nil)
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -1003,11 +996,11 @@ func TestHandlersWithoutInitialization(t *testing.T) {
 		c.Set("user_type", database.UserTypeGuest)
 		c.Next()
 	})
-	router.POST("/api/v1/keys", HandleCreateAPIKey)
-	router.GET("/api/v1/keys", HandleListAPIKeys)
-	router.GET("/api/v1/keys/:provider", HandleGetAPIKey)
-	router.PUT("/api/v1/keys/:provider", HandleUpdateAPIKey)
-	router.DELETE("/api/v1/keys/:provider", HandleDeleteAPIKey)
+	router.POST("/api/v1/keys", h.CreateAPIKey)
+	router.GET("/api/v1/keys", h.ListAPIKeys)
+	router.GET("/api/v1/keys/:provider", h.GetAPIKey)
+	router.PUT("/api/v1/keys/:provider", h.UpdateAPIKey)
+	router.DELETE("/api/v1/keys/:provider", h.DeleteAPIKey)
 
 	tests := []struct {
 		name   string
@@ -1050,7 +1043,7 @@ func TestHandleCreateAPIKeyDatabaseErrors(t *testing.T) {
 	dbMgr := database.NewDatabaseManager(mockAdapter, nil, false)
 	mockStorage := newMockSecureStorage()
 
-	InitializeAPIKeyHandlers(dbMgr, mockStorage, nil)
+	h := NewAPIKeyHandler(dbMgr, mockStorage, nil)
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -1058,7 +1051,7 @@ func TestHandleCreateAPIKeyDatabaseErrors(t *testing.T) {
 		c.Set("user_type", database.UserTypeGuest)
 		c.Next()
 	})
-	router.POST("/api/v1/keys", HandleCreateAPIKey)
+	router.POST("/api/v1/keys", h.CreateAPIKey)
 
 	createReq := CreateAPIKeyRequest{
 		Provider: "openai",
@@ -1082,14 +1075,14 @@ func TestUnauthorizedRequests(t *testing.T) {
 	dbMgr := database.NewDatabaseManager(mockAdapter, nil, false)
 	mockStorage := newMockSecureStorage()
 
-	InitializeAPIKeyHandlers(dbMgr, mockStorage, nil)
+	h := NewAPIKeyHandler(dbMgr, mockStorage, nil)
 
 	router := gin.New()
-	router.POST("/api/v1/keys", HandleCreateAPIKey)
-	router.GET("/api/v1/keys", HandleListAPIKeys)
-	router.GET("/api/v1/keys/:provider", HandleGetAPIKey)
-	router.PUT("/api/v1/keys/:provider", HandleUpdateAPIKey)
-	router.DELETE("/api/v1/keys/:provider", HandleDeleteAPIKey)
+	router.POST("/api/v1/keys", h.CreateAPIKey)
+	router.GET("/api/v1/keys", h.ListAPIKeys)
+	router.GET("/api/v1/keys/:provider", h.GetAPIKey)
+	router.PUT("/api/v1/keys/:provider", h.UpdateAPIKey)
+	router.DELETE("/api/v1/keys/:provider", h.DeleteAPIKey)
 
 	tests := []struct {
 		name   string
@@ -1132,7 +1125,7 @@ func TestHandleGetAPIKeyStorageError(t *testing.T) {
 	dbMgr := database.NewDatabaseManager(mockAdapter, nil, false)
 	mockStorage := newMockSecureStorage()
 
-	InitializeAPIKeyHandlers(dbMgr, mockStorage, nil)
+	h := NewAPIKeyHandler(dbMgr, mockStorage, nil)
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -1140,8 +1133,8 @@ func TestHandleGetAPIKeyStorageError(t *testing.T) {
 		c.Set("user_type", database.UserTypeGuest)
 		c.Next()
 	})
-	router.POST("/api/v1/keys", HandleCreateAPIKey)
-	router.GET("/api/v1/keys/:provider", HandleGetAPIKey)
+	router.POST("/api/v1/keys", h.CreateAPIKey)
+	router.GET("/api/v1/keys/:provider", h.GetAPIKey)
 
 	createReq := CreateAPIKeyRequest{
 		Provider: "openai",
@@ -1174,17 +1167,10 @@ func TestHandleGetAPIKeyStorageError(t *testing.T) {
 }
 
 func TestGetAPIKeyForProviderUninitalized(t *testing.T) {
-	oldDbManager := dbManager
-	oldSecureStorage := secureStorage
-	dbManager = nil
-	secureStorage = nil
-	defer func() {
-		dbManager = oldDbManager
-		secureStorage = oldSecureStorage
-	}()
+	h := NewAPIKeyHandler(nil, nil, nil)
 
 	ctx := context.Background()
-	_, err := GetAPIKeyForProvider(ctx, "test-user", database.UserTypeGuest, "openai")
+	_, err := h.GetAPIKeyForProvider(ctx, "test-user", database.UserTypeGuest, "openai")
 	if err == nil {
 		t.Errorf("Expected error when handlers not initialized")
 	}

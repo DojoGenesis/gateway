@@ -13,10 +13,10 @@ import (
 // MCPServerConnection manages a single MCP server connection and provides
 // methods for tool discovery and invocation.
 type MCPServerConnection struct {
-	name   string
-	config MCPServerConfig
-	client *client.Client
-	mu     sync.RWMutex
+	name    string
+	config  MCPServerConfig
+	client  *client.Client
+	mu      sync.RWMutex
 	healthy bool
 }
 
@@ -28,8 +28,8 @@ func NewMCPServerConnection(name string, cfg MCPServerConfig) (*MCPServerConnect
 	}
 
 	return &MCPServerConnection{
-		name:   name,
-		config: cfg,
+		name:    name,
+		config:  cfg,
 		healthy: false,
 	}, nil
 }

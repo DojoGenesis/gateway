@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 )
 
 func TestShouldReflect_FrequencyNever(t *testing.T) {
@@ -115,8 +115,8 @@ func TestShouldReflect_TriggerMatching(t *testing.T) {
 		{"milestone", true},
 		{"learning", false},
 		{"session_end", false},
-		{"ERROR", true},      // Case-insensitive
-		{"MILESTONE", true},  // Case-insensitive
+		{"ERROR", true},     // Case-insensitive
+		{"MILESTONE", true}, // Case-insensitive
 	}
 
 	for _, tt := range tests {

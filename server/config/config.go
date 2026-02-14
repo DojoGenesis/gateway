@@ -11,14 +11,14 @@ import (
 )
 
 type Config struct {
-	Port           string            `yaml:"port"`
-	AllowedOrigins []string          `yaml:"allowed_origins"`
-	Environment    string            `yaml:"environment"`
-	PluginDir      string            `yaml:"plugin_dir"`
-	Providers      []ProviderConfig  `yaml:"providers"`
-	Routing        RoutingConfig     `yaml:"routing"`
-	Budget         BudgetConfig      `yaml:"budget"`
-	OTEL           OTELConfig        `yaml:"otel"`
+	Port           string           `yaml:"port"`
+	AllowedOrigins []string         `yaml:"allowed_origins"`
+	Environment    string           `yaml:"environment"`
+	PluginDir      string           `yaml:"plugin_dir"`
+	Providers      []ProviderConfig `yaml:"providers"`
+	Routing        RoutingConfig    `yaml:"routing"`
+	Budget         BudgetConfig     `yaml:"budget"`
+	OTEL           OTELConfig       `yaml:"otel"`
 }
 
 type ProviderConfig struct {
@@ -60,7 +60,6 @@ type OTELConfig struct {
 	SamplingRate float64 `json:"sampling_rate" yaml:"sampling_rate"`
 	ServiceName  string  `json:"service_name" yaml:"service_name"`
 }
-
 
 func Load() *Config {
 	cfg := loadDefaults()

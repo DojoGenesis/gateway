@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 )
 
 func TestAgentInitializer_Initialize(t *testing.T) {
@@ -14,8 +16,12 @@ func TestAgentInitializer_Initialize(t *testing.T) {
 
 	// Create a temporary workspace with agent.yaml
 	workspaceRoot := filepath.Join(os.TempDir(), "test_workspace")
-	os.MkdirAll(workspaceRoot, 0755)
-	defer os.RemoveAll(workspaceRoot)
+	if err := os.MkdirAll(workspaceRoot, 0750); err != nil {
+		t.Fatalf("failed to create test workspace: %v", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(workspaceRoot) // Cleanup best-effort
+	}()
 
 	agentFile := filepath.Join(workspaceRoot, "agent.yaml")
 	err := os.WriteFile(agentFile, []byte(`
@@ -40,7 +46,7 @@ reflection:
   triggers:
     - error
     - milestone
-`), 0644)
+`), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test agent.yaml: %v", err)
 	}
@@ -70,8 +76,12 @@ func TestAgentInitializer_CacheHit(t *testing.T) {
 
 	// Create a temporary workspace
 	workspaceRoot := filepath.Join(os.TempDir(), "test_workspace_cache")
-	os.MkdirAll(workspaceRoot, 0755)
-	defer os.RemoveAll(workspaceRoot)
+	if err := os.MkdirAll(workspaceRoot, 0750); err != nil {
+		t.Fatalf("failed to create test workspace: %v", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(workspaceRoot) // Cleanup best-effort
+	}()
 
 	agentFile := filepath.Join(workspaceRoot, "agent.yaml")
 	err := os.WriteFile(agentFile, []byte(`
@@ -94,7 +104,7 @@ reflection:
   frequency: never
   format: structured
   triggers: []
-`), 0644)
+`), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test agent.yaml: %v", err)
 	}
@@ -127,7 +137,7 @@ reflection:
   format: narrative
   triggers:
     - error
-`), 0644)
+`), 0600)
 	if err != nil {
 		t.Fatalf("Failed to modify agent.yaml: %v", err)
 	}
@@ -148,8 +158,12 @@ func TestAgentInitializer_ClearCache(t *testing.T) {
 	ctx := context.Background()
 
 	workspaceRoot := filepath.Join(os.TempDir(), "test_workspace_clear")
-	os.MkdirAll(workspaceRoot, 0755)
-	defer os.RemoveAll(workspaceRoot)
+	if err := os.MkdirAll(workspaceRoot, 0750); err != nil {
+		t.Fatalf("failed to create test workspace: %v", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(workspaceRoot) // Cleanup best-effort
+	}()
 
 	agentFile := filepath.Join(workspaceRoot, "agent.yaml")
 	err := os.WriteFile(agentFile, []byte(`
@@ -173,7 +187,7 @@ reflection:
   format: structured
   triggers:
     - error
-`), 0644)
+`), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test agent.yaml: %v", err)
 	}
@@ -209,7 +223,7 @@ reflection:
   format: bullets
   triggers:
     - milestone
-`), 0644)
+`), 0600)
 	if err != nil {
 		t.Fatalf("Failed to modify agent.yaml: %v", err)
 	}
@@ -234,8 +248,12 @@ func TestAgentInitializer_DifferentModes(t *testing.T) {
 
 	// Create workspace with modes
 	workspaceRoot := filepath.Join(os.TempDir(), "test_workspace_modes")
-	os.MkdirAll(workspaceRoot, 0755)
-	defer os.RemoveAll(workspaceRoot)
+	if err := os.MkdirAll(workspaceRoot, 0750); err != nil {
+		t.Fatalf("failed to create test workspace: %v", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(workspaceRoot) // Cleanup best-effort
+	}()
 
 	agentFile := filepath.Join(workspaceRoot, "agent.yaml")
 	err := os.WriteFile(agentFile, []byte(`
@@ -274,7 +292,7 @@ modes:
       strategy: spot-check
     error_handling:
       retry_count: 5
-`), 0644)
+`), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -310,32 +328,32 @@ modes:
 }
 
 func TestConvertToAgentConfig(t *testing.T) {
-	disposition := &DispositionConfig{
+	disp := &disposition.DispositionConfig{
 		Pacing:     "measured",
 		Depth:      "thorough",
 		Tone:       "professional",
 		Initiative: "responsive",
-		Validation: ValidationConfig{
+		Validation: disposition.ValidationConfig{
 			Strategy:     "thorough",
 			RequireTests: true,
 			RequireDocs:  false,
 		},
-		ErrorHandling: ErrorHandlingConfig{
+		ErrorHandling: disposition.ErrorHandlingConfig{
 			Strategy:   "log-and-continue",
 			RetryCount: 3,
 		},
-		Collaboration: CollaborationConfig{
+		Collaboration: disposition.CollaborationConfig{
 			Style:            "consultative",
 			CheckInFrequency: "regularly",
 		},
-		Reflection: ReflectionConfig{
+		Reflection: disposition.ReflectionConfig{
 			Frequency: "session-end",
 			Format:    "structured",
 			Triggers:  []string{"error", "milestone"},
 		},
 	}
 
-	agentConfig := convertToAgentConfig(disposition)
+	agentConfig := convertToAgentConfig(disp)
 
 	if agentConfig.Pacing != "measured" {
 		t.Errorf("Expected pacing 'measured', got '%s'", agentConfig.Pacing)

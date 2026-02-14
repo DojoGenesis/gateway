@@ -9,4 +9,7 @@ use (
 	./memory
 	./server
 	./mcp
+	./orchestration
+	./disposition
+	./skill
 )

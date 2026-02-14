@@ -10,11 +10,11 @@ import (
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
 	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )
@@ -31,7 +31,7 @@ func registerTestTools() {
 			return map[string]interface{}{"output": "test_tool executed successfully"}, nil
 		},
 	})
-	
+
 	// Try to register test_tool2, ignore error if already registered
 	tools.RegisterTool(&tools.ToolDefinition{
 		Name:        "test_tool2",
@@ -47,9 +47,9 @@ func init() {
 	registerTestTools()
 }
 
-type mockPlanner struct{
-	generatePlanFunc    func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error)
-	regeneratePlanFunc  func(ctx context.Context, task *orchestration.Task, failedPlan *orchestration.Plan, errorContext string) (*orchestration.Plan, error)
+type mockPlanner struct {
+	generatePlanFunc   func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error)
+	regeneratePlanFunc func(ctx context.Context, task *orchestration.Task, failedPlan *orchestration.Plan, errorContext string) (*orchestration.Plan, error)
 }
 
 func (m *mockPlanner) GeneratePlan(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
@@ -98,21 +98,21 @@ func TestOrchestrationEnablement(t *testing.T) {
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
-	
+
 	if agent.useOrchestration {
 		t.Error("Orchestration should be disabled by default")
 	}
-	
+
 	agent.EnableOrchestration(true)
-	
+
 	if !agent.useOrchestration {
 		t.Error("Orchestration should be enabled after calling EnableOrchestration(true)")
 	}
-	
+
 	agent.EnableOrchestration(false)
-	
+
 	if agent.useOrchestration {
 		t.Error("Orchestration should be disabled after calling EnableOrchestration(false)")
 	}
@@ -122,23 +122,23 @@ func TestSetOrchestrationComponents(t *testing.T) {
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
-	
+
 	if agent.orchestrationEngine != nil {
 		t.Error("Orchestration engine should be nil by default")
 	}
-	
+
 	if agent.orchestrationPlanner != nil {
 		t.Error("Orchestration planner should be nil by default")
 	}
-	
+
 	eventChan := make(chan events.StreamEvent)
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(1000, 5000, 10000)
-	
+
 	mockPlanner := &mockPlanner{}
-	
+
 	engine := orchestration.NewEngine(
 		orchestration.DefaultEngineConfig(),
 		mockPlanner,
@@ -147,14 +147,14 @@ func TestSetOrchestrationComponents(t *testing.T) {
 		costTracker,
 		budgetTracker,
 	)
-	
+
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
-	
+
 	if agent.orchestrationEngine == nil {
 		t.Error("Orchestration engine should be set")
 	}
-	
+
 	if agent.orchestrationPlanner == nil {
 		t.Error("Orchestration planner should be set")
 	}
@@ -164,22 +164,22 @@ func TestHandleQueryWithOrchestration_ComponentsNotInitialized(t *testing.T) {
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
-	
+
 	ctx := context.Background()
 	req := QueryRequest{
 		Query:  "Test query",
 		UserID: "user1",
 	}
-	
+
 	_, err := agent.HandleQueryWithOrchestration(ctx, req)
-	
+
 	if err == nil {
 		t.Error("Expected error when orchestration components not initialized")
 	}
-	
+
 	if err.Error() != "orchestration components not initialized" {
 		t.Errorf("Expected 'orchestration components not initialized' error, got: %v", err)
 	}
@@ -187,18 +187,18 @@ func TestHandleQueryWithOrchestration_ComponentsNotInitialized(t *testing.T) {
 
 func TestHandleQueryWithOrchestration_Success(t *testing.T) {
 	registerTestTools() // Ensure test tools are available
-	
+
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
-	
+
 	eventChan := make(chan events.StreamEvent, 10)
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
-	
+
 	mockPlanner := &mockPlanner{
 		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
 			plan := orchestration.NewPlan(task.ID)
@@ -222,10 +222,10 @@ func TestHandleQueryWithOrchestration_Success(t *testing.T) {
 			return plan, nil
 		},
 	}
-	
+
 	config := orchestration.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
-	
+
 	engine := orchestration.NewEngine(
 		config,
 		mockPlanner,
@@ -234,42 +234,42 @@ func TestHandleQueryWithOrchestration_Success(t *testing.T) {
 		costTracker,
 		budgetTracker,
 	)
-	
+
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
-	
+
 	ctx := context.Background()
 	req := QueryRequest{
 		Query:  "Test complex query",
 		UserID: "user1",
 	}
-	
+
 	response, err := agent.HandleQueryWithOrchestration(ctx, req)
-	
+
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
-	
+
 	if response == nil {
 		t.Fatal("Expected response, got nil")
 	}
-	
+
 	if response.Provider != "orchestration" {
 		t.Errorf("Expected provider 'orchestration', got: %s", response.Provider)
 	}
-	
+
 	if response.Model != "orchestration-engine" {
 		t.Errorf("Expected model 'orchestration-engine', got: %s", response.Model)
 	}
-	
+
 	if len(response.ToolCalls) != 2 {
 		t.Errorf("Expected 2 tool calls, got: %d", len(response.ToolCalls))
 	}
-	
+
 	if len(response.ToolResults) != 2 {
 		t.Errorf("Expected 2 tool results, got: %d", len(response.ToolResults))
 	}
-	
+
 	if response.Content == "" {
 		t.Error("Expected non-empty response content")
 	}
@@ -279,20 +279,20 @@ func TestHandleQueryWithOrchestration_PlanGenerationFailure(t *testing.T) {
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
-	
+
 	eventChan := make(chan events.StreamEvent, 10)
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
-	
+
 	mockPlanner := &mockPlanner{
 		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
 			return nil, errors.New("plan generation failed")
 		},
 	}
-	
+
 	engine := orchestration.NewEngine(
 		orchestration.DefaultEngineConfig(),
 		mockPlanner,
@@ -301,22 +301,22 @@ func TestHandleQueryWithOrchestration_PlanGenerationFailure(t *testing.T) {
 		costTracker,
 		budgetTracker,
 	)
-	
+
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
-	
+
 	ctx := context.Background()
 	req := QueryRequest{
 		Query:  "Test query",
 		UserID: "user1",
 	}
-	
+
 	_, err := agent.HandleQueryWithOrchestration(ctx, req)
-	
+
 	if err == nil {
 		t.Fatal("Expected error when plan generation fails")
 	}
-	
+
 	if !errors.Is(err, errors.New("failed to generate plan: plan generation failed")) && err.Error() != "failed to generate plan: plan generation failed" {
 		t.Errorf("Expected plan generation error, got: %v", err)
 	}
@@ -326,14 +326,14 @@ func TestHandleQueryWithOrchestration_ExecutionFailure(t *testing.T) {
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
-	
+
 	eventChan := make(chan events.StreamEvent, 10)
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
-	
+
 	mockPlanner := &mockPlanner{
 		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
 			plan := orchestration.NewPlan(task.ID)
@@ -349,10 +349,10 @@ func TestHandleQueryWithOrchestration_ExecutionFailure(t *testing.T) {
 			return plan, nil
 		},
 	}
-	
+
 	config := orchestration.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
-	
+
 	engine := orchestration.NewEngine(
 		config,
 		mockPlanner,
@@ -361,18 +361,18 @@ func TestHandleQueryWithOrchestration_ExecutionFailure(t *testing.T) {
 		costTracker,
 		budgetTracker,
 	)
-	
+
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
-	
+
 	ctx := context.Background()
 	req := QueryRequest{
 		Query:  "Test query",
 		UserID: "user1",
 	}
-	
+
 	_, err := agent.HandleQueryWithOrchestration(ctx, req)
-	
+
 	if err == nil {
 		t.Fatal("Expected error when execution fails")
 	}
@@ -382,16 +382,16 @@ func TestBuildResponseFromPlan(t *testing.T) {
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
-	
+
 	task := orchestration.NewTask("user1", "Test task description")
 	plan := orchestration.NewPlan(task.ID)
 	plan.Metadata["reasoning"] = "This is the reasoning"
-	
+
 	now := time.Now()
 	end := now.Add(500 * time.Millisecond)
-	
+
 	plan.Nodes = []*orchestration.PlanNode{
 		{
 			ID:         "node1",
@@ -412,53 +412,53 @@ func TestBuildResponseFromPlan(t *testing.T) {
 			EndTime:    &end,
 		},
 	}
-	
+
 	response := agent.buildResponseFromPlan(plan, task)
-	
+
 	if response == nil {
 		t.Fatal("Expected response, got nil")
 	}
-	
+
 	if response.ID != plan.ID {
 		t.Errorf("Expected response ID to match plan ID, got: %s", response.ID)
 	}
-	
+
 	if response.Provider != "orchestration" {
 		t.Errorf("Expected provider 'orchestration', got: %s", response.Provider)
 	}
-	
+
 	if response.Model != "orchestration-engine" {
 		t.Errorf("Expected model 'orchestration-engine', got: %s", response.Model)
 	}
-	
+
 	if len(response.ToolCalls) != 2 {
 		t.Errorf("Expected 2 tool calls, got: %d", len(response.ToolCalls))
 	}
-	
+
 	if len(response.ToolResults) != 2 {
 		t.Errorf("Expected 2 tool results, got: %d", len(response.ToolResults))
 	}
-	
+
 	if response.Content == "" {
 		t.Error("Expected non-empty content")
 	}
-	
+
 	if !contains(response.Content, "Test task description") {
 		t.Error("Expected content to contain task description")
 	}
-	
+
 	if !contains(response.Content, "This is the reasoning") {
 		t.Error("Expected content to contain reasoning")
 	}
-	
+
 	if !contains(response.Content, "tool1") {
 		t.Error("Expected content to contain tool1")
 	}
-	
+
 	if !contains(response.Content, "tool2") {
 		t.Error("Expected content to contain tool2")
 	}
-	
+
 	if !contains(response.Content, "Tool error") {
 		t.Error("Expected content to contain error message")
 	}
@@ -466,38 +466,38 @@ func TestBuildResponseFromPlan(t *testing.T) {
 
 func TestHandleQueryWithOrchestration_WithTraceLogger(t *testing.T) {
 	registerTestTools() // Ensure test tools are available
-	
+
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
-	
+
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
 	defer db.Close()
-	
+
 	traceStorage, err := trace.NewTraceStorage(db)
 	if err != nil {
 		t.Fatalf("Failed to create trace storage: %v", err)
 	}
-	
+
 	eventChan2 := make(chan events.StreamEvent, 10)
 	traceLogger := trace.NewTraceLogger(traceStorage, eventChan2)
 	agent.SetTraceLogger(traceLogger)
-	
+
 	eventChan := make(chan events.StreamEvent, 10)
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
-	
+
 	mockPlanner := &mockPlanner{}
-	
+
 	config := orchestration.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
-	
+
 	engine := orchestration.NewEngine(
 		config,
 		mockPlanner,
@@ -506,22 +506,22 @@ func TestHandleQueryWithOrchestration_WithTraceLogger(t *testing.T) {
 		costTracker,
 		budgetTracker,
 	)
-	
+
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
-	
+
 	ctx := context.Background()
 	req := QueryRequest{
 		Query:  "Test query with trace",
 		UserID: "user1",
 	}
-	
+
 	response, err := agent.HandleQueryWithOrchestration(ctx, req)
-	
+
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
-	
+
 	if response == nil {
 		t.Fatal("Expected response, got nil")
 	}
@@ -529,29 +529,29 @@ func TestHandleQueryWithOrchestration_WithTraceLogger(t *testing.T) {
 
 func TestHandleQueryWithOrchestration_WithMemory(t *testing.T) {
 	registerTestTools() // Ensure test tools are available
-	
+
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
-	
+
 	memManager, err := memory.NewMemoryManager(":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create memory manager: %v", err)
 	}
 	agent.SetMemoryManager(memManager)
-	
+
 	eventChan := make(chan events.StreamEvent, 10)
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
-	
+
 	mockPlanner := &mockPlanner{}
-	
+
 	config := orchestration.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
-	
+
 	engine := orchestration.NewEngine(
 		config,
 		mockPlanner,
@@ -560,33 +560,33 @@ func TestHandleQueryWithOrchestration_WithMemory(t *testing.T) {
 		costTracker,
 		budgetTracker,
 	)
-	
+
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
-	
+
 	ctx := context.Background()
 	req := QueryRequest{
 		Query:     "Test query with memory",
 		UserID:    "user1",
 		UseMemory: true,
 	}
-	
+
 	response, err := agent.HandleQueryWithOrchestration(ctx, req)
-	
+
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
-	
+
 	if response == nil {
 		t.Fatal("Expected response, got nil")
 	}
-	
+
 	ctx2 := context.Background()
 	memories, err := memManager.SearchByType(ctx2, "conversation:user1", 10)
 	if err != nil {
 		t.Fatalf("Expected no error retrieving memories, got: %v", err)
 	}
-	
+
 	if len(memories) != 1 {
 		t.Errorf("Expected 1 memory entry, got: %d", len(memories))
 	}
@@ -596,18 +596,18 @@ func TestHandleQueryWithOrchestration_WithMemory(t *testing.T) {
 
 func TestHandleQueryWithOrchestration_EmptyPlan(t *testing.T) {
 	registerTestTools()
-	
+
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
-	
+
 	eventChan := make(chan events.StreamEvent, 10)
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
-	
+
 	mockPlanner := &mockPlanner{
 		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
 			plan := orchestration.NewPlan(task.ID)
@@ -616,10 +616,10 @@ func TestHandleQueryWithOrchestration_EmptyPlan(t *testing.T) {
 			return plan, nil
 		},
 	}
-	
+
 	config := orchestration.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
-	
+
 	engine := orchestration.NewEngine(
 		config,
 		mockPlanner,
@@ -628,24 +628,24 @@ func TestHandleQueryWithOrchestration_EmptyPlan(t *testing.T) {
 		costTracker,
 		budgetTracker,
 	)
-	
+
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
-	
+
 	ctx := context.Background()
 	req := QueryRequest{
 		Query:  "Test query with empty plan",
 		UserID: "user1",
 	}
-	
+
 	_, err := agent.HandleQueryWithOrchestration(ctx, req)
-	
+
 	// Empty plan should result in an error from the engine
 	// (no executable nodes means the plan is invalid or incomplete)
 	if err == nil {
 		t.Fatal("Expected error with empty plan, got nil")
 	}
-	
+
 	expectedErr := "orchestration execution failed"
 	if !strings.Contains(err.Error(), expectedErr) {
 		t.Errorf("Expected error containing '%s', got: %v", expectedErr, err)
@@ -654,18 +654,18 @@ func TestHandleQueryWithOrchestration_EmptyPlan(t *testing.T) {
 
 func TestHandleQueryWithOrchestration_AllNodesFailed(t *testing.T) {
 	registerTestTools()
-	
+
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
-	
+
 	eventChan := make(chan events.StreamEvent, 10)
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
-	
+
 	mockPlanner := &mockPlanner{
 		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
 			plan := orchestration.NewPlan(task.ID)
@@ -688,10 +688,10 @@ func TestHandleQueryWithOrchestration_AllNodesFailed(t *testing.T) {
 			return plan, nil
 		},
 	}
-	
+
 	config := orchestration.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
-	
+
 	engine := orchestration.NewEngine(
 		config,
 		mockPlanner,
@@ -700,18 +700,18 @@ func TestHandleQueryWithOrchestration_AllNodesFailed(t *testing.T) {
 		costTracker,
 		budgetTracker,
 	)
-	
+
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
-	
+
 	ctx := context.Background()
 	req := QueryRequest{
 		Query:  "Test query with all nodes failing",
 		UserID: "user1",
 	}
-	
+
 	_, err := agent.HandleQueryWithOrchestration(ctx, req)
-	
+
 	// Should return error when all nodes fail
 	if err == nil {
 		t.Fatal("Expected error when all nodes fail")
@@ -720,18 +720,18 @@ func TestHandleQueryWithOrchestration_AllNodesFailed(t *testing.T) {
 
 func TestHandleQueryWithOrchestration_ContextCancellation(t *testing.T) {
 	registerTestTools()
-	
+
 	pm := &MockPluginManager{
 		providers: make(map[string]providerpkg.ModelProvider),
 	}
-	
+
 	agent := NewPrimaryAgent(pm)
 	agent.EnableOrchestration(true)
-	
+
 	eventChan := make(chan events.StreamEvent, 10)
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(10000, 50000, 100000)
-	
+
 	mockPlanner := &mockPlanner{
 		generatePlanFunc: func(ctx context.Context, task *orchestration.Task) (*orchestration.Plan, error) {
 			plan := orchestration.NewPlan(task.ID)
@@ -747,10 +747,10 @@ func TestHandleQueryWithOrchestration_ContextCancellation(t *testing.T) {
 			return plan, nil
 		},
 	}
-	
+
 	config := orchestration.DefaultEngineConfig()
 	config.EnableAutoReplanning = false
-	
+
 	engine := orchestration.NewEngine(
 		config,
 		mockPlanner,
@@ -759,25 +759,23 @@ func TestHandleQueryWithOrchestration_ContextCancellation(t *testing.T) {
 		costTracker,
 		budgetTracker,
 	)
-	
+
 	agent.SetOrchestrationEngine(engine)
 	agent.SetOrchestrationPlanner(mockPlanner)
-	
+
 	// Create a context that's already cancelled
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
-	
+
 	req := QueryRequest{
 		Query:  "Test query with cancelled context",
 		UserID: "user1",
 	}
-	
+
 	_, err := agent.HandleQueryWithOrchestration(ctx, req)
-	
+
 	// Should fail due to cancelled context
 	if err == nil {
 		t.Fatal("Expected error due to cancelled context")
 	}
 }
-
-

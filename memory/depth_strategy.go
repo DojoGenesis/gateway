@@ -3,7 +3,7 @@ package memory
 import (
 	"strings"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 )
 
 // MemoryCategory classifies the type of information in a memory entry.

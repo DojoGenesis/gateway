@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -30,31 +32,31 @@ type PluginManagerInterface interface {
 	GetProvider(name string) (provider.ModelProvider, error)
 }
 
-var (
+// ModelHandler handles model and provider HTTP requests.
+type ModelHandler struct {
 	pluginManager PluginManagerInterface
-)
+}
 
-func InitializeModelHandlers(pm PluginManagerInterface) {
-	pluginManager = pm
+// NewModelHandler creates a new ModelHandler.
+func NewModelHandler(pm PluginManagerInterface) *ModelHandler {
+	return &ModelHandler{pluginManager: pm}
 }
 
 type ProviderStatus struct {
 	Name   string                 `json:"name"`
 	Status string                 `json:"status"`
-	Info   *provider.ProviderInfo   `json:"info,omitempty"`
+	Info   *provider.ProviderInfo `json:"info,omitempty"`
 	Error  string                 `json:"error,omitempty"`
 	Config map[string]interface{} `json:"config,omitempty"`
 }
 
-func HandleListModels(c *gin.Context) {
-	if pluginManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "plugin manager not initialized",
-		})
+func (h *ModelHandler) ListModels(c *gin.Context) {
+	if h.pluginManager == nil {
+		respondInternalError(c, "plugin manager not initialized")
 		return
 	}
 
-	providers := pluginManager.GetProviders()
+	providers := h.pluginManager.GetProviders()
 	allModels := []provider.ModelInfo{}
 
 	for name, provider := range providers {
@@ -63,11 +65,9 @@ func HandleListModels(c *gin.Context) {
 
 		models, err := provider.ListModels(ctx)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":    "failed to list models",
-				"provider": name,
-				"details":  err.Error(),
-			})
+			slog.Error("failed to list models", "error", err, "provider", name)
+			respondError(c, http.StatusInternalServerError, "failed to list models",
+				fmt.Sprintf("provider: %s", name))
 			return
 		}
 
@@ -84,15 +84,13 @@ func HandleListModels(c *gin.Context) {
 	})
 }
 
-func HandleListProviders(c *gin.Context) {
-	if pluginManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "plugin manager not initialized",
-		})
+func (h *ModelHandler) ListProviders(c *gin.Context) {
+	if h.pluginManager == nil {
+		respondInternalError(c, "plugin manager not initialized")
 		return
 	}
 
-	providers := pluginManager.GetProviders()
+	providers := h.pluginManager.GetProviders()
 	providerStatuses := []ProviderStatus{}
 
 	for name, provider := range providers {
@@ -101,6 +99,7 @@ func HandleListProviders(c *gin.Context) {
 
 		info, err := provider.GetInfo(ctx)
 		if err != nil {
+			slog.Warn("failed to get provider info", "error", err, "provider", name)
 			providerStatuses = append(providerStatuses, ProviderStatus{
 				Name:   name,
 				Status: "error",

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 )
 
 func TestValidate_None(t *testing.T) {

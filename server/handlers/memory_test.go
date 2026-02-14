@@ -25,16 +25,16 @@ func setupMemoryTestRouter(t *testing.T) (*gin.Engine, *memory.MemoryManager, fu
 		t.Fatalf("Failed to create memory manager: %v", err)
 	}
 
-	InitializeMemoryHandlers(mm)
+	h := NewMemoryHandler(mm, nil, nil)
 
 	router := gin.New()
 
-	router.POST("/api/v1/memory", HandleStoreMemory)
-	router.GET("/api/v1/memory/:id", HandleRetrieveMemory)
-	router.PUT("/api/v1/memory/:id", HandleUpdateMemory)
-	router.POST("/api/v1/memory/search", HandleSearchMemory)
-	router.GET("/api/v1/memory/list", HandleListMemories)
-	router.DELETE("/api/v1/memory/:id", HandleDeleteMemory)
+	router.POST("/api/v1/memory", h.StoreMemory)
+	router.GET("/api/v1/memory/:id", h.RetrieveMemory)
+	router.PUT("/api/v1/memory/:id", h.UpdateMemory)
+	router.POST("/api/v1/memory/search", h.SearchMemory)
+	router.GET("/api/v1/memory/list", h.ListMemories)
+	router.DELETE("/api/v1/memory/:id", h.DeleteMemory)
 
 	cleanup := func() {
 		mm.Close()
@@ -419,13 +419,13 @@ func TestHandleDeleteMemory(t *testing.T) {
 func TestMemoryHandlersWithoutInitialization(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	memoryManager = nil
+	h := NewMemoryHandler(nil, nil, nil)
 
 	router := gin.New()
-	router.POST("/api/v1/memory", HandleStoreMemory)
-	router.GET("/api/v1/memory/:id", HandleRetrieveMemory)
-	router.POST("/api/v1/memory/search", HandleSearchMemory)
-	router.DELETE("/api/v1/memory/:id", HandleDeleteMemory)
+	router.POST("/api/v1/memory", h.StoreMemory)
+	router.GET("/api/v1/memory/:id", h.RetrieveMemory)
+	router.POST("/api/v1/memory/search", h.SearchMemory)
+	router.DELETE("/api/v1/memory/:id", h.DeleteMemory)
 
 	tests := []struct {
 		name   string
@@ -665,12 +665,13 @@ func TestHandleListMemories(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		mem := memory.Memory{
-			ID:        fmt.Sprintf("list-test-id-%d", i),
-			Type:      "conversation",
-			Content:   fmt.Sprintf("Content %d", i),
-			Metadata:  map[string]interface{}{"session_id": "test-session"},
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
+			ID:          fmt.Sprintf("list-test-id-%d", i),
+			Type:        "conversation",
+			Content:     fmt.Sprintf("Content %d", i),
+			Metadata:    map[string]interface{}{"session_id": "test-session"},
+			ContextType: "test-session",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
 		}
 		err := mm.Store(context.Background(), mem)
 		assert.NoError(t, err)
@@ -776,15 +777,15 @@ func setupGardenTestRouter(t *testing.T) (*gin.Engine, *memory.GardenManager, fu
 		t.Fatalf("Failed to create garden manager: %v", err)
 	}
 
-	InitializeGardenHandlers(gm)
+	h := NewMemoryHandler(mm, gm, nil)
 
 	router := gin.New()
 
-	router.GET("/api/v1/memory/seeds", HandleListSeeds)
-	router.POST("/api/v1/memory/seeds", HandleCreateSeed)
-	router.GET("/api/v1/memory/snapshots/:session", HandleListSnapshots)
-	router.POST("/api/v1/memory/snapshots", HandleCreateSnapshot)
-	router.POST("/api/v1/memory/restore/:snapshot", HandleRestoreSnapshot)
+	router.GET("/api/v1/memory/seeds", h.ListSeeds)
+	router.POST("/api/v1/memory/seeds", h.CreateSeed)
+	router.GET("/api/v1/memory/snapshots/:session", h.ListSnapshots)
+	router.POST("/api/v1/memory/snapshots", h.CreateSnapshot)
+	router.POST("/api/v1/memory/restore/:snapshot", h.RestoreSnapshot)
 
 	cleanup := func() {
 		mm.Close()
@@ -1002,14 +1003,15 @@ func TestHandleRestoreSnapshot_NotFound(t *testing.T) {
 
 func TestGardenHandlersWithoutInitialization(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	gardenManager = nil
+
+	h := NewMemoryHandler(nil, nil, nil)
 
 	router := gin.New()
-	router.GET("/api/v1/memory/seeds", HandleListSeeds)
-	router.POST("/api/v1/memory/seeds", HandleCreateSeed)
-	router.GET("/api/v1/memory/snapshots/:session", HandleListSnapshots)
-	router.POST("/api/v1/memory/snapshots", HandleCreateSnapshot)
-	router.POST("/api/v1/memory/restore/:snapshot", HandleRestoreSnapshot)
+	router.GET("/api/v1/memory/seeds", h.ListSeeds)
+	router.POST("/api/v1/memory/seeds", h.CreateSeed)
+	router.GET("/api/v1/memory/snapshots/:session", h.ListSnapshots)
+	router.POST("/api/v1/memory/snapshots", h.CreateSnapshot)
+	router.POST("/api/v1/memory/restore/:snapshot", h.RestoreSnapshot)
 
 	tests := []struct {
 		name     string

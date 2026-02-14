@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,7 +83,7 @@ func (pm *PluginManager) DiscoverPlugins() error {
 	if len(pm.config.Providers) > 0 {
 		for _, providerCfg := range pm.config.Providers {
 			if !providerCfg.Enabled {
-				log.Printf("Skipping disabled plugin: %s", providerCfg.Name)
+				slog.Info("skipping disabled plugin", "name", providerCfg.Name)
 				continue
 			}
 
@@ -94,21 +94,21 @@ func (pm *PluginManager) DiscoverPlugins() error {
 
 			info, err := os.Stat(pluginPath)
 			if err != nil {
-				log.Printf("Failed to stat plugin %s: %v", providerCfg.Name, err)
+				slog.Error("failed to stat plugin", "name", providerCfg.Name, "error", err)
 				continue
 			}
 
 			if info.Mode()&0111 == 0 {
-				log.Printf("Plugin %s is not executable", providerCfg.Name)
+				slog.Warn("plugin is not executable", "name", providerCfg.Name)
 				continue
 			}
 
 			if err := pm.loadPluginWithConfig(providerCfg.Name, pluginPath, providerCfg.Config); err != nil {
-				log.Printf("Failed to load plugin %s: %v", providerCfg.Name, err)
+				slog.Error("failed to load plugin", "name", providerCfg.Name, "error", err)
 				continue
 			}
 
-			log.Printf("Loaded plugin: %s (priority %d)", providerCfg.Name, providerCfg.Priority)
+			slog.Info("loaded plugin", "name", providerCfg.Name, "priority", providerCfg.Priority)
 		}
 		return nil
 	}
@@ -129,7 +129,7 @@ func (pm *PluginManager) DiscoverPlugins() error {
 
 		info, err := os.Stat(pluginPath)
 		if err != nil {
-			log.Printf("Failed to stat plugin %s: %v", name, err)
+			slog.Error("failed to stat plugin", "name", name, "error", err)
 			continue
 		}
 
@@ -138,11 +138,11 @@ func (pm *PluginManager) DiscoverPlugins() error {
 		}
 
 		if err := pm.loadPluginWithConfig(name, pluginPath, nil); err != nil {
-			log.Printf("Failed to load plugin %s: %v", name, err)
+			slog.Error("failed to load plugin", "name", name, "error", err)
 			continue
 		}
 
-		log.Printf("Discovered and loaded plugin: %s", name)
+		slog.Info("discovered and loaded plugin", "name", name)
 	}
 
 	return nil
@@ -232,7 +232,7 @@ func (pm *PluginManager) monitorPlugin(ctx context.Context, name string) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("[PluginManager] Monitor for %s cancelled", name)
+			slog.Debug("plugin monitor cancelled", "name", name)
 			return
 		case <-time.After(pm.config.MonitorInterval):
 		}
@@ -256,12 +256,12 @@ func (pm *PluginManager) monitorPlugin(ctx context.Context, name string) {
 		pm.mu.Unlock()
 
 		if !hasPath {
-			log.Printf("Plugin %s crashed but path not found, cannot restart", name)
+			slog.Error("plugin crashed but path not found, cannot restart", "name", name)
 			return
 		}
 
 		if restartCount >= maxAttempts {
-			log.Printf("Plugin %s exceeded max restart attempts (%d), giving up", name, maxAttempts)
+			slog.Error("plugin exceeded max restart attempts, giving up", "name", name, "max_attempts", maxAttempts)
 			pm.mu.Lock()
 			delete(pm.pluginPaths, name)
 			delete(pm.pluginConfigs, name)
@@ -271,17 +271,17 @@ func (pm *PluginManager) monitorPlugin(ctx context.Context, name string) {
 			return
 		}
 
-		log.Printf("Plugin %s crashed (attempt %d/%d), restarting...", name, restartCount+1, maxAttempts)
+		slog.Warn("plugin crashed, restarting", "name", name, "attempt", restartCount+1, "max_attempts", maxAttempts)
 
 		select {
 		case <-ctx.Done():
-			log.Printf("[PluginManager] Monitor for %s cancelled during restart delay", name)
+			slog.Debug("plugin monitor cancelled during restart delay", "name", name)
 			return
 		case <-time.After(pm.config.RestartDelay):
 		}
 
 		if _, err := os.Stat(pluginPath); os.IsNotExist(err) {
-			log.Printf("Plugin binary %s no longer exists, cannot restart", pluginPath)
+			slog.Error("plugin binary no longer exists, cannot restart", "name", name, "path", pluginPath)
 			pm.mu.Lock()
 			delete(pm.pluginPaths, name)
 			delete(pm.pluginConfigs, name)
@@ -294,11 +294,11 @@ func (pm *PluginManager) monitorPlugin(ctx context.Context, name string) {
 		pm.mu.Lock()
 		pm.restartCounts[name] = restartCount + 1
 		if err := pm.loadPluginWithConfig(name, pluginPath, pluginConfig); err != nil {
-			log.Printf("Failed to restart plugin %s: %v", name, err)
+			slog.Error("failed to restart plugin", "name", name, "error", err)
 			pm.mu.Unlock()
 			return
 		}
-		log.Printf("Successfully restarted plugin %s", name)
+		slog.Info("successfully restarted plugin", "name", name)
 		pm.mu.Unlock()
 		return
 	}
@@ -348,7 +348,7 @@ func (pm *PluginManager) Shutdown() error {
 	var errs []error
 
 	for name, client := range pm.clients {
-		log.Printf("Shutting down plugin: %s", name)
+		slog.Info("shutting down plugin", "name", name)
 		client.Kill()
 		delete(pm.clients, name)
 		delete(pm.providers, name)
@@ -407,7 +407,7 @@ func (pm *PluginManager) UpdatePluginConfig(name string, configUpdates map[strin
 		return fmt.Errorf("failed to restart plugin %s with updated config: %w", name, err)
 	}
 
-	log.Printf("Plugin %s restarted with updated config", name)
+	slog.Info("plugin restarted with updated config", "name", name)
 	return nil
 }
 

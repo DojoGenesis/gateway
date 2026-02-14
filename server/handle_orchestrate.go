@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -12,8 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
+	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 )
 
 // ─── Orchestration API Types ─────────────────────────────────────────────────
@@ -145,7 +145,7 @@ func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestra
 			Type: events.OrchestrationFailed,
 			Data: map[string]interface{}{
 				"orchestration_id": state.ID,
-				"error":           err.Error(),
+				"error":            err.Error(),
 			},
 			Timestamp: time.Now(),
 		}
@@ -206,7 +206,7 @@ func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestra
 			Type: events.OrchestrationFailed,
 			Data: map[string]interface{}{
 				"orchestration_id": state.ID,
-				"error":           execErr.Error(),
+				"error":            execErr.Error(),
 			},
 			Timestamp: time.Now(),
 		}
@@ -238,7 +238,7 @@ func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestra
 		Type: events.OrchestrationComplete,
 		Data: map[string]interface{}{
 			"orchestration_id":  state.ID,
-			"final_output":     finalOutput,
+			"final_output":      finalOutput,
 			"total_duration_ms": totalDurationMs,
 		},
 		Timestamp: time.Now(),
@@ -283,7 +283,7 @@ func (s *Server) handleOrchestrationEvents(c *gin.Context) {
 	for _, evt := range pastEvents {
 		data, err := json.Marshal(evt)
 		if err != nil {
-			log.Printf("[Orchestrate] Failed to marshal event: %v", err)
+			slog.Error("failed to marshal event", "error", err)
 			continue
 		}
 		fmt.Fprintf(c.Writer, "data: %s\n\n", data)
@@ -308,7 +308,7 @@ func (s *Server) handleOrchestrationEvents(c *gin.Context) {
 			}
 			data, err := json.Marshal(evt)
 			if err != nil {
-				log.Printf("[Orchestrate] Failed to marshal event: %v", err)
+				slog.Error("failed to marshal event", "error", err)
 				continue
 			}
 			fmt.Fprintf(c.Writer, "data: %s\n\n", data)

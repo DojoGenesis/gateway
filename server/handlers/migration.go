@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
@@ -31,41 +32,43 @@ type StartMigrationResponse struct {
 func (h *MigrationHandlers) HandleStartMigration(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondUnauthorized(c, "unauthorized")
 		return
 	}
 
 	var req StartMigrationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body", "details": err.Error()})
+		respondBadRequest(c, "invalid request body")
 		return
 	}
 
 	summary, err := h.migrationManager.GetDataSummary(c.Request.Context(), userID.(string))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get data summary", "details": err.Error()})
+		slog.Error("failed to get data summary", "error", err)
+		respondInternalError(c, "failed to get data summary")
 		return
 	}
 
 	migrationID, err := h.migrationManager.StartMigration(c.Request.Context(), userID.(string), req.CloudUserID)
 	if err != nil {
 		if errors.Is(err, database.ErrMigrationInProgress) {
-			c.JSON(http.StatusConflict, gin.H{"error": "migration already in progress"})
+			respondConflict(c, "migration already in progress")
 			return
 		}
 		if errors.Is(err, database.ErrMigrationAlreadyDone) {
-			c.JSON(http.StatusConflict, gin.H{"error": "migration already completed"})
+			respondConflict(c, "migration already completed")
 			return
 		}
 		if errors.Is(err, database.ErrNoDataToMigrate) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "no data to migrate"})
+			respondBadRequest(c, "no data to migrate")
 			return
 		}
 		if errors.Is(err, database.ErrCloudAdapterRequired) {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "cloud adapter not available"})
+			respondError(c, http.StatusServiceUnavailable, "cloud adapter not available")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start migration", "details": err.Error()})
+		slog.Error("failed to start migration", "error", err)
+		respondInternalError(c, "failed to start migration")
 		return
 	}
 
@@ -83,23 +86,24 @@ type GetMigrationStatusResponse struct {
 func (h *MigrationHandlers) HandleGetMigrationStatus(c *gin.Context) {
 	migrationID := c.Param("id")
 	if migrationID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "migration_id is required"})
+		respondBadRequest(c, "migration_id is required")
 		return
 	}
 
 	_, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondUnauthorized(c, "unauthorized")
 		return
 	}
 
 	progress, err := h.migrationManager.GetMigrationStatus(c.Request.Context(), migrationID)
 	if err != nil {
 		if errors.Is(err, database.ErrMigrationNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "migration not found"})
+			respondNotFound(c, "migration")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get migration status", "details": err.Error()})
+		slog.Error("failed to get migration status", "error", err)
+		respondInternalError(c, "failed to get migration status")
 		return
 	}
 
@@ -115,7 +119,7 @@ type GetLatestMigrationResponse struct {
 func (h *MigrationHandlers) HandleGetLatestMigration(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondUnauthorized(c, "unauthorized")
 		return
 	}
 
@@ -125,7 +129,8 @@ func (h *MigrationHandlers) HandleGetLatestMigration(c *gin.Context) {
 			c.JSON(http.StatusOK, GetLatestMigrationResponse{Progress: nil})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get latest migration", "details": err.Error()})
+		slog.Error("failed to get latest migration", "error", err)
+		respondInternalError(c, "failed to get latest migration")
 		return
 	}
 
@@ -137,23 +142,24 @@ func (h *MigrationHandlers) HandleGetLatestMigration(c *gin.Context) {
 func (h *MigrationHandlers) HandleCancelMigration(c *gin.Context) {
 	migrationID := c.Param("id")
 	if migrationID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "migration_id is required"})
+		respondBadRequest(c, "migration_id is required")
 		return
 	}
 
 	_, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondUnauthorized(c, "unauthorized")
 		return
 	}
 
 	err := h.migrationManager.CancelMigration(c.Request.Context(), migrationID)
 	if err != nil {
 		if errors.Is(err, database.ErrMigrationNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "migration not found or already completed"})
+			respondError(c, http.StatusNotFound, "migration not found or already completed")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel migration", "details": err.Error()})
+		slog.Error("failed to cancel migration", "error", err)
+		respondInternalError(c, "failed to cancel migration")
 		return
 	}
 
@@ -169,13 +175,14 @@ type GetDataSummaryResponse struct {
 func (h *MigrationHandlers) HandleGetDataSummary(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondUnauthorized(c, "unauthorized")
 		return
 	}
 
 	summary, err := h.migrationManager.GetDataSummary(c.Request.Context(), userID.(string))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get data summary", "details": err.Error()})
+		slog.Error("failed to get data summary", "error", err)
+		respondInternalError(c, "failed to get data summary")
 		return
 	}
 

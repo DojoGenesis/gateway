@@ -3,6 +3,7 @@ package apptools
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -122,9 +123,10 @@ func MemorySearch(ctx context.Context, params map[string]interface{}) (map[strin
 
 	results, err := memoryManager.SearchSemantic(ctx, query, tier, contextType, maxResults)
 	if err != nil {
+		slog.Error("memory search failed", "error", err, "query", query)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("search failed: %v", err),
+			"error":   "search failed",
 		}, nil
 	}
 
@@ -184,9 +186,10 @@ func MemoryGet(ctx context.Context, params map[string]interface{}) (map[string]i
 
 	content, metadata, err := memoryManager.GetLines(ctx, path, startLine, lineCount)
 	if err != nil {
+		slog.Error("failed to retrieve content", "error", err, "path", path)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to retrieve content: %v", err),
+			"error":   "failed to retrieve content",
 		}, nil
 	}
 

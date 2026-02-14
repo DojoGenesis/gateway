@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -356,7 +356,7 @@ func (am *ArtifactManager) ListArtifacts(ctx context.Context, projectID string, 
 		)
 
 		if err != nil {
-			log.Printf("Warning: failed to scan artifact row: %v", err)
+			slog.Warn("failed to scan artifact row", "error", err)
 			continue
 		}
 
@@ -369,7 +369,7 @@ func (am *ArtifactManager) ListArtifacts(ctx context.Context, projectID string, 
 		}
 
 		if err := json.Unmarshal([]byte(metadataJSON), &artifact.Metadata); err != nil {
-			log.Printf("Warning: failed to unmarshal artifact metadata: %v", err)
+			slog.Warn("failed to unmarshal artifact metadata", "error", err)
 			continue
 		}
 
@@ -410,7 +410,7 @@ func (am *ArtifactManager) ListVersions(ctx context.Context, artifactID string) 
 		)
 
 		if err != nil {
-			log.Printf("Warning: failed to scan artifact version row: %v", err)
+			slog.Warn("failed to scan artifact version row", "error", err)
 			continue
 		}
 
@@ -427,7 +427,7 @@ func (am *ArtifactManager) ListVersions(ctx context.Context, artifactID string) 
 		}
 
 		if err := json.Unmarshal([]byte(metadataJSON), &av.Metadata); err != nil {
-			log.Printf("Warning: failed to unmarshal artifact version metadata: %v", err)
+			slog.Warn("failed to unmarshal artifact version metadata", "error", err)
 			continue
 		}
 

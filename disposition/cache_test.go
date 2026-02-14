@@ -154,8 +154,8 @@ func TestDispositionCache_MultipleKeys(t *testing.T) {
 
 func TestMakeCacheKey(t *testing.T) {
 	tests := []struct {
-		workspace  string
-		mode       string
+		workspace   string
+		mode        string
 		expectedKey string
 	}{
 		{"/path/to/workspace", "prod", "/path/to/workspace:prod"},

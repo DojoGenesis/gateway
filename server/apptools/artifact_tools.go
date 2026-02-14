@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/artifacts"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
@@ -53,9 +54,10 @@ func CreateArtifact(ctx context.Context, params map[string]interface{}) (map[str
 
 	artifact, err := artifactManager.CreateArtifact(ctx, projectID, sessionID, artifacts.ArtifactType(artifactType), name, description, content)
 	if err != nil {
+		slog.Error("failed to create artifact", "error", err)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to create artifact: %v", err),
+			"error":   "failed to create artifact",
 		}, nil
 	}
 
@@ -104,9 +106,10 @@ func UpdateArtifact(ctx context.Context, params map[string]interface{}) (map[str
 
 	artifact, err := artifactManager.UpdateArtifact(ctx, artifactID, newContent, commitMessage)
 	if err != nil {
+		slog.Error("failed to update artifact", "error", err)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to update artifact: %v", err),
+			"error":   "failed to update artifact",
 		}, nil
 	}
 
@@ -145,9 +148,10 @@ func GetArtifact(ctx context.Context, params map[string]interface{}) (map[string
 
 	artifact, err := artifactManager.GetArtifact(ctx, artifactID)
 	if err != nil {
+		slog.Error("failed to get artifact", "error", err, "artifact_id", artifactID)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to get artifact: %v", err),
+			"error":   "failed to get artifact",
 		}, nil
 	}
 
@@ -157,9 +161,10 @@ func GetArtifact(ctx context.Context, params map[string]interface{}) (map[string
 	}
 
 	if err != nil {
+		slog.Error("failed to get artifact version", "error", err, "artifact_id", artifactID)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to get artifact version: %v", err),
+			"error":   "failed to get artifact version",
 		}, nil
 	}
 
@@ -205,9 +210,10 @@ func ListArtifacts(ctx context.Context, params map[string]interface{}) (map[stri
 
 	artifactList, err := artifactManager.ListArtifacts(ctx, projectID, artifactType, limit)
 	if err != nil {
+		slog.Error("failed to list artifacts", "error", err)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to list artifacts: %v", err),
+			"error":   "failed to list artifacts",
 		}, nil
 	}
 
@@ -236,9 +242,10 @@ func ListArtifactVersions(ctx context.Context, params map[string]interface{}) (m
 
 	versions, err := artifactManager.ListVersions(ctx, artifactID)
 	if err != nil {
+		slog.Error("failed to list versions", "error", err, "artifact_id", artifactID)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to list versions: %v", err),
+			"error":   "failed to list versions",
 		}, nil
 	}
 
@@ -270,9 +277,10 @@ func ExportArtifact(ctx context.Context, params map[string]interface{}) (map[str
 
 	artifact, err := artifactManager.GetArtifact(ctx, artifactID)
 	if err != nil {
+		slog.Error("failed to get artifact", "error", err, "artifact_id", artifactID)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to get artifact: %v", err),
+			"error":   "failed to get artifact",
 		}, nil
 	}
 
@@ -283,9 +291,10 @@ func ExportArtifact(ctx context.Context, params map[string]interface{}) (map[str
 
 	artifactVersion, err := artifactManager.GetArtifactVersion(ctx, artifactID, versionNum)
 	if err != nil {
+		slog.Error("failed to get artifact version", "error", err, "artifact_id", artifactID, "version", versionNum)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to get artifact version: %v", err),
+			"error":   "failed to get artifact version",
 		}, nil
 	}
 

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
 	_ "modernc.org/sqlite"
 )
 
@@ -30,6 +31,11 @@ func NewFallbackStorage(dbPath string) (*FallbackStorage, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open fallback storage: %w", err)
+	}
+
+	if err := database.ConfigureSQLiteDB(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to configure fallback storage: %w", err)
 	}
 
 	if err := initFallbackDB(db); err != nil {

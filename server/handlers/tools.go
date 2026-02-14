@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
@@ -41,10 +42,7 @@ func HandleListTools(c *gin.Context) {
 func HandleSearchTools(c *gin.Context) {
 	var req SearchToolsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-		})
+		respondBadRequestWithSuccess(c, "Invalid request body")
 		return
 	}
 
@@ -61,10 +59,8 @@ func HandleSearchTools(c *gin.Context) {
 
 	result, err := tools.SearchTools(c.Request.Context(), params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
+		slog.Error("failed to search tools", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to search tools")
 		return
 	}
 
@@ -74,10 +70,7 @@ func HandleSearchTools(c *gin.Context) {
 func HandleGetToolInfo(c *gin.Context) {
 	toolName := c.Param("name")
 	if toolName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Tool name is required",
-		})
+		respondBadRequestWithSuccess(c, "Tool name is required")
 		return
 	}
 
@@ -87,10 +80,8 @@ func HandleGetToolInfo(c *gin.Context) {
 
 	result, err := tools.GetToolInfo(c.Request.Context(), params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
+		slog.Error("failed to get tool info", "error", err, "tool", toolName)
+		respondInternalErrorWithSuccess(c, "Failed to get tool info")
 		return
 	}
 
@@ -106,18 +97,12 @@ func HandleGetToolInfo(c *gin.Context) {
 func HandleInvokeTool(c *gin.Context) {
 	var req InvokeToolRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body: " + err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Invalid request body")
 		return
 	}
 
 	if req.ToolName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "tool_name is required",
-		})
+		respondBadRequestWithSuccess(c, "tool_name is required")
 		return
 	}
 
@@ -127,10 +112,8 @@ func HandleInvokeTool(c *gin.Context) {
 
 	result, err := tools.InvokeTool(c.Request.Context(), req.ToolName, req.Params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
+		slog.Error("failed to invoke tool", "error", err, "tool", req.ToolName)
+		respondInternalErrorWithSuccess(c, "Failed to invoke tool")
 		return
 	}
 

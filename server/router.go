@@ -6,22 +6,10 @@ import (
 
 // setupRoutes registers all HTTP routes on the Gin engine.
 func (s *Server) setupRoutes() {
-	// Initialize existing handler modules with injected dependencies
-	if s.pluginManager != nil {
-		handlers.InitializeModelHandlers(s.pluginManager)
-	}
-	if s.intentClassifier != nil && s.primaryAgent != nil {
-		handlers.InitializeChatHandlers(s.intentClassifier, s.primaryAgent, s.userRouter, s.pluginManager)
-	}
-	if s.memoryManager != nil {
-		handlers.InitializeMemoryHandlers(s.memoryManager)
-	}
-	if s.gardenManager != nil {
-		handlers.InitializeGardenHandlers(s.gardenManager)
-	}
-	if s.memoryMaintenance != nil {
-		handlers.InitializeMaintenanceHandlers(s.memoryMaintenance)
-	}
+	// Initialize all handler structs with injected dependencies
+	modelHandler := handlers.NewModelHandler(s.pluginManager)
+	chatHandler := handlers.NewChatHandler(s.intentClassifier, s.primaryAgent, s.userRouter, s.pluginManager)
+	memoryHandler := handlers.NewMemoryHandler(s.memoryManager, s.gardenManager, s.memoryMaintenance)
 
 	// ─── Infrastructure ──────────────────────────────────────────────
 	s.router.GET("/health", s.handleHealth)
@@ -76,24 +64,23 @@ func (s *Server) setupRoutes() {
 		}
 
 		// ─── Legacy endpoints (preserving existing routes) ───────────
-		// These delegate to existing handler functions for backward compatibility
-		v1.POST("/chat", handlers.HandleChat)
-		v1.GET("/providers", handlers.HandleListProviders)
+		v1.POST("/chat", chatHandler.Chat)
+		v1.GET("/providers", modelHandler.ListProviders)
 		v1.POST("/tools/search", handlers.HandleSearchTools)
 		v1.POST("/tools/invoke", handlers.HandleInvokeTool)
 
-		// Memory garden
-		v1.GET("/garden/context", handlers.HandleGetGardenContext)
-		v1.GET("/garden/stats", handlers.HandleGetGardenStats)
-		v1.GET("/seeds", handlers.HandleListSeeds)
-		v1.POST("/seeds", handlers.HandleCreateSeed)
-		v1.DELETE("/seeds/:id", handlers.HandleDeleteSeed)
-		v1.GET("/snapshots/:session", handlers.HandleListSnapshots)
-		v1.POST("/snapshots", handlers.HandleCreateSnapshot)
-		v1.GET("/snapshots/restore/:snapshot", handlers.HandleRestoreSnapshot)
-		v1.DELETE("/snapshots/:id", handlers.HandleDeleteSnapshot)
-		v1.GET("/snapshots/export/:id", handlers.HandleExportSnapshot)
-		v1.POST("/maintenance/run", handlers.HandleRunMaintenance)
+		// Memory garden endpoints (called from server methods via handle_memory.go)
+		v1.GET("/garden/context", memoryHandler.GetGardenContext)
+		v1.GET("/garden/stats", memoryHandler.GetGardenStats)
+		v1.GET("/seeds", memoryHandler.ListSeeds)
+		v1.POST("/seeds", memoryHandler.CreateSeed)
+		v1.DELETE("/seeds/:id", memoryHandler.DeleteSeed)
+		v1.GET("/snapshots/:session", memoryHandler.ListSnapshots)
+		v1.POST("/snapshots", memoryHandler.CreateSnapshot)
+		v1.GET("/snapshots/restore/:snapshot", memoryHandler.RestoreSnapshot)
+		v1.DELETE("/snapshots/:id", memoryHandler.DeleteSnapshot)
+		v1.GET("/snapshots/export/:id", memoryHandler.ExportSnapshot)
+		v1.POST("/maintenance/run", memoryHandler.RunMaintenance)
 	}
 
 	// ─── Admin Routes (v0.2.0 - New) ─────────────────────────────────

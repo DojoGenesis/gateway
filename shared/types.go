@@ -4,9 +4,9 @@ import "time"
 
 // Message is a conversation message (used across provider, memory, orchestration).
 type Message struct {
-	Role       string     `json:"role"`        // "system", "user", "assistant", "tool"
-	Content    string     `json:"content"`     // Message text
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"` // Assistant tool calls (role == "assistant")
+	Role       string     `json:"role"`                   // "system", "user", "assistant", "tool"
+	Content    string     `json:"content"`                // Message text
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`   // Assistant tool calls (role == "assistant")
 	ToolCallID string     `json:"tool_call_id,omitempty"` // Tool call ID (role == "tool")
 }
 

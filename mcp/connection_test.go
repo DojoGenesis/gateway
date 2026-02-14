@@ -7,10 +7,10 @@ import (
 
 func TestNewMCPServerConnection(t *testing.T) {
 	tests := []struct {
-		name    string
+		name     string
 		connName string
-		config  MCPServerConfig
-		wantErr bool
+		config   MCPServerConfig
+		wantErr  bool
 	}{
 		{
 			name:     "valid config",

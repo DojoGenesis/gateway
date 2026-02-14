@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/collaboration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/errors"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/intelligence"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/reflection"

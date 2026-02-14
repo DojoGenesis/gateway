@@ -8,14 +8,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/artifacts"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/artifacts"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/middleware"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/projects"
 	"github.com/gin-gonic/gin"
-	_ "modernc.org/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 )
 
 func setupGuestTestDB(t *testing.T) string {
@@ -116,11 +116,11 @@ func TestGuestUserCanStoreMemory(t *testing.T) {
 	mm, err := memory.NewMemoryManager(dbPath)
 	require.NoError(t, err)
 
-	InitializeMemoryHandlers(mm)
+	h := NewMemoryHandler(mm, nil, nil)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.POST("/api/v1/memory", middleware.OptionalAuthMiddleware(), HandleStoreMemory)
+	router.POST("/api/v1/memory", middleware.OptionalAuthMiddleware(), h.StoreMemory)
 
 	reqBody := map[string]interface{}{
 		"type":    "note",
@@ -149,11 +149,11 @@ func TestGuestUserCanListMemories(t *testing.T) {
 	mm, err := memory.NewMemoryManager(dbPath)
 	require.NoError(t, err)
 
-	InitializeMemoryHandlers(mm)
+	h := NewMemoryHandler(mm, nil, nil)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/api/v1/memory/list", middleware.OptionalAuthMiddleware(), HandleListMemories)
+	router.GET("/api/v1/memory/list", middleware.OptionalAuthMiddleware(), h.ListMemories)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/api/v1/memory/list", nil)
@@ -175,11 +175,11 @@ func TestGuestUserCanCreateProject(t *testing.T) {
 	pm, err := projects.NewProjectManager(db)
 	require.NoError(t, err)
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.POST("/api/v1/projects", middleware.OptionalAuthMiddleware(), HandleCreateProject)
+	router.POST("/api/v1/projects", middleware.OptionalAuthMiddleware(), h.CreateProject)
 
 	reqBody := map[string]interface{}{
 		"name":        "test-guest-project",
@@ -209,11 +209,11 @@ func TestGuestUserCanListProjects(t *testing.T) {
 	pm, err := projects.NewProjectManager(db)
 	require.NoError(t, err)
 
-	InitializeProjectHandlers(pm)
+	h := NewProjectHandler(pm)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/api/v1/projects", middleware.OptionalAuthMiddleware(), HandleListProjects)
+	router.GET("/api/v1/projects", middleware.OptionalAuthMiddleware(), h.ListProjects)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/api/v1/projects", nil)
@@ -238,13 +238,13 @@ func TestGuestUserCanCreateArtifact(t *testing.T) {
 	am, err := artifacts.NewArtifactManager(db)
 	require.NoError(t, err)
 
-	InitializeProjectHandlers(pm)
-	InitializeArtifactHandlers(am)
+	ph := NewProjectHandler(pm)
+	ah := NewArtifactHandler(am)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.POST("/api/v1/projects", middleware.OptionalAuthMiddleware(), HandleCreateProject)
-	router.POST("/api/v1/artifacts", middleware.OptionalAuthMiddleware(), HandleCreateArtifact)
+	router.POST("/api/v1/projects", middleware.OptionalAuthMiddleware(), ph.CreateProject)
+	router.POST("/api/v1/artifacts", middleware.OptionalAuthMiddleware(), ah.CreateArtifact)
 
 	projectReqBody := map[string]interface{}{
 		"name":        "test-project-for-artifact",
@@ -304,11 +304,11 @@ func TestGuestUserCanListArtifacts(t *testing.T) {
 	am, err := artifacts.NewArtifactManager(db)
 	require.NoError(t, err)
 
-	InitializeArtifactHandlers(am)
+	ah := NewArtifactHandler(am)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/api/v1/artifacts", middleware.OptionalAuthMiddleware(), HandleListArtifacts)
+	router.GET("/api/v1/artifacts", middleware.OptionalAuthMiddleware(), ah.ListArtifacts)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/api/v1/artifacts", nil)
@@ -333,11 +333,11 @@ func TestAuthenticatedUserCanAccessMemory(t *testing.T) {
 	mm, err := memory.NewMemoryManager(dbPath)
 	require.NoError(t, err)
 
-	InitializeMemoryHandlers(mm)
+	h := NewMemoryHandler(mm, nil, nil)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.POST("/api/v1/memory", middleware.OptionalAuthMiddleware(), HandleStoreMemory)
+	router.POST("/api/v1/memory", middleware.OptionalAuthMiddleware(), h.StoreMemory)
 
 	reqBody := map[string]interface{}{
 		"type":    "note",

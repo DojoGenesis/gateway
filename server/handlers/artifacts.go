@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,10 +13,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var artifactManager *artifacts.ArtifactManager
+// ArtifactHandler handles artifact-related HTTP requests.
+type ArtifactHandler struct {
+	manager *artifacts.ArtifactManager
+}
 
-func InitializeArtifactHandlers(am *artifacts.ArtifactManager) {
-	artifactManager = am
+// NewArtifactHandler creates a new ArtifactHandler.
+func NewArtifactHandler(am *artifacts.ArtifactManager) *ArtifactHandler {
+	return &ArtifactHandler{manager: am}
 }
 
 type CreateArtifactRequest struct {
@@ -38,56 +43,38 @@ type ListArtifactsRequest struct {
 	Limit     int    `form:"limit"`
 }
 
-func HandleCreateArtifact(c *gin.Context) {
-	if artifactManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "artifact manager not initialized",
-		})
+func (h *ArtifactHandler) CreateArtifact(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "artifact manager not initialized")
 		return
 	}
 
 	var req CreateArtifactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid request body",
-			"details": err.Error(),
-		})
+		slog.Warn("invalid create artifact request body", "error", err)
+		respondBadRequestWithSuccess(c, "invalid request body")
 		return
 	}
 
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "artifact name cannot be empty",
-		})
+		respondBadRequestWithSuccess(c, "artifact name cannot be empty")
 		return
 	}
 
 	if len(req.Name) > 200 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "artifact name too long (max 200 characters)",
-		})
+		respondBadRequestWithSuccess(c, "artifact name too long (max 200 characters)")
 		return
 	}
 
 	if len(req.Description) > 5000 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "description too long (max 5000 characters)",
-		})
+		respondBadRequestWithSuccess(c, "description too long (max 5000 characters)")
 		return
 	}
 
 	const maxContentSize = 10 * 1024 * 1024
 	if len(req.Content) > maxContentSize {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "content too large (max 10MB)",
-		})
+		respondBadRequestWithSuccess(c, "content too large (max 10MB)")
 		return
 	}
 
@@ -103,15 +90,12 @@ func HandleCreateArtifact(c *gin.Context) {
 		"other":      true,
 	}
 	if !validTypes[req.Type] {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success":     false,
-			"error":       "invalid artifact type",
-			"valid_types": []string{"document", "code", "image", "data", "config", "script", "markdown", "stylesheet", "other"},
-		})
+		respondBadRequestWithSuccess(c, "invalid artifact type",
+			"valid types: document, code, image, data, config, script, markdown, stylesheet, other")
 		return
 	}
 
-	artifact, err := artifactManager.CreateArtifact(
+	artifact, err := h.manager.CreateArtifact(
 		c.Request.Context(),
 		req.ProjectID,
 		req.SessionID,
@@ -121,21 +105,15 @@ func HandleCreateArtifact(c *gin.Context) {
 		req.Content,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to create artifact",
-			"details": err.Error(),
-		})
+		slog.Error("failed to create artifact", "error", err, "project_id", req.ProjectID, "name", req.Name)
+		respondInternalErrorWithSuccess(c, "failed to create artifact")
 		return
 	}
 
-	initialVersion, err := artifactManager.GetArtifactVersion(c.Request.Context(), artifact.ID, 1)
+	initialVersion, err := h.manager.GetArtifactVersion(c.Request.Context(), artifact.ID, 1)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to retrieve initial version",
-			"details": err.Error(),
-		})
+		slog.Error("failed to retrieve initial version", "error", err, "artifact_id", artifact.ID)
+		respondInternalErrorWithSuccess(c, "failed to retrieve initial version")
 		return
 	}
 
@@ -146,21 +124,15 @@ func HandleCreateArtifact(c *gin.Context) {
 	})
 }
 
-func HandleGetArtifact(c *gin.Context) {
-	if artifactManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "artifact manager not initialized",
-		})
+func (h *ArtifactHandler) GetArtifact(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "artifact manager not initialized")
 		return
 	}
 
 	artifactID := c.Param("id")
 	if artifactID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "artifact ID is required",
-		})
+		respondBadRequestWithSuccess(c, "artifact ID is required")
 		return
 	}
 
@@ -170,33 +142,24 @@ func HandleGetArtifact(c *gin.Context) {
 		var err error
 		version, err = strconv.Atoi(versionStr)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				"error":   "invalid version parameter",
-				"details": err.Error(),
-			})
+			slog.Warn("invalid version parameter", "error", err, "version_str", versionStr)
+			respondBadRequestWithSuccess(c, "invalid version parameter")
 			return
 		}
 	}
 
-	artifact, err := artifactManager.GetArtifact(c.Request.Context(), artifactID)
+	artifact, err := h.manager.GetArtifact(c.Request.Context(), artifactID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "artifact not found",
-			"details": err.Error(),
-		})
+		slog.Warn("artifact not found", "error", err, "artifact_id", artifactID)
+		respondNotFoundWithSuccess(c, "artifact not found")
 		return
 	}
 
 	if version > 0 {
-		artifactVersion, err := artifactManager.GetArtifactVersion(c.Request.Context(), artifactID, version)
+		artifactVersion, err := h.manager.GetArtifactVersion(c.Request.Context(), artifactID, version)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"error":   "artifact version not found",
-				"details": err.Error(),
-			})
+			slog.Warn("artifact version not found", "error", err, "artifact_id", artifactID, "version", version)
+			respondNotFoundWithSuccess(c, "artifact version not found")
 			return
 		}
 
@@ -208,13 +171,10 @@ func HandleGetArtifact(c *gin.Context) {
 		return
 	}
 
-	latestVersion, err := artifactManager.GetArtifactVersion(c.Request.Context(), artifactID, artifact.LatestVersion)
+	latestVersion, err := h.manager.GetArtifactVersion(c.Request.Context(), artifactID, artifact.LatestVersion)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "artifact version not found",
-			"details": err.Error(),
-		})
+		slog.Error("failed to retrieve latest artifact version", "error", err, "artifact_id", artifactID, "version", artifact.LatestVersion)
+		respondNotFoundWithSuccess(c, "artifact version not found")
 		return
 	}
 
@@ -225,22 +185,16 @@ func HandleGetArtifact(c *gin.Context) {
 	})
 }
 
-func HandleListArtifacts(c *gin.Context) {
-	if artifactManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "artifact manager not initialized",
-		})
+func (h *ArtifactHandler) ListArtifacts(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "artifact manager not initialized")
 		return
 	}
 
 	var req ListArtifactsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid query parameters",
-			"details": err.Error(),
-		})
+		slog.Warn("invalid list artifacts query parameters", "error", err)
+		respondBadRequestWithSuccess(c, "invalid query parameters")
 		return
 	}
 
@@ -252,13 +206,10 @@ func HandleListArtifacts(c *gin.Context) {
 		limit = 100
 	}
 
-	artifactsList, err := artifactManager.ListArtifacts(c.Request.Context(), req.ProjectID, artifacts.ArtifactType(req.Type), limit)
+	artifactsList, err := h.manager.ListArtifacts(c.Request.Context(), req.ProjectID, artifacts.ArtifactType(req.Type), limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to list artifacts",
-			"details": err.Error(),
-		})
+		slog.Error("failed to list artifacts", "error", err, "project_id", req.ProjectID, "type", req.Type)
+		respondInternalErrorWithSuccess(c, "failed to list artifacts")
 		return
 	}
 
@@ -269,40 +220,28 @@ func HandleListArtifacts(c *gin.Context) {
 	})
 }
 
-func HandleUpdateArtifact(c *gin.Context) {
-	if artifactManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "artifact manager not initialized",
-		})
+func (h *ArtifactHandler) UpdateArtifact(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "artifact manager not initialized")
 		return
 	}
 
 	artifactID := c.Param("id")
 	if artifactID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "artifact ID is required",
-		})
+		respondBadRequestWithSuccess(c, "artifact ID is required")
 		return
 	}
 
 	var req UpdateArtifactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid request body",
-			"details": err.Error(),
-		})
+		slog.Warn("invalid update artifact request body", "error", err)
+		respondBadRequestWithSuccess(c, "invalid request body")
 		return
 	}
 
 	const maxContentSize = 10 * 1024 * 1024
 	if len(req.Content) > maxContentSize {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "content too large (max 10MB)",
-		})
+		respondBadRequestWithSuccess(c, "content too large (max 10MB)")
 		return
 	}
 
@@ -311,18 +250,15 @@ func HandleUpdateArtifact(c *gin.Context) {
 		commitMessage = "Updated artifact"
 	}
 
-	updatedArtifact, err := artifactManager.UpdateArtifact(
+	updatedArtifact, err := h.manager.UpdateArtifact(
 		c.Request.Context(),
 		artifactID,
 		req.Content,
 		commitMessage,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to update artifact",
-			"details": err.Error(),
-		})
+		slog.Error("failed to update artifact", "error", err, "artifact_id", artifactID)
+		respondInternalErrorWithSuccess(c, "failed to update artifact")
 		return
 	}
 
@@ -332,30 +268,21 @@ func HandleUpdateArtifact(c *gin.Context) {
 	})
 }
 
-func HandleDeleteArtifact(c *gin.Context) {
-	if artifactManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "artifact manager not initialized",
-		})
+func (h *ArtifactHandler) DeleteArtifact(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "artifact manager not initialized")
 		return
 	}
 
 	artifactID := c.Param("id")
 	if artifactID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "artifact ID is required",
-		})
+		respondBadRequestWithSuccess(c, "artifact ID is required")
 		return
 	}
 
-	if err := artifactManager.DeleteArtifact(c.Request.Context(), artifactID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to delete artifact",
-			"details": err.Error(),
-		})
+	if err := h.manager.DeleteArtifact(c.Request.Context(), artifactID); err != nil {
+		slog.Error("failed to delete artifact", "error", err, "artifact_id", artifactID)
+		respondInternalErrorWithSuccess(c, "failed to delete artifact")
 		return
 	}
 
@@ -365,31 +292,22 @@ func HandleDeleteArtifact(c *gin.Context) {
 	})
 }
 
-func HandleListArtifactVersions(c *gin.Context) {
-	if artifactManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "artifact manager not initialized",
-		})
+func (h *ArtifactHandler) ListArtifactVersions(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "artifact manager not initialized")
 		return
 	}
 
 	artifactID := c.Param("id")
 	if artifactID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "artifact ID is required",
-		})
+		respondBadRequestWithSuccess(c, "artifact ID is required")
 		return
 	}
 
-	versions, err := artifactManager.ListVersions(c.Request.Context(), artifactID)
+	versions, err := h.manager.ListVersions(c.Request.Context(), artifactID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to list versions",
-			"details": err.Error(),
-		})
+		slog.Error("failed to list artifact versions", "error", err, "artifact_id", artifactID)
+		respondInternalErrorWithSuccess(c, "failed to list versions")
 		return
 	}
 
@@ -400,21 +318,15 @@ func HandleListArtifactVersions(c *gin.Context) {
 	})
 }
 
-func HandleExportArtifact(c *gin.Context) {
-	if artifactManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "artifact manager not initialized",
-		})
+func (h *ArtifactHandler) ExportArtifact(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalErrorWithSuccess(c, "artifact manager not initialized")
 		return
 	}
 
 	artifactID := c.Param("id")
 	if artifactID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "artifact ID is required",
-		})
+		respondBadRequestWithSuccess(c, "artifact ID is required")
 		return
 	}
 
@@ -426,23 +338,17 @@ func HandleExportArtifact(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Minute)
 	defer cancel()
 
-	artifact, err := artifactManager.GetArtifact(ctx, artifactID)
+	artifact, err := h.manager.GetArtifact(ctx, artifactID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "artifact not found",
-			"details": err.Error(),
-		})
+		slog.Warn("artifact not found for export", "error", err, "artifact_id", artifactID)
+		respondNotFoundWithSuccess(c, "artifact not found")
 		return
 	}
 
-	versions, err := artifactManager.ListVersions(ctx, artifactID)
+	versions, err := h.manager.ListVersions(ctx, artifactID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "failed to retrieve versions",
-			"details": err.Error(),
-		})
+		slog.Error("failed to retrieve versions for export", "error", err, "artifact_id", artifactID)
+		respondInternalErrorWithSuccess(c, "failed to retrieve versions")
 		return
 	}
 
@@ -461,12 +367,9 @@ func HandleExportArtifact(c *gin.Context) {
 		c.JSON(http.StatusOK, exportData)
 
 	case "markdown", "md":
-		latestVersion, err := artifactManager.GetArtifactVersion(ctx, artifactID, artifact.LatestVersion)
+		latestVersion, err := h.manager.GetArtifactVersion(ctx, artifactID, artifact.LatestVersion)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				"error":   "failed to retrieve latest version",
-			})
+			respondInternalErrorWithSuccess(c, "failed to retrieve latest version")
 			return
 		}
 
@@ -477,12 +380,9 @@ func HandleExportArtifact(c *gin.Context) {
 		c.String(http.StatusOK, latestVersion.Content)
 
 	case "text", "txt":
-		latestVersion, err := artifactManager.GetArtifactVersion(ctx, artifactID, artifact.LatestVersion)
+		latestVersion, err := h.manager.GetArtifactVersion(ctx, artifactID, artifact.LatestVersion)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				"error":   "failed to retrieve latest version",
-			})
+			respondInternalErrorWithSuccess(c, "failed to retrieve latest version")
 			return
 		}
 
@@ -493,10 +393,7 @@ func HandleExportArtifact(c *gin.Context) {
 		c.String(http.StatusOK, latestVersion.Content)
 
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success":           false,
-			"error":             fmt.Sprintf("unsupported export format: %s", format),
-			"supported_formats": []string{"json", "markdown", "md", "text", "txt"},
-		})
+		respondBadRequestWithSuccess(c, fmt.Sprintf("unsupported export format: %s", format),
+			"supported formats: json, markdown, md, text, txt")
 	}
 }

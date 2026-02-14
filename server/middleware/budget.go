@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -90,7 +91,8 @@ func BudgetMiddleware(tracker *services.BudgetTracker, costTracker *services.Cos
 
 			// Track the usage
 			if err := tracker.TrackUsage(userID, tokenUsage); err != nil {
-				c.Header("X-Budget-Error", err.Error())
+				slog.Warn("budget tracking error", "user_id", userID, "error", err)
+				c.Header("X-Budget-Error", "tracking_failed")
 			}
 
 			// Calculate cost if model is provided

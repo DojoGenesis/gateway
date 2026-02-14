@@ -3,7 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -12,10 +12,10 @@ import (
 
 // ServerStatus represents the health and status of an MCP server connection.
 type ServerStatus struct {
-	Name       string    `json:"name"`
-	Connected  bool      `json:"connected"`
-	ToolCount  int       `json:"tool_count"`
-	LastError  string    `json:"last_error,omitempty"`
+	Name        string    `json:"name"`
+	Connected   bool      `json:"connected"`
+	ToolCount   int       `json:"tool_count"`
+	LastError   string    `json:"last_error,omitempty"`
 	LastChecked time.Time `json:"last_checked"`
 }
 
@@ -67,7 +67,7 @@ func (m *MCPHostManager) Start(ctx context.Context) error {
 	for _, serverCfg := range m.config.Servers {
 		if err := m.startServer(ctx, serverCfg, healthCtx); err != nil {
 			// Log error but continue with other servers (graceful degradation)
-			log.Printf("Warning: failed to start MCP server %s: %v", serverCfg.ID, err)
+			slog.Warn("failed to start MCP server", "server", serverCfg.ID, "error", err)
 			continue
 		}
 	}
@@ -99,8 +99,7 @@ func (m *MCPHostManager) startServer(ctx context.Context, serverCfg MCPServerCon
 	for _, mcpTool := range tools {
 		toolDef := CreateToolDefinition(mcpTool, conn, serverCfg.NamespacePrefix)
 		if err := m.toolRegistry.Register(ctx, toolDef); err != nil {
-			log.Printf("Warning: failed to register tool %s from server %s: %v",
-				toolDef.Name, serverCfg.ID, err)
+			slog.Warn("failed to register tool", "tool", toolDef.Name, "server", serverCfg.ID, "error", err)
 			// Continue registering other tools
 		}
 	}
@@ -114,7 +113,7 @@ func (m *MCPHostManager) startServer(ctx context.Context, serverCfg MCPServerCon
 		go m.healthCheckLoop(healthCtx, serverCfg.ID, serverCfg.HealthCheck.IntervalSec)
 	}
 
-	log.Printf("MCP server %s (%s) connected: %d tools registered", serverCfg.ID, serverCfg.DisplayName, len(tools))
+	slog.Info("MCP server connected", "server", serverCfg.ID, "display_name", serverCfg.DisplayName, "tool_count", len(tools))
 
 	return nil
 }
@@ -153,7 +152,7 @@ func (m *MCPHostManager) checkAndReconnect(ctx context.Context, serverName strin
 	}
 
 	// Connection is unhealthy - attempt reconnect
-	log.Printf("MCP server %s is unhealthy, attempting reconnect...", serverName)
+	slog.Warn("MCP server is unhealthy, attempting reconnect", "server", serverName)
 
 	// Find server config
 	var serverCfg *MCPServerConfig
@@ -165,25 +164,25 @@ func (m *MCPHostManager) checkAndReconnect(ctx context.Context, serverName strin
 	}
 
 	if serverCfg == nil {
-		log.Printf("Error: server config not found for %s", serverName)
+		slog.Error("server config not found", "server", serverName)
 		return
 	}
 
 	// Disconnect old connection
 	if err := conn.Disconnect(ctx); err != nil {
-		log.Printf("Warning: error disconnecting from %s: %v", serverName, err)
+		slog.Warn("error disconnecting from server", "server", serverName, "error", err)
 	}
 
 	// Create new connection
 	newConn, err := NewMCPServerConnection(serverCfg.ID, *serverCfg)
 	if err != nil {
-		log.Printf("Error: failed to create new connection for %s: %v", serverName, err)
+		slog.Error("failed to create new connection", "server", serverName, "error", err)
 		return
 	}
 
 	// Attempt to connect
 	if err := newConn.Connect(ctx); err != nil {
-		log.Printf("Error: failed to reconnect to %s: %v", serverName, err)
+		slog.Error("failed to reconnect", "server", serverName, "error", err)
 		return
 	}
 
@@ -192,7 +191,7 @@ func (m *MCPHostManager) checkAndReconnect(ctx context.Context, serverName strin
 	m.connections[serverName] = newConn
 	m.mu.Unlock()
 
-	log.Printf("MCP server %s reconnected successfully", serverName)
+	slog.Info("MCP server reconnected successfully", "server", serverName)
 }
 
 // Stop gracefully shuts down all MCP server connections and stops health checks.
@@ -216,14 +215,14 @@ func (m *MCPHostManager) Stop(ctx context.Context) error {
 	case <-done:
 		// All health checks stopped
 	case <-time.After(5 * time.Second):
-		log.Println("Warning: timeout waiting for health checks to stop")
+		slog.Warn("timeout waiting for health checks to stop")
 	}
 
 	// Disconnect from all servers
 	var lastErr error
 	for name, conn := range m.connections {
 		if err := conn.Disconnect(ctx); err != nil {
-			log.Printf("Error disconnecting from %s: %v", name, err)
+			slog.Error("error disconnecting from server", "server", name, "error", err)
 			lastErr = err
 		}
 	}

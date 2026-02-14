@@ -251,9 +251,9 @@ func TestResolveDisposition_SemverValidation(t *testing.T) {
 	defer os.RemoveAll(workspaceRoot)
 
 	tests := []struct {
-		name        string
-		version     string
-		shouldFail  bool
+		name       string
+		version    string
+		shouldFail bool
 	}{
 		{"valid_1.0.0", "1.0.0", false},
 		{"valid_2.1.3", "2.1.3", false},

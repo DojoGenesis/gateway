@@ -18,9 +18,9 @@ func (s *Server) handleAdminHealth(c *gin.Context) {
 		"version": Version,
 		"uptime":  time.Since(s.startTime).String(),
 		"system": gin.H{
-			"go_version":      runtime.Version(),
-			"num_goroutines":  runtime.NumGoroutine(),
-			"num_cpu":         runtime.NumCPU(),
+			"go_version":     runtime.Version(),
+			"num_goroutines": runtime.NumGoroutine(),
+			"num_cpu":        runtime.NumCPU(),
 		},
 	}
 
@@ -73,10 +73,10 @@ func (s *Server) handleAdminHealth(c *gin.Context) {
 			totalMCPTools += status.ToolCount
 		}
 		health["mcp"] = gin.H{
-			"enabled":         true,
-			"server_count":    len(mcpStatus),
-			"total_tools":     totalMCPTools,
-			"servers":         mcpServers,
+			"enabled":      true,
+			"server_count": len(mcpStatus),
+			"total_tools":  totalMCPTools,
+			"servers":      mcpServers,
 		}
 	} else {
 		health["mcp"] = gin.H{
@@ -106,9 +106,9 @@ func (s *Server) handleAdminConfig(c *gin.Context) {
 			"shutdown_timeout": s.cfg.ShutdownTimeout.String(),
 		},
 		"features": gin.H{
-			"otel_enabled":       s.traceLogger != nil,
-			"mcp_enabled":        s.mcpHostManager != nil,
-			"memory_enabled":     s.memoryManager != nil,
+			"otel_enabled":          s.traceLogger != nil,
+			"mcp_enabled":           s.mcpHostManager != nil,
+			"memory_enabled":        s.memoryManager != nil,
 			"orchestration_enabled": s.orchestrationEngine != nil,
 		},
 	}
@@ -122,7 +122,7 @@ func (s *Server) handleAdminConfigReload(c *gin.Context) {
 	// TODO: Implement config reload logic
 	// For now, return not implemented
 	c.JSON(http.StatusNotImplemented, gin.H{
-		"error": "config reload not yet implemented",
+		"error":   "config reload not yet implemented",
 		"message": "configuration reload requires service restart in v0.2.0",
 	})
 }
@@ -207,12 +207,13 @@ func (s *Server) handleAdminMCPServers(c *gin.Context) {
 // handleAdminMCPStatus returns MCP server connection status and overall health.
 // GET /admin/mcp/status
 // Response format per Phase 3 spec (§4.2):
-// {
-//   "servers": { "server_id": { "server_id": "...", "state": "connected", "tool_count": 14, ... } },
-//   "total_servers": 1,
-//   "total_tools": 14,
-//   "healthy": true
-// }
+//
+//	{
+//	  "servers": { "server_id": { "server_id": "...", "state": "connected", "tool_count": 14, ... } },
+//	  "total_servers": 1,
+//	  "total_tools": 14,
+//	  "healthy": true
+//	}
 func (s *Server) handleAdminMCPStatus(c *gin.Context) {
 	if s.mcpHostManager == nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -241,12 +242,12 @@ func (s *Server) handleAdminMCPStatus(c *gin.Context) {
 
 		// Build server status object
 		servers[serverID] = gin.H{
-			"server_id":        serverID,
-			"display_name":     status.Name,
-			"state":            state,
+			"server_id":         serverID,
+			"display_name":      status.Name,
+			"state":             state,
 			"last_health_check": status.LastChecked,
-			"tool_count":       status.ToolCount,
-			"last_error":       status.LastError,
+			"tool_count":        status.ToolCount,
+			"last_error":        status.LastError,
 		}
 
 		// Aggregate metrics

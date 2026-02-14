@@ -11,8 +11,8 @@ import (
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/gin-gonic/gin"
-	_ "modernc.org/sqlite"
 	"github.com/stretchr/testify/assert"
+	_ "modernc.org/sqlite"
 )
 
 func setupAgentTestDB(t *testing.T) *sql.DB {
@@ -76,10 +76,10 @@ func TestHandleListAgents_Success(t *testing.T) {
 		t.Fatalf("Failed to seed agents: %v", err)
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.GET("/api/agents", HandleListAgents)
+	router.GET("/api/agents", h.ListAgents)
 
 	req, _ := http.NewRequest("GET", "/api/agents", nil)
 	w := httptest.NewRecorder()
@@ -126,10 +126,10 @@ func TestHandleListAgents_Success(t *testing.T) {
 func TestHandleListAgents_NotInitialized(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	InitializeAgentHandlers(nil)
+	h := NewAgentHandler(nil)
 
 	router := gin.New()
-	router.GET("/api/agents", HandleListAgents)
+	router.GET("/api/agents", h.ListAgents)
 
 	req, _ := http.NewRequest("GET", "/api/agents", nil)
 	w := httptest.NewRecorder()
@@ -158,10 +158,10 @@ func TestHandleGetAgent_Success(t *testing.T) {
 		t.Fatalf("Failed to seed agents: %v", err)
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.GET("/api/agents/:id", HandleGetAgent)
+	router.GET("/api/agents/:id", h.GetAgent)
 
 	req, _ := http.NewRequest("GET", "/api/agents/primary_agent", nil)
 	w := httptest.NewRecorder()
@@ -189,10 +189,10 @@ func TestHandleGetAgent_NotFound(t *testing.T) {
 		t.Fatalf("Failed to create agent manager: %v", err)
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.GET("/api/agents/:id", HandleGetAgent)
+	router.GET("/api/agents/:id", h.GetAgent)
 
 	req, _ := http.NewRequest("GET", "/api/agents/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -221,10 +221,10 @@ func TestHandleGetAgentCapabilities_Success(t *testing.T) {
 		t.Fatalf("Failed to seed agents: %v", err)
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.GET("/api/agents/:id/capabilities", HandleGetAgentCapabilities)
+	router.GET("/api/agents/:id/capabilities", h.GetAgentCapabilities)
 
 	req, _ := http.NewRequest("GET", "/api/agents/primary_agent/capabilities", nil)
 	w := httptest.NewRecorder()
@@ -264,10 +264,10 @@ func TestHandleGetAgentCapabilities_NotFound(t *testing.T) {
 		t.Fatalf("Failed to create agent manager: %v", err)
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.GET("/api/agents/:id/capabilities", HandleGetAgentCapabilities)
+	router.GET("/api/agents/:id/capabilities", h.GetAgentCapabilities)
 
 	req, _ := http.NewRequest("GET", "/api/agents/nonexistent/capabilities", nil)
 	w := httptest.NewRecorder()
@@ -287,10 +287,10 @@ func TestHandleSeedAgents_Success(t *testing.T) {
 		t.Fatalf("Failed to create agent manager: %v", err)
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.POST("/api/agents/seed", HandleSeedAgents)
+	router.POST("/api/agents/seed", h.SeedAgents)
 
 	req, _ := http.NewRequest("POST", "/api/agents/seed", nil)
 	w := httptest.NewRecorder()
@@ -319,10 +319,10 @@ func TestHandleSeedAgents_Idempotent(t *testing.T) {
 		t.Fatalf("Failed to create agent manager: %v", err)
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.POST("/api/agents/seed", HandleSeedAgents)
+	router.POST("/api/agents/seed", h.SeedAgents)
 
 	req1, _ := http.NewRequest("POST", "/api/agents/seed", nil)
 	w1 := httptest.NewRecorder()
@@ -363,10 +363,10 @@ func TestHandleListAgents_Pagination_Success(t *testing.T) {
 		}
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.GET("/api/agents", HandleListAgents)
+	router.GET("/api/agents", h.ListAgents)
 
 	req, _ := http.NewRequest("GET", "/api/agents?page=1&limit=10", nil)
 	w := httptest.NewRecorder()
@@ -409,10 +409,10 @@ func TestHandleListAgents_Pagination_SecondPage(t *testing.T) {
 		}
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.GET("/api/agents", HandleListAgents)
+	router.GET("/api/agents", h.ListAgents)
 
 	req, _ := http.NewRequest("GET", "/api/agents?page=2&limit=10", nil)
 	w := httptest.NewRecorder()
@@ -439,10 +439,10 @@ func TestHandleListAgents_Pagination_InvalidPage(t *testing.T) {
 		t.Fatalf("Failed to create agent manager: %v", err)
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.GET("/api/agents", HandleListAgents)
+	router.GET("/api/agents", h.ListAgents)
 
 	req, _ := http.NewRequest("GET", "/api/agents?page=invalid&limit=10", nil)
 	w := httptest.NewRecorder()
@@ -467,10 +467,10 @@ func TestHandleListAgents_Pagination_InvalidLimit(t *testing.T) {
 		t.Fatalf("Failed to create agent manager: %v", err)
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.GET("/api/agents", HandleListAgents)
+	router.GET("/api/agents", h.ListAgents)
 
 	req, _ := http.NewRequest("GET", "/api/agents?page=1&limit=invalid", nil)
 	w := httptest.NewRecorder()
@@ -508,10 +508,10 @@ func TestHandleListAgents_Pagination_MaxLimit(t *testing.T) {
 		}
 	}
 
-	InitializeAgentHandlers(am)
+	h := NewAgentHandler(am)
 
 	router := gin.New()
-	router.GET("/api/agents", HandleListAgents)
+	router.GET("/api/agents", h.ListAgents)
 
 	req, _ := http.NewRequest("GET", "/api/agents?page=1&limit=200", nil)
 	w := httptest.NewRecorder()

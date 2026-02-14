@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -116,7 +116,7 @@ func setupChatTestRouter() *gin.Engine {
 	return r
 }
 
-func setupTestHandlers() {
+func TestHandleChat_ValidationErrors(t *testing.T) {
 	ic := agent.NewIntentClassifier()
 
 	mockProvider := &mockModelProvider{
@@ -140,15 +140,10 @@ func setupTestHandlers() {
 
 	pa := agent.NewPrimaryAgent(pm)
 
-	// Pass nil for UserRouter in tests - selectProvider handles nil gracefully
-	// by falling back to default provider
-	InitializeChatHandlers(ic, pa, nil, nil)
-}
+	h := NewChatHandler(ic, pa, nil, nil)
 
-func TestHandleChat_ValidationErrors(t *testing.T) {
-	setupTestHandlers()
 	router := setupChatTestRouter()
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	tests := []struct {
 		name           string
@@ -195,9 +190,33 @@ func TestHandleChat_ValidationErrors(t *testing.T) {
 }
 
 func TestHandleChat_SimpleQuery_NonStreaming(t *testing.T) {
-	setupTestHandlers()
+	ic := agent.NewIntentClassifier()
+
+	mockProvider := &mockModelProvider{
+		response: &provider.CompletionResponse{
+			ID:      "test-response",
+			Model:   "mock-model",
+			Content: "This is a test response",
+			Usage: provider.Usage{
+				InputTokens:  10,
+				OutputTokens: 20,
+				TotalTokens:  30,
+			},
+		},
+	}
+
+	pm := &mockPluginManager{
+		providers: map[string]provider.ModelProvider{
+			"mock": mockProvider,
+		},
+	}
+
+	pa := agent.NewPrimaryAgent(pm)
+
+	h := NewChatHandler(ic, pa, nil, nil)
+
 	router := setupChatTestRouter()
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	tests := []struct {
 		name            string
@@ -268,9 +287,33 @@ func TestHandleChat_SimpleQuery_NonStreaming(t *testing.T) {
 }
 
 func TestHandleChat_SimpleQuery_Streaming(t *testing.T) {
-	setupTestHandlers()
+	ic := agent.NewIntentClassifier()
+
+	mockProvider := &mockModelProvider{
+		response: &provider.CompletionResponse{
+			ID:      "test-response",
+			Model:   "mock-model",
+			Content: "This is a test response",
+			Usage: provider.Usage{
+				InputTokens:  10,
+				OutputTokens: 20,
+				TotalTokens:  30,
+			},
+		},
+	}
+
+	pm := &mockPluginManager{
+		providers: map[string]provider.ModelProvider{
+			"mock": mockProvider,
+		},
+	}
+
+	pa := agent.NewPrimaryAgent(pm)
+
+	h := NewChatHandler(ic, pa, nil, nil)
+
 	router := setupChatTestRouter()
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	reqBody := ChatRequest{
 		Message:   "hello",
@@ -321,10 +364,10 @@ func TestHandleChat_ComplexQuery_NonStreaming(t *testing.T) {
 
 	pa := agent.NewPrimaryAgent(pm)
 
-	InitializeChatHandlers(ic, pa, nil, nil)
+	h := NewChatHandler(ic, pa, nil, nil)
 
 	router := setupChatTestRouter()
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	reqBody := ChatRequest{
 		Message:   "Build a React todo app",
@@ -357,22 +400,8 @@ func TestHandleChat_ComplexQuery_NonStreaming(t *testing.T) {
 func TestHandleChat_ComplexQuery_Streaming(t *testing.T) {
 	t.Skip("Streaming tests require a real HTTP connection; httptest.ResponseRecorder doesn't support CloseNotifier")
 
-	ic := agent.NewIntentClassifier()
-
-	streamChan := make(chan *provider.CompletionChunk, 5)
-	mockProvider := &mockModelProvider{
-		streamResponse: streamChan,
-	}
-
-	pm := &mockPluginManager{
-		providers: map[string]provider.ModelProvider{
-			"mock": mockProvider,
-		},
-	}
-
-	pa := agent.NewPrimaryAgent(pm)
-
-	InitializeChatHandlers(ic, pa, nil, nil)
+	// Test is skipped - streaming tests require real HTTP connection
+	// This is a placeholder for when streaming tests are enabled
 }
 
 func TestHandleChat_ErrorHandling(t *testing.T) {
@@ -390,10 +419,10 @@ func TestHandleChat_ErrorHandling(t *testing.T) {
 
 	pa := agent.NewPrimaryAgent(pm)
 
-	InitializeChatHandlers(ic, pa, nil, nil)
+	h := NewChatHandler(ic, pa, nil, nil)
 
 	router := setupChatTestRouter()
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	reqBody := ChatRequest{
 		Message:   "Build a React app",
@@ -442,10 +471,10 @@ func TestHandleChat_WithModel(t *testing.T) {
 
 	pa := agent.NewPrimaryAgent(pm)
 
-	InitializeChatHandlers(ic, pa, nil, nil)
+	h := NewChatHandler(ic, pa, nil, nil)
 
 	router := setupChatTestRouter()
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	reqBody := ChatRequest{
 		Message:   "Build something complex",
@@ -566,11 +595,10 @@ func TestNormalizeQuery(t *testing.T) {
 }
 
 func TestHandleChat_NotInitialized(t *testing.T) {
-	intentClassifier = nil
-	primaryAgent = nil
+	h := NewChatHandler(nil, nil, nil, nil)
 
 	router := setupChatTestRouter()
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	reqBody := ChatRequest{
 		Message:   "hello",
@@ -621,10 +649,10 @@ func TestHandleChat_ContextCancellation(t *testing.T) {
 
 	pa := agent.NewPrimaryAgent(pm)
 
-	InitializeChatHandlers(ic, pa, nil, nil)
+	h := NewChatHandler(ic, pa, nil, nil)
 
 	router := setupChatTestRouter()
-	router.POST("/chat", HandleChat)
+	router.POST("/chat", h.Chat)
 
 	reqBody := ChatRequest{
 		Message:   "Build a complex application",
@@ -677,7 +705,7 @@ func TestHandleChat_RoutingDecisionHeaders(t *testing.T) {
 
 	pa := agent.NewPrimaryAgent(pm)
 
-	InitializeChatHandlers(ic, pa, nil, nil)
+	h := NewChatHandler(ic, pa, nil, nil)
 
 	tests := []struct {
 		name             string
@@ -708,7 +736,7 @@ func TestHandleChat_RoutingDecisionHeaders(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := setupChatTestRouter()
-			router.POST("/chat", HandleChat)
+			router.POST("/chat", h.Chat)
 
 			reqBody := ChatRequest{
 				Message:   tt.message,

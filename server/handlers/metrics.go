@@ -37,14 +37,24 @@ type PerformanceMetrics struct {
 	ComplexQueryAvgMs float64 `json:"complex_query_avg_ms,omitempty"`
 }
 
-func HandleMetrics(c *gin.Context) {
+// MetricsHandler handles metrics HTTP requests.
+type MetricsHandler struct {
+	chatHandler *ChatHandler
+}
+
+// NewMetricsHandler creates a new MetricsHandler.
+func NewMetricsHandler(ch *ChatHandler) *MetricsHandler {
+	return &MetricsHandler{chatHandler: ch}
+}
+
+func (h *MetricsHandler) GetMetrics(c *gin.Context) {
 	var cacheMetrics CacheMetrics
 
-	if responseCache != nil {
-		hits, misses, hitRate := responseCache.Stats()
+	if h.chatHandler != nil && h.chatHandler.cache != nil {
+		hits, misses, hitRate := h.chatHandler.cache.Stats()
 		cacheMetrics = CacheMetrics{
 			Enabled:   true,
-			Size:      responseCache.Size(),
+			Size:      h.chatHandler.cache.Size(),
 			MaxSize:   1000,
 			Hits:      hits,
 			Misses:    misses,
@@ -76,15 +86,13 @@ func HandleMetrics(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-func HandleCacheClear(c *gin.Context) {
-	if responseCache == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "cache not initialized",
-		})
+func (h *MetricsHandler) ClearCache(c *gin.Context) {
+	if h.chatHandler == nil || h.chatHandler.cache == nil {
+		respondError(c, http.StatusServiceUnavailable, "cache not initialized")
 		return
 	}
 
-	responseCache.Clear()
+	h.chatHandler.cache.Clear()
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "cache cleared successfully",
@@ -92,15 +100,13 @@ func HandleCacheClear(c *gin.Context) {
 	})
 }
 
-func HandleCacheDisable(c *gin.Context) {
-	if responseCache == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "cache not initialized",
-		})
+func (h *MetricsHandler) DisableCache(c *gin.Context) {
+	if h.chatHandler == nil || h.chatHandler.cache == nil {
+		respondError(c, http.StatusServiceUnavailable, "cache not initialized")
 		return
 	}
 
-	responseCache.Disable()
+	h.chatHandler.cache.Disable()
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "cache disabled",
@@ -108,15 +114,13 @@ func HandleCacheDisable(c *gin.Context) {
 	})
 }
 
-func HandleCacheEnable(c *gin.Context) {
-	if responseCache == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "cache not initialized",
-		})
+func (h *MetricsHandler) EnableCache(c *gin.Context) {
+	if h.chatHandler == nil || h.chatHandler.cache == nil {
+		respondError(c, http.StatusServiceUnavailable, "cache not initialized")
 		return
 	}
 
-	responseCache.Enable()
+	h.chatHandler.cache.Enable()
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "cache enabled",

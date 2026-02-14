@@ -15,9 +15,9 @@ import (
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	_ "modernc.org/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 )
 
 func setupMigrationHandlerTest(t *testing.T) (*sql.DB, *database.MigrationManager, *MigrationHandlers, func()) {

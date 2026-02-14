@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,30 +24,28 @@ func Logger() gin.HandlerFunc {
 			path = path + "?" + raw
 		}
 
-		requestID := ""
-		if rid, exists := c.Get("request_id"); exists {
-			requestID = rid.(string)
+		attrs := []any{
+			"method", method,
+			"path", path,
+			"status", statusCode,
+			"latency", latency,
+			"client_ip", clientIP,
 		}
 
-		if requestID != "" {
-			log.Printf("[%s] %s %s %d %v [request_id=%s] %s",
-				method,
-				path,
-				clientIP,
-				statusCode,
-				latency,
-				requestID,
-				c.Errors.String(),
-			)
+		if rid, exists := c.Get("request_id"); exists {
+			attrs = append(attrs, "request_id", rid)
+		}
+
+		if errStr := c.Errors.String(); errStr != "" {
+			attrs = append(attrs, "errors", errStr)
+		}
+
+		if statusCode >= 500 {
+			slog.Error("request completed", attrs...)
+		} else if statusCode >= 400 {
+			slog.Warn("request completed", attrs...)
 		} else {
-			log.Printf("[%s] %s %s %d %v %s",
-				method,
-				path,
-				clientIP,
-				statusCode,
-				latency,
-				c.Errors.String(),
-			)
+			slog.Info("request completed", attrs...)
 		}
 	}
 }

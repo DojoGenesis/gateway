@@ -3,13 +3,13 @@ package handlers
 import (
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/streaming"
 	"github.com/gin-gonic/gin"
@@ -21,22 +21,35 @@ const (
 	ResponseTypeError    = "error"
 )
 
-var (
-	intentClassifier *agent.IntentClassifier
-	primaryAgent     *agent.PrimaryAgent
-	userRouter       *services.UserRouter
-	responseCache    *agent.ResponseCache
-	streamingAgent   *streaming.StreamingAgentWithEvents
-	chatPluginMgr    *provider.PluginManager
-)
+// cloudProviders lists provider names considered "cloud" (API-based, higher quality).
+// Order determines preference — first loaded wins for reasoning tasks.
+var cloudProviders = []string{"deepseek-api", "openai", "anthropic", "google", "groq", "mistral"}
 
-func InitializeChatHandlers(ic *agent.IntentClassifier, pa *agent.PrimaryAgent, ur *services.UserRouter, pm *provider.PluginManager) {
-	intentClassifier = ic
-	primaryAgent = pa
-	userRouter = ur
-	chatPluginMgr = pm
-	responseCache = agent.NewResponseCache(1*time.Hour, 1000)
-	streamingAgent = streaming.NewStreamingAgentWithEvents(pa)
+// localProviders lists provider names considered "local" (low latency, free).
+// Order determines preference — first loaded wins for fast tasks.
+var localProviders = []string{"ollama", "embedded-qwen3"}
+
+// ChatHandler handles chat-related HTTP requests.
+type ChatHandler struct {
+	classifier *agent.IntentClassifier
+	agent      *agent.PrimaryAgent
+	router     *services.UserRouter
+	cache      *agent.ResponseCache
+	streaming  *streaming.StreamingAgentWithEvents
+	pluginMgr  *provider.PluginManager
+}
+
+// NewChatHandler creates a new ChatHandler with the specified dependencies.
+// It initializes derived fields (cache, streaming) internally.
+func NewChatHandler(ic *agent.IntentClassifier, pa *agent.PrimaryAgent, ur *services.UserRouter, pm *provider.PluginManager) *ChatHandler {
+	return &ChatHandler{
+		classifier: ic,
+		agent:      pa,
+		router:     ur,
+		cache:      agent.NewResponseCache(1*time.Hour, 1000),
+		streaming:  streaming.NewStreamingAgentWithEvents(pa),
+		pluginMgr:  pm,
+	}
 }
 
 type ChatRequest struct {
@@ -49,32 +62,26 @@ type ChatRequest struct {
 }
 
 type ChatResponse struct {
-	Type    string        `json:"type"`
-	Content string        `json:"content"`
+	Type    string          `json:"type"`
+	Content string          `json:"content"`
 	Usage   *provider.Usage `json:"usage,omitempty"`
 }
 
-func HandleChat(c *gin.Context) {
-	if intentClassifier == nil || primaryAgent == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "chat handler not initialized",
-		})
+// Chat handles chat requests.
+func (h *ChatHandler) Chat(c *gin.Context) {
+	if h.classifier == nil || h.agent == nil {
+		respondInternalError(c, "chat handler not initialized")
 		return
 	}
 
 	var req ChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid request format",
-			"details": err.Error(),
-		})
+		respondBadRequest(c, "invalid request format")
 		return
 	}
 
 	if req.Message == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "message is required",
-		})
+		respondBadRequest(c, "message is required")
 		return
 	}
 
@@ -84,19 +91,13 @@ func HandleChat(c *gin.Context) {
 	// Leave room for system prompt and response (use 50% of context)
 	const maxInputChars = 16384
 	if len(req.Message) > maxInputChars {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":         "message too long",
-			"details":       fmt.Sprintf("Message exceeds maximum length of %d characters (got %d). Please shorten your message.", maxInputChars, len(req.Message)),
-			"max_length":    maxInputChars,
-			"actual_length": len(req.Message),
-		})
+		respondBadRequest(c, "message too long",
+			fmt.Sprintf("Message exceeds maximum length of %d characters (got %d). Please shorten your message.", maxInputChars, len(req.Message)))
 		return
 	}
 
 	if req.SessionID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "session_id is required",
-		})
+		respondBadRequest(c, "session_id is required")
 		return
 	}
 
@@ -110,45 +111,45 @@ func HandleChat(c *gin.Context) {
 	c.Set("user_id", req.UserID)
 
 	// Use new routing system
-	decision := intentClassifier.Route(req.Message)
+	decision := h.classifier.Route(req.Message)
 
 	// Structured logging for routing decisions
-	log.Printf("[IntentRouter] Query: %q | Category: %s | Handler: %s | Provider: %s | Confidence: %.2f | Reasoning: %v",
-		req.Message,
-		decision.Category.String(),
-		decision.Handler,
-		decision.Provider,
-		decision.Confidence,
-		decision.Reasoning,
+	slog.Info("intent classified",
+		"query", req.Message,
+		"category", decision.Category.String(),
+		"handler", decision.Handler,
+		"provider", decision.Provider,
+		"confidence", decision.Confidence,
+		"reasoning", decision.Reasoning,
 	)
 
 	// Route based on decision
 	switch decision.Handler {
 	case "template":
-		handleTemplateQuery(c, &req, decision)
+		h.handleTemplateQuery(c, &req, decision)
 	case "llm-fast", "llm-reasoning":
 		if req.Stream {
-			handleStreamingQuery(c, &req, decision)
+			h.handleStreamingQuery(c, &req, decision)
 		} else {
-			handleNonStreamingQuery(c, &req, decision)
+			h.handleNonStreamingQuery(c, &req, decision)
 		}
 	default:
 		// Fallback to llm-fast for unknown handlers
-		log.Printf("[IntentRouter] WARNING: Unknown handler %s, falling back to llm-fast", decision.Handler)
+		slog.Warn("unknown handler, falling back to llm-fast", "handler", decision.Handler)
 		decision.Handler = "llm-fast"
 		decision.Provider = "" // Let selectProviderWithRouting resolve to a real provider
 		if req.Stream {
-			handleStreamingQuery(c, &req, decision)
+			h.handleStreamingQuery(c, &req, decision)
 		} else {
-			handleNonStreamingQuery(c, &req, decision)
+			h.handleNonStreamingQuery(c, &req, decision)
 		}
 	}
 }
 
-func handleTemplateQuery(c *gin.Context, req *ChatRequest, decision agent.RoutingDecision) {
+func (h *ChatHandler) handleTemplateQuery(c *gin.Context, req *ChatRequest, decision agent.RoutingDecision) {
 	normalizedQuery := normalizeQuery(req.Message)
 
-	cached, found := responseCache.Get(normalizedQuery)
+	cached, found := h.cache.Get(normalizedQuery)
 	var response string
 
 	if found {
@@ -156,7 +157,7 @@ func handleTemplateQuery(c *gin.Context, req *ChatRequest, decision agent.Routin
 		c.Header("X-Cache-Hit", "true")
 	} else {
 		response = getTemplateResponse(req.Message)
-		responseCache.Set(normalizedQuery, response)
+		h.cache.Set(normalizedQuery, response)
 		c.Header("X-Cache-Hit", "false")
 	}
 
@@ -167,14 +168,14 @@ func handleTemplateQuery(c *gin.Context, req *ChatRequest, decision agent.Routin
 
 	// If template fallback is configured and response is empty, fallback to LLM
 	if decision.Fallback == "llm-fast" && response == "I'm here to help! Could you please provide more details about what you'd like to work on?" {
-		log.Printf("[IntentRouter] Template response not found, falling back to %s", decision.Fallback)
+		slog.Info("template response not found, falling back", "fallback", decision.Fallback)
 		// Update decision for fallback
 		decision.Handler = decision.Fallback
 		decision.Provider = decision.Fallback
 		if req.Stream {
-			handleStreamingQuery(c, req, decision)
+			h.handleStreamingQuery(c, req, decision)
 		} else {
-			handleNonStreamingQuery(c, req, decision)
+			h.handleNonStreamingQuery(c, req, decision)
 		}
 		return
 	}
@@ -201,27 +202,23 @@ func handleTemplateQuery(c *gin.Context, req *ChatRequest, decision agent.Routin
 	}
 }
 
-func handleNonStreamingQuery(c *gin.Context, req *ChatRequest, decision agent.RoutingDecision) {
+func (h *ChatHandler) handleNonStreamingQuery(c *gin.Context, req *ChatRequest, decision agent.RoutingDecision) {
 	ctx := c.Request.Context()
 
 	// Select provider based on routing decision, user status, and model preference
-	providerName, resolvedModel, err := selectProviderWithRouting(req.UserID, req.Model, decision)
+	providerName, resolvedModel, err := h.selectProviderWithRouting(req.UserID, req.Model, decision)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to select provider",
-			"details": err.Error(),
-		})
+		slog.Error("failed to select provider", "error", err)
+		respondInternalError(c, "failed to select provider")
 		return
 	}
 
-	log.Printf("[IntentRouter] Selected provider: %s (model: %s) for handler: %s", providerName, resolvedModel, decision.Handler)
+	slog.Info("selected provider", "provider", providerName, "model", resolvedModel, "handler", decision.Handler)
 
-	response, err := primaryAgent.HandleQuery(ctx, req.Message, providerName, resolvedModel, req.UserID)
+	response, err := h.agent.HandleQuery(ctx, req.Message, providerName, resolvedModel, req.UserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to generate response",
-			"details": err.Error(),
-		})
+		slog.Error("failed to generate response", "error", err)
+		respondInternalError(c, "failed to generate response")
 		return
 	}
 
@@ -241,20 +238,18 @@ func handleNonStreamingQuery(c *gin.Context, req *ChatRequest, decision agent.Ro
 	})
 }
 
-func handleStreamingQuery(c *gin.Context, req *ChatRequest, decision agent.RoutingDecision) {
+func (h *ChatHandler) handleStreamingQuery(c *gin.Context, req *ChatRequest, decision agent.RoutingDecision) {
 	ctx := c.Request.Context()
 
 	// Select provider based on routing decision, user status, and model preference
-	providerName, resolvedModel, err := selectProviderWithRouting(req.UserID, req.Model, decision)
+	providerName, resolvedModel, err := h.selectProviderWithRouting(req.UserID, req.Model, decision)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to select provider",
-			"details": err.Error(),
-		})
+		slog.Error("failed to select provider", "error", err)
+		respondInternalError(c, "failed to select provider")
 		return
 	}
 
-	log.Printf("[IntentRouter] Selected provider: %s (model: %s) for handler: %s (streaming)", providerName, resolvedModel, decision.Handler)
+	slog.Info("selected provider", "provider", providerName, "model", resolvedModel, "handler", decision.Handler, "streaming", true)
 
 	// Build query request for streaming agent
 	queryReq := agent.QueryRequest{
@@ -262,19 +257,17 @@ func handleStreamingQuery(c *gin.Context, req *ChatRequest, decision agent.Routi
 		ProviderName: providerName,
 		ModelID:      resolvedModel,
 		UserID:       req.UserID,
-		UserTier:     getUserTier(req.UserID),
+		UserTier:     h.getUserTier(req.UserID),
 		UseMemory:    false,
 		Temperature:  agent.DefaultTemperature,
 		MaxTokens:    agent.DefaultMaxTokens,
 	}
 
 	// Use StreamingAgent with detailed events
-	stream, err := streamingAgent.HandleQueryStreamingWithEvents(ctx, queryReq)
+	stream, err := h.streaming.HandleQueryStreamingWithEvents(ctx, queryReq)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to start streaming",
-			"details": err.Error(),
-		})
+		slog.Error("failed to start streaming", "error", err)
+		respondInternalError(c, "failed to start streaming")
 		return
 	}
 
@@ -332,9 +325,10 @@ func handleStreamingQuery(c *gin.Context, req *ChatRequest, decision agent.Routi
 			case streaming.ResponseChunk:
 				// Use "response_chunk" as SSE event name (matches streaming.ResponseChunk constant)
 				// so the frontend can match on currentEvent === "response_chunk"
+				content, _ := event.Data["content"].(string)
 				c.SSEvent(string(streaming.ResponseChunk), ChatResponse{
 					Type:    ResponseTypeChunk,
-					Content: event.Data["content"].(string),
+					Content: content,
 				})
 			case streaming.Complete:
 				if usage, ok := event.Data["usage"].(map[string]interface{}); ok {
@@ -353,8 +347,16 @@ func handleStreamingQuery(c *gin.Context, req *ChatRequest, decision agent.Routi
 				return false
 			case streaming.Error:
 				// Use "error" as SSE event name (matches streaming.Error constant)
+				errorMsg := "unknown error"
+				if err, ok := event.Data["error"]; ok && err != nil {
+					if errStr, ok := err.(string); ok {
+						errorMsg = errStr
+					} else if errVal, ok := err.(error); ok {
+						errorMsg = errVal.Error()
+					}
+				}
 				c.SSEvent(string(streaming.Error), gin.H{
-					"error": event.Data["error"],
+					"error": errorMsg,
 				})
 				return false
 			}
@@ -417,73 +419,42 @@ func normalizeQuery(query string) string {
 	return strings.ToLower(query)
 }
 
-// selectProvider selects the appropriate provider based on user status and model preference.
-// If a specific model is requested, it routes to the provider that has that model.
-// Otherwise, it uses user-based routing (guest vs authenticated).
-func selectProvider(userID, model string) (string, error) {
-	// If no UserRouter initialized, use empty string (default provider)
-	if userRouter == nil {
-		return "", nil
-	}
-
-	// If specific model requested, find provider for that model
-	if model != "" {
-		providerName, err := userRouter.SelectProviderForModel(userID, model)
-		if err != nil {
-			// If model not found, fallback to user-based routing
-			return userRouter.SelectProvider(userID)
-		}
-		return providerName, nil
-	}
-
-	// Use user-based routing (guest vs authenticated)
-	return userRouter.SelectProvider(userID)
-}
-
-// cloudProviders lists provider names considered "cloud" (API-based, higher quality).
-// Order determines preference — first loaded wins for reasoning tasks.
-var cloudProviders = []string{"deepseek-api", "openai", "anthropic", "google", "groq", "mistral"}
-
-// localProviders lists provider names considered "local" (low latency, free).
-// Order determines preference — first loaded wins for fast tasks.
-var localProviders = []string{"ollama", "embedded-qwen3"}
-
 // resolveProviderAlias maps abstract intent-classifier provider names (like "llm-fast"
 // and "llm-reasoning") to actual registered plugin names. It dynamically checks which
 // providers are actually loaded (i.e., have valid API keys and running plugin processes)
 // and picks the best available one — no hardcoded fallbacks.
-func resolveProviderAlias(provider string) string {
-	if chatPluginMgr == nil {
+func (h *ChatHandler) resolveProviderAlias(provider string) string {
+	if h.pluginMgr == nil {
 		return provider
 	}
 
 	switch provider {
 	case "llm-fast":
 		// Fast inference: prefer local providers, then fall back to any cloud provider
-		if name := firstLoadedProvider(localProviders); name != "" {
+		if name := h.firstLoadedProvider(localProviders); name != "" {
 			return name
 		}
-		if name := firstLoadedProvider(cloudProviders); name != "" {
+		if name := h.firstLoadedProvider(cloudProviders); name != "" {
 			return name
 		}
 	case "llm-reasoning":
 		// Reasoning: prefer cloud providers, then fall back to any local provider
-		if name := firstLoadedProvider(cloudProviders); name != "" {
+		if name := h.firstLoadedProvider(cloudProviders); name != "" {
 			return name
 		}
-		if name := firstLoadedProvider(localProviders); name != "" {
+		if name := h.firstLoadedProvider(localProviders); name != "" {
 			return name
 		}
 	default:
 		// Direct provider name — check if loaded, otherwise find any alternative
-		if _, err := chatPluginMgr.GetProvider(provider); err == nil {
+		if _, err := h.pluginMgr.GetProvider(provider); err == nil {
 			return provider
 		}
 		// Try cloud first, then local
-		if name := firstLoadedProvider(cloudProviders); name != "" {
+		if name := h.firstLoadedProvider(cloudProviders); name != "" {
 			return name
 		}
-		if name := firstLoadedProvider(localProviders); name != "" {
+		if name := h.firstLoadedProvider(localProviders); name != "" {
 			return name
 		}
 	}
@@ -494,9 +465,9 @@ func resolveProviderAlias(provider string) string {
 
 // firstLoadedProvider returns the first provider from the given list that is
 // currently loaded in the plugin manager, or "" if none are loaded.
-func firstLoadedProvider(candidates []string) string {
+func (h *ChatHandler) firstLoadedProvider(candidates []string) string {
 	for _, name := range candidates {
-		if _, err := chatPluginMgr.GetProvider(name); err == nil {
+		if _, err := h.pluginMgr.GetProvider(name); err == nil {
 			return name
 		}
 	}
@@ -512,29 +483,29 @@ func firstLoadedProvider(candidates []string) string {
 //  1. Explicit model requested by user (req.Model)
 //  2. Provider from routing decision (decision.Provider), resolved through alias mapping
 //  3. User-based routing (guest vs authenticated)
-func selectProviderWithRouting(userID, model string, decision agent.RoutingDecision) (string, string, error) {
+func (h *ChatHandler) selectProviderWithRouting(userID, model string, decision agent.RoutingDecision) (string, string, error) {
 	// If specific model requested by user, honor that (highest priority)
 	if model != "" {
-		if userRouter != nil {
-			providerName, err := userRouter.SelectProviderForModel(userID, model)
+		if h.router != nil {
+			providerName, err := h.router.SelectProviderForModel(userID, model)
 			if err == nil {
 				return providerName, model, nil
 			}
 			// Model not found in any provider — clear model so provider uses its default
-			log.Printf("[chat] Model %q not found in any provider, will use provider default", model)
+			slog.Warn("model not found in any provider, will use provider default", "model", model)
 		}
 	}
 
 	// If routing decision specifies a provider, resolve aliases and use it
 	if decision.Provider != "" {
-		resolved := resolveProviderAlias(decision.Provider)
-		log.Printf("[chat] Resolved provider alias: %q → %q", decision.Provider, resolved)
+		resolved := h.resolveProviderAlias(decision.Provider)
+		slog.Info("resolved provider alias", "from", decision.Provider, "to", resolved)
 		return resolved, "", nil
 	}
 
 	// Fallback to user-based routing
-	if userRouter != nil {
-		provider, err := userRouter.SelectProvider(userID)
+	if h.router != nil {
+		provider, err := h.router.SelectProvider(userID)
 		return provider, "", err
 	}
 
@@ -544,7 +515,7 @@ func selectProviderWithRouting(userID, model string, decision agent.RoutingDecis
 
 // getUserTier determines the user tier based on user ID.
 // Empty user ID means guest tier.
-func getUserTier(userID string) string {
+func (h *ChatHandler) getUserTier(userID string) string {
 	if userID == "" {
 		return "guest"
 	}

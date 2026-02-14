@@ -67,15 +67,15 @@ func VerifyAllTools() error {
 
 func ListAllTools() map[string][]string {
 	categories := map[string][]string{
-		"file_operations":    {},
-		"web_operations":     {},
-		"web_advanced":       {},
-		"computation":        {},
-		"system":             {},
-		"planning":           {},
-		"research":           {},
-		"meta":   {},
-		"visual": {},
+		"file_operations": {},
+		"web_operations":  {},
+		"web_advanced":    {},
+		"computation":     {},
+		"system":          {},
+		"planning":        {},
+		"research":        {},
+		"meta":            {},
+		"visual":          {},
 	}
 
 	allTools := GetAllTools()

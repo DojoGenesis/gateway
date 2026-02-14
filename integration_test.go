@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
 )
 
@@ -193,29 +193,37 @@ func TestToolRegistryWithNamespaces(t *testing.T) {
 	registry := tools.NewContextAwareRegistry()
 
 	// Clear registry for clean test
-	registry.Clear(ctx)
+	_ = registry.Clear(ctx) // Error ignored in test setup
 
 	// Register tools with different namespaces
 	testTools := []*tools.ToolDefinition{
 		{
 			Name:        "composio.create_task",
 			Description: "Create a task in Composio",
-			Function:    func(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) { return nil, nil },
+			Function: func(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) {
+				return nil, nil
+			},
 		},
 		{
 			Name:        "composio.list_tasks",
 			Description: "List tasks in Composio",
-			Function:    func(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) { return nil, nil },
+			Function: func(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) {
+				return nil, nil
+			},
 		},
 		{
 			Name:        "github.create_issue",
 			Description: "Create a GitHub issue",
-			Function:    func(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) { return nil, nil },
+			Function: func(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) {
+				return nil, nil
+			},
 		},
 		{
 			Name:        "builtin_search",
 			Description: "Built-in search tool",
-			Function:    func(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) { return nil, nil },
+			Function: func(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) {
+				return nil, nil
+			},
 		},
 	}
 

@@ -12,6 +12,7 @@ COPY tools/go.mod tools/go.sum* ./tools/
 COPY memory/go.mod memory/go.sum* ./memory/
 COPY server/go.mod server/go.sum* ./server/
 COPY mcp/go.mod mcp/go.sum* ./mcp/
+COPY orchestration/go.mod orchestration/go.sum* ./orchestration/
 
 # Download dependencies for all modules
 RUN cd shared && go mod download && \
@@ -20,7 +21,8 @@ RUN cd shared && go mod download && \
     cd ../tools && go mod download && \
     cd ../memory && go mod download && \
     cd ../server && go mod download && \
-    cd ../mcp && go mod download
+    cd ../mcp && go mod download && \
+    cd ../orchestration && go mod download
 
 # Copy source code
 COPY . .
@@ -36,6 +38,10 @@ FROM gcr.io/distroless/static-debian12
 COPY --from=builder /agentic-gateway /agentic-gateway
 
 EXPOSE 8080
+
+# Health check: the binary supports --health-check flag (self-contained HTTP probe).
+# Docker Compose uses: ["/agentic-gateway", "--health-check"]
+# No curl/wget needed — works in distroless.
 
 # Run as non-root user (nobody)
 USER 65534:65534

@@ -28,8 +28,9 @@ const (
 	AlertThreshold      = 0.95
 )
 
-// Message represents a chat message for context building.
-type Message struct {
+// ContextMessage represents a chat message for context building.
+// Renamed from Message to avoid shadowing shared.Message.
+type ContextMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
@@ -42,12 +43,12 @@ type ContextBuilder struct {
 
 // ContextBuildResult contains the built context with tier information.
 type ContextBuildResult struct {
-	Messages        []Message          `json:"messages"`
+	Messages        []ContextMessage    `json:"messages"`
 	TiersUsed       map[ContextTier]int `json:"tiers_used"`
-	TotalTokens     int                `json:"total_tokens"`
-	CapacityPercent float64            `json:"capacity_percent"`
-	Pruned          []ContextTier      `json:"pruned"`
-	Alert           bool               `json:"alert"`
+	TotalTokens     int                 `json:"total_tokens"`
+	CapacityPercent float64             `json:"capacity_percent"`
+	Pruned          []ContextTier       `json:"pruned"`
+	Alert           bool                `json:"alert"`
 }
 
 // NewContextBuilder creates a new ContextBuilder.
@@ -66,7 +67,7 @@ func (cb *ContextBuilder) SetContextCapacity(capacity int) {
 // BuildContext builds a tiered context from seeds, recent memories, and compressed history.
 func (cb *ContextBuilder) BuildContext(ctx context.Context, query string, sessionID string, systemPrompt string) (*ContextBuildResult, error) {
 	result := &ContextBuildResult{
-		Messages:  []Message{},
+		Messages:  []ContextMessage{},
 		TiersUsed: make(map[ContextTier]int),
 		Pruned:    []ContextTier{},
 	}
@@ -98,7 +99,7 @@ func (cb *ContextBuilder) BuildContext(ctx context.Context, query string, sessio
 	capacityUsed := float64(result.TotalTokens+tier3Tokens) / float64(cb.contextCapacity)
 	if capacityUsed > PruneThresholdTier3 {
 		result.Pruned = append(result.Pruned, Tier3Referenced)
-		tier3Messages = []Message{}
+		tier3Messages = []ContextMessage{}
 		tier3Tokens = 0
 	}
 
@@ -117,7 +118,7 @@ func (cb *ContextBuilder) BuildContext(ctx context.Context, query string, sessio
 	if capacityUsed > PruneThresholdTier4 {
 		result.Pruned = append(result.Pruned, Tier4Pruned)
 		tier4Tokens = 0
-		tier4Messages = []Message{}
+		tier4Messages = []ContextMessage{}
 	}
 
 	result.Messages = append(result.Messages, tier4Messages...)
@@ -130,17 +131,17 @@ func (cb *ContextBuilder) BuildContext(ctx context.Context, query string, sessio
 	return result, nil
 }
 
-func (cb *ContextBuilder) buildTier1(systemPrompt string, query string) []Message {
-	messages := []Message{}
+func (cb *ContextBuilder) buildTier1(systemPrompt string, query string) []ContextMessage {
+	messages := []ContextMessage{}
 
 	if systemPrompt != "" {
-		messages = append(messages, Message{
+		messages = append(messages, ContextMessage{
 			Role:    "system",
 			Content: systemPrompt,
 		})
 	}
 
-	messages = append(messages, Message{
+	messages = append(messages, ContextMessage{
 		Role:    "user",
 		Content: query,
 	})
@@ -148,8 +149,8 @@ func (cb *ContextBuilder) buildTier1(systemPrompt string, query string) []Messag
 	return messages
 }
 
-func (cb *ContextBuilder) buildTier2(ctx context.Context, query string, availableTokens int) ([]Message, int, error) {
-	messages := []Message{}
+func (cb *ContextBuilder) buildTier2(ctx context.Context, query string, availableTokens int) ([]ContextMessage, int, error) {
+	messages := []ContextMessage{}
 
 	allSeeds, err := cb.gardenManager.ListSeeds(ctx, 100)
 	if err != nil {
@@ -171,7 +172,7 @@ func (cb *ContextBuilder) buildTier2(ctx context.Context, query string, availabl
 	}
 
 	if seedsContent != "" {
-		messages = append(messages, Message{
+		messages = append(messages, ContextMessage{
 			Role:    "system",
 			Content: fmt.Sprintf("Relevant knowledge seeds:\n%s", seedsContent),
 		})
@@ -180,8 +181,8 @@ func (cb *ContextBuilder) buildTier2(ctx context.Context, query string, availabl
 	return messages, tokens, nil
 }
 
-func (cb *ContextBuilder) buildTier3(ctx context.Context, sessionID string, availableTokens int) ([]Message, int, error) {
-	messages := []Message{}
+func (cb *ContextBuilder) buildTier3(ctx context.Context, sessionID string, availableTokens int) ([]ContextMessage, int, error) {
+	messages := []ContextMessage{}
 
 	recentMemories, err := cb.gardenManager.memManager.ListMemories(ctx, MemoryFilter{
 		Limit: 10,
@@ -205,7 +206,7 @@ func (cb *ContextBuilder) buildTier3(ctx context.Context, sessionID string, avai
 			role = "assistant"
 		}
 
-		messages = append(messages, Message{
+		messages = append(messages, ContextMessage{
 			Role:    role,
 			Content: mem.Content,
 		})
@@ -221,8 +222,8 @@ func (cb *ContextBuilder) buildTier3(ctx context.Context, sessionID string, avai
 	return messages, totalTokens, nil
 }
 
-func (cb *ContextBuilder) buildTier4(ctx context.Context, sessionID string, availableTokens int) ([]Message, int, error) {
-	messages := []Message{}
+func (cb *ContextBuilder) buildTier4(ctx context.Context, sessionID string, availableTokens int) ([]ContextMessage, int, error) {
+	messages := []ContextMessage{}
 
 	compressedHistories, err := cb.gardenManager.RetrieveCompressedHistory(ctx, sessionID)
 	if err != nil {
@@ -248,7 +249,7 @@ func (cb *ContextBuilder) buildTier4(ctx context.Context, sessionID string, avai
 	}
 
 	if combinedContent.Len() > 0 {
-		messages = append(messages, Message{
+		messages = append(messages, ContextMessage{
 			Role:    "system",
 			Content: fmt.Sprintf("Compressed history:\n%s", combinedContent.String()),
 		})
@@ -268,7 +269,7 @@ func (cb *ContextBuilder) formatSeeds(seeds []Seed) string {
 	return builder.String()
 }
 
-func (cb *ContextBuilder) estimateTokens(messages []Message) int {
+func (cb *ContextBuilder) estimateTokens(messages []ContextMessage) int {
 	total := 0
 	for _, msg := range messages {
 		total += estimateTokensFromText(msg.Content)

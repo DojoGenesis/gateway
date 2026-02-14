@@ -18,9 +18,9 @@ type SkillExecutor interface {
 // DefaultSkillExecutor is the default implementation of SkillExecutor
 type DefaultSkillExecutor struct {
 	registry    SkillRegistry
-	toolInvoker ToolInvoker  // Local interface to avoid circular dependency
-	traceLogger TraceLogger  // Local interface to avoid circular dependency
-	callDepth   int          // Track call depth for meta-skill safety (max = 3, enforced in Phase 4b)
+	toolInvoker ToolInvoker // Local interface to avoid circular dependency
+	traceLogger TraceLogger // Local interface to avoid circular dependency
+	callDepth   int         // Track call depth for meta-skill safety (max = 3, enforced in Phase 4b)
 }
 
 // NewSkillExecutor creates a new skill executor

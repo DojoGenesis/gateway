@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -10,10 +11,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var searchDB *sql.DB
+// SearchHandler handles conversation search HTTP requests.
+type SearchHandler struct {
+	db *sql.DB
+}
 
-func InitializeSearchHandlers(db *sql.DB) {
-	searchDB = db
+// NewSearchHandler creates a new SearchHandler.
+func NewSearchHandler(db *sql.DB) *SearchHandler {
+	return &SearchHandler{db: db}
 }
 
 type SearchConversationsRequest struct {
@@ -31,31 +36,21 @@ type ConversationSearchResult struct {
 	UpdatedAt time.Time              `json:"updated_at"`
 }
 
-func HandleSearchConversations(c *gin.Context) {
-	if searchDB == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "search handler not initialized",
-		})
+func (h *SearchHandler) SearchConversations(c *gin.Context) {
+	if h.db == nil {
+		respondInternalErrorWithSuccess(c, "search handler not initialized")
 		return
 	}
 
 	var req SearchConversationsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Query parameter 'q' is required",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Query parameter 'q' is required")
 		return
 	}
 
 	query := strings.TrimSpace(req.Query)
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Search query cannot be empty",
-		})
+		respondBadRequestWithSuccess(c, "Search query cannot be empty")
 		return
 	}
 
@@ -76,13 +71,10 @@ func HandleSearchConversations(c *gin.Context) {
 		LIMIT ?
 	`
 
-	rows, err := searchDB.QueryContext(c.Request.Context(), sqlQuery, query, maxResults)
+	rows, err := h.db.QueryContext(c.Request.Context(), sqlQuery, query, maxResults)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to search conversations",
-			"details": err.Error(),
-		})
+		slog.Error("failed to search conversations", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to search conversations")
 		return
 	}
 	defer rows.Close()

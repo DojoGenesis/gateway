@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -153,12 +153,12 @@ func (bs *BackfillService) ProcessBackfill(ctx context.Context, batchSize int, d
 	}
 
 	if verbose {
-		log.Printf("Found %d memories without embeddings", len(memories))
+		slog.Info("found memories without embeddings", "count", len(memories))
 	}
 
 	if dryRun {
 		if verbose {
-			log.Println("Dry run mode - skipping embedding generation")
+			slog.Info("dry run mode - skipping embedding generation")
 		}
 		result.Duration = time.Since(startTime).String()
 		return result, nil
@@ -166,7 +166,7 @@ func (bs *BackfillService) ProcessBackfill(ctx context.Context, batchSize int, d
 
 	for i, memory := range memories {
 		if verbose && i > 0 && i%10 == 0 {
-			log.Printf("Progress: %d/%d memories processed", i, len(memories))
+			slog.Info("backfill progress", "processed", i, "total", len(memories))
 		}
 
 		embeddingCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -178,7 +178,7 @@ func (bs *BackfillService) ProcessBackfill(ctx context.Context, batchSize int, d
 			errMsg := fmt.Sprintf("failed to generate embedding for %s: %v", memory.ID, err)
 			result.Errors = append(result.Errors, errMsg)
 			if verbose {
-				log.Printf("Error: %s", errMsg)
+				slog.Error("failed to generate embedding", "memory_id", memory.ID, "error", err)
 			}
 			continue
 		}
@@ -208,8 +208,7 @@ func (bs *BackfillService) ProcessBackfill(ctx context.Context, batchSize int, d
 	result.Duration = time.Since(startTime).String()
 
 	if verbose {
-		log.Printf("Backfill complete: %d processed, %d succeeded, %d failed in %s",
-			result.ProcessedCount, result.SuccessCount, result.FailedCount, result.Duration)
+		slog.Info("backfill complete", "processed", result.ProcessedCount, "succeeded", result.SuccessCount, "failed", result.FailedCount, "duration", result.Duration)
 	}
 
 	return result, nil

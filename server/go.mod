@@ -6,6 +6,8 @@ require (
 	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/chromedp/chromedp v0.14.2
 	github.com/gin-contrib/cors v1.7.6
+	github.com/golang-jwt/jwt/v5 v5.2.2
+	golang.org/x/time v0.9.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-hclog v1.6.3

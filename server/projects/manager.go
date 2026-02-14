@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -285,17 +285,17 @@ func (pm *ProjectManager) ListTemplates(ctx context.Context) ([]ProjectTemplate,
 		)
 
 		if err != nil {
-			log.Printf("warning: failed to scan template row: %v", err)
+			slog.Warn("failed to scan template row", "error", err)
 			continue
 		}
 
 		if err := json.Unmarshal([]byte(structureJSON), &template.Structure); err != nil {
-			log.Printf("warning: failed to unmarshal template structure for %s: %v", template.ID, err)
+			slog.Warn("failed to unmarshal template structure", "template_id", template.ID, "error", err)
 			continue
 		}
 
 		if err := json.Unmarshal([]byte(settingsJSON), &template.DefaultSettings); err != nil {
-			log.Printf("warning: failed to unmarshal template settings for %s: %v", template.ID, err)
+			slog.Warn("failed to unmarshal template settings", "template_id", template.ID, "error", err)
 			continue
 		}
 
@@ -459,7 +459,7 @@ func (pm *ProjectManager) GetProject(ctx context.Context, id string) (*Project, 
 
 	updateQuery := `UPDATE projects SET last_accessed_at = ? WHERE id = ?`
 	if _, err := pm.db.ExecContext(ctx, updateQuery, time.Now(), id); err != nil {
-		log.Printf("warning: failed to update last_accessed_at for project %s: %v", id, err)
+		slog.Warn("failed to update last_accessed_at", "project_id", id, "error", err)
 	}
 
 	return &project, nil
@@ -506,7 +506,7 @@ func (pm *ProjectManager) ListProjects(ctx context.Context, status string) ([]Pr
 		)
 
 		if err != nil {
-			log.Printf("warning: failed to scan project row: %v", err)
+			slog.Warn("failed to scan project row", "error", err)
 			continue
 		}
 
@@ -515,12 +515,12 @@ func (pm *ProjectManager) ListProjects(ctx context.Context, status string) ([]Pr
 		}
 
 		if err := json.Unmarshal([]byte(settingsJSON), &project.Settings); err != nil {
-			log.Printf("warning: failed to unmarshal project settings for %s: %v", project.ID, err)
+			slog.Warn("failed to unmarshal project settings", "project_id", project.ID, "error", err)
 			continue
 		}
 
 		if err := json.Unmarshal([]byte(metadataJSON), &project.Metadata); err != nil {
-			log.Printf("warning: failed to unmarshal project metadata for %s: %v", project.ID, err)
+			slog.Warn("failed to unmarshal project metadata", "project_id", project.ID, "error", err)
 			continue
 		}
 

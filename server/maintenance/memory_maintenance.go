@@ -3,7 +3,7 @@ package maintenance
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,7 +86,7 @@ func (mm *MemoryMaintenance) RunMaintenance(ctx context.Context) (*MaintenanceRe
 	}
 	report.MemorySize.BeforeBytes = beforeSize
 
-	log.Println("Starting memory maintenance cycle...")
+	slog.Info("starting memory maintenance cycle")
 
 	dailyFiles, err := mm.scanDailyFiles(ctx)
 	if err != nil {
@@ -96,7 +96,7 @@ func (mm *MemoryMaintenance) RunMaintenance(ctx context.Context) (*MaintenanceRe
 		return report, fmt.Errorf("failed to scan daily files: %w", err)
 	}
 
-	log.Printf("Found %d daily files to process", len(dailyFiles))
+	slog.Info("found daily files to process", "count", len(dailyFiles))
 	report.FilesProcessed = len(dailyFiles)
 
 	insights := []Insight{}
@@ -109,7 +109,7 @@ func (mm *MemoryMaintenance) RunMaintenance(ctx context.Context) (*MaintenanceRe
 		insights = append(insights, fileInsights...)
 	}
 
-	log.Printf("Extracted %d insights from daily files", len(insights))
+	slog.Info("extracted insights from daily files", "count", len(insights))
 	report.InsightsExtracted = len(insights)
 
 	if len(insights) > 0 {
@@ -127,14 +127,14 @@ func (mm *MemoryMaintenance) RunMaintenance(ctx context.Context) (*MaintenanceRe
 		report.FilesArchived++
 	}
 
-	log.Printf("Archived %d files", report.FilesArchived)
+	slog.Info("archived files", "count", report.FilesArchived)
 
 	composted, err := mm.CompostMemory(ctx)
 	if err != nil {
 		report.Errors = append(report.Errors, fmt.Sprintf("failed to compost memory: %v", err))
 	} else {
 		report.EntriesComposted = composted
-		log.Printf("Composted %d outdated entries", composted)
+		slog.Info("composted outdated entries", "count", composted)
 	}
 
 	backfillService := memory.NewBackfillService(mm.memoryManager, nil)
@@ -146,20 +146,20 @@ func (mm *MemoryMaintenance) RunMaintenance(ctx context.Context) (*MaintenanceRe
 		report.EmbeddingsRemaining = backfillStatus.TotalMemories - backfillStatus.MemoriesWithEmbedding
 
 		if report.EmbeddingsRemaining > 0 {
-			log.Printf("Running embedding backfill (%.2f%% complete)...", backfillStatus.ProgressPercent)
+			slog.Info("running embedding backfill", "progress_percent", backfillStatus.ProgressPercent)
 			backfillResult, err := backfillService.ProcessBackfill(ctx, 1000, false, false)
 			if err != nil {
 				report.Errors = append(report.Errors, fmt.Sprintf("backfill failed: %v", err))
 			} else {
 				report.EmbeddingsBackfilled = backfillResult.SuccessCount
-				log.Printf("Backfilled %d embeddings in %s", backfillResult.SuccessCount, backfillResult.Duration)
+				slog.Info("backfilled embeddings", "count", backfillResult.SuccessCount, "duration", backfillResult.Duration)
 
 				if backfillResult.FailedCount > 0 {
 					report.Errors = append(report.Errors, fmt.Sprintf("backfill: %d failures", backfillResult.FailedCount))
 				}
 			}
 		} else {
-			log.Println("All memories have embeddings")
+			slog.Info("all memories have embeddings")
 		}
 	}
 
@@ -172,12 +172,17 @@ func (mm *MemoryMaintenance) RunMaintenance(ctx context.Context) (*MaintenanceRe
 
 	mm.finalizeReport(report)
 
-	log.Printf("Memory maintenance completed in %v", report.Duration)
-	log.Printf("Processed %d files, archived %d, extracted %d insights, composted %d entries, backfilled %d embeddings",
-		report.FilesProcessed, report.FilesArchived, report.InsightsExtracted, report.EntriesComposted, report.EmbeddingsBackfilled)
+	slog.Info("memory maintenance completed",
+		"duration", report.Duration,
+		"files_processed", report.FilesProcessed,
+		"files_archived", report.FilesArchived,
+		"insights_extracted", report.InsightsExtracted,
+		"entries_composted", report.EntriesComposted,
+		"embeddings_backfilled", report.EmbeddingsBackfilled,
+	)
 
 	if len(report.Errors) > 0 {
-		log.Printf("Maintenance completed with %d errors", len(report.Errors))
+		slog.Warn("maintenance completed with errors", "error_count", len(report.Errors))
 	}
 
 	if mm.notifier != nil && report.FilesArchived > 0 {
@@ -271,8 +276,14 @@ func (mm *MemoryMaintenance) IdentifyInsights(ctx context.Context, dailyFile str
 
 	resp, err := prov.GenerateCompletion(ctx, req)
 	if err != nil {
-		log.Printf(`{"level":"error","component":"memory_maintenance","method":"IdentifyInsights","error":"%s","model":"embedded-qwen3","file":"%s","content_length":%d,"timestamp":"%s"}`,
-			err.Error(), dailyFile, len(contentStr), time.Now().UTC().Format(time.RFC3339))
+		slog.Error("failed to generate insights",
+			"component", "memory_maintenance",
+			"method", "IdentifyInsights",
+			"error", err,
+			"model", "embedded-qwen3",
+			"file", dailyFile,
+			"content_length", len(contentStr),
+		)
 		return nil, fmt.Errorf("failed to generate insights: %w", err)
 	}
 
@@ -397,7 +408,7 @@ func (mm *MemoryMaintenance) ArchiveFile(ctx context.Context, filePath string) e
 		},
 	})
 	if err != nil {
-		log.Printf("Warning: failed to compress %s, archiving uncompressed: %v", filePath, err)
+		slog.Warn("failed to compress file, archiving uncompressed", "file", filePath, "error", err)
 	} else {
 		contentStr = compressed.CompressedContent
 	}

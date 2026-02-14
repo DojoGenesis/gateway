@@ -91,9 +91,9 @@ type MetadataBlock struct {
 // Metadata represents the YAML frontmatter structure in SKILL.md files
 // Supports both nested (spec-compliant) and flat (backward compat) formats
 type Metadata struct {
-	Name        string         `yaml:"name"`
-	Description string         `yaml:"description"`
-	Triggers    []string       `yaml:"triggers"`
+	Name        string   `yaml:"name"`
+	Description string   `yaml:"description"`
+	Triggers    []string `yaml:"triggers"`
 
 	// Nested format (per spec) - takes precedence if present
 	MetadataBlock *MetadataBlock `yaml:"metadata,omitempty"`

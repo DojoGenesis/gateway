@@ -2,29 +2,30 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/maintenance"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/maintenance"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-var memoryManager *memory.MemoryManager
-var gardenManager *memory.GardenManager
-var memoryMaintenance *maintenance.MemoryMaintenance
-
-func InitializeMemoryHandlers(mm *memory.MemoryManager) {
-	memoryManager = mm
+// MemoryHandler handles memory, garden, and maintenance-related HTTP requests.
+type MemoryHandler struct {
+	memory      *memory.MemoryManager
+	garden      *memory.GardenManager
+	maintenance *maintenance.MemoryMaintenance
 }
 
-func InitializeGardenHandlers(gm *memory.GardenManager) {
-	gardenManager = gm
-}
-
-func InitializeMaintenanceHandlers(mm *maintenance.MemoryMaintenance) {
-	memoryMaintenance = mm
+// NewMemoryHandler creates a new MemoryHandler.
+func NewMemoryHandler(mm *memory.MemoryManager, gm *memory.GardenManager, maint *maintenance.MemoryMaintenance) *MemoryHandler {
+	return &MemoryHandler{
+		memory:      mm,
+		garden:      gm,
+		maintenance: maint,
+	}
 }
 
 type StoreMemoryRequest struct {
@@ -52,30 +53,20 @@ func validateContextType(contextType string) error {
 	return nil
 }
 
-func HandleStoreMemory(c *gin.Context) {
-	if memoryManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "memory manager not initialized",
-		})
+func (h *MemoryHandler) StoreMemory(c *gin.Context) {
+	if h.memory == nil {
+		respondInternalErrorWithSuccess(c, "memory manager not initialized")
 		return
 	}
 
 	var req StoreMemoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Invalid request body")
 		return
 	}
 
 	if err := validateContextType(req.ContextType); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Invalid context_type: must be one of 'private', 'group', or 'public'")
 		return
 	}
 
@@ -98,12 +89,9 @@ func HandleStoreMemory(c *gin.Context) {
 		UpdatedAt:   now,
 	}
 
-	if err := memoryManager.Store(c.Request.Context(), mem); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to store memory",
-			"details": err.Error(),
-		})
+	if err := h.memory.Store(c.Request.Context(), mem); err != nil {
+		slog.Error("failed to store memory", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to store memory")
 		return
 	}
 
@@ -113,31 +101,22 @@ func HandleStoreMemory(c *gin.Context) {
 	})
 }
 
-func HandleRetrieveMemory(c *gin.Context) {
-	if memoryManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "memory manager not initialized",
-		})
+func (h *MemoryHandler) RetrieveMemory(c *gin.Context) {
+	if h.memory == nil {
+		respondInternalErrorWithSuccess(c, "memory manager not initialized")
 		return
 	}
 
 	memoryID := c.Param("id")
 	if memoryID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Memory ID is required",
-		})
+		respondBadRequestWithSuccess(c, "Memory ID is required")
 		return
 	}
 
-	mem, err := memoryManager.Retrieve(c.Request.Context(), memoryID)
+	mem, err := h.memory.Retrieve(c.Request.Context(), memoryID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Memory not found",
-			"details": err.Error(),
-		})
+		slog.Warn("memory not found", "id", memoryID, "error", err)
+		respondNotFoundWithSuccess(c, "Memory not found")
 		return
 	}
 
@@ -147,22 +126,15 @@ func HandleRetrieveMemory(c *gin.Context) {
 	})
 }
 
-func HandleSearchMemory(c *gin.Context) {
-	if memoryManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "memory manager not initialized",
-		})
+func (h *MemoryHandler) SearchMemory(c *gin.Context) {
+	if h.memory == nil {
+		respondInternalErrorWithSuccess(c, "memory manager not initialized")
 		return
 	}
 
 	var req SearchMemoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Invalid request body")
 		return
 	}
 
@@ -174,13 +146,10 @@ func HandleSearchMemory(c *gin.Context) {
 		maxResults = 100
 	}
 
-	memories, err := memoryManager.Search(c.Request.Context(), req.Query, maxResults)
+	memories, err := h.memory.Search(c.Request.Context(), req.Query, maxResults)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to search memories",
-			"details": err.Error(),
-		})
+		slog.Error("failed to search memories", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to search memories")
 		return
 	}
 
@@ -191,30 +160,21 @@ func HandleSearchMemory(c *gin.Context) {
 	})
 }
 
-func HandleDeleteMemory(c *gin.Context) {
-	if memoryManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "memory manager not initialized",
-		})
+func (h *MemoryHandler) DeleteMemory(c *gin.Context) {
+	if h.memory == nil {
+		respondInternalErrorWithSuccess(c, "memory manager not initialized")
 		return
 	}
 
 	memoryID := c.Param("id")
 	if memoryID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Memory ID is required",
-		})
+		respondBadRequestWithSuccess(c, "Memory ID is required")
 		return
 	}
 
-	if err := memoryManager.Delete(c.Request.Context(), memoryID); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Failed to delete memory",
-			"details": err.Error(),
-		})
+	if err := h.memory.Delete(c.Request.Context(), memoryID); err != nil {
+		slog.Warn("failed to delete memory", "id", memoryID, "error", err)
+		respondNotFoundWithSuccess(c, "Failed to delete memory")
 		return
 	}
 
@@ -229,49 +189,33 @@ type UpdateMemoryRequest struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
-func HandleUpdateMemory(c *gin.Context) {
-	if memoryManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "memory manager not initialized",
-		})
+func (h *MemoryHandler) UpdateMemory(c *gin.Context) {
+	if h.memory == nil {
+		respondInternalErrorWithSuccess(c, "memory manager not initialized")
 		return
 	}
 
 	memoryID := c.Param("id")
 	if memoryID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Memory ID is required",
-		})
+		respondBadRequestWithSuccess(c, "Memory ID is required")
 		return
 	}
 
 	var req UpdateMemoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Invalid request body")
 		return
 	}
 
 	if req.Content == "" && req.Metadata == nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "At least one of content or metadata must be provided",
-		})
+		respondBadRequestWithSuccess(c, "At least one of content or metadata must be provided")
 		return
 	}
 
-	updatedMemory, err := memoryManager.Update(c.Request.Context(), memoryID, req.Content, req.Metadata)
+	updatedMemory, err := h.memory.Update(c.Request.Context(), memoryID, req.Content, req.Metadata)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to update memory",
-			"details": err.Error(),
-		})
+		slog.Error("failed to update memory", "id", memoryID, "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to update memory")
 		return
 	}
 
@@ -286,22 +230,15 @@ type ListMemoriesRequest struct {
 	MaxResults int    `form:"max_results"`
 }
 
-func HandleListMemories(c *gin.Context) {
-	if memoryManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "memory manager not initialized",
-		})
+func (h *MemoryHandler) ListMemories(c *gin.Context) {
+	if h.memory == nil {
+		respondInternalErrorWithSuccess(c, "memory manager not initialized")
 		return
 	}
 
 	var req ListMemoriesRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid query parameters",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Invalid query parameters")
 		return
 	}
 
@@ -313,13 +250,10 @@ func HandleListMemories(c *gin.Context) {
 		maxResults = 100
 	}
 
-	memories, err := memoryManager.List(c.Request.Context(), req.SessionID, maxResults)
+	memories, err := h.memory.List(c.Request.Context(), req.SessionID, maxResults)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to list memories",
-			"details": err.Error(),
-		})
+		slog.Error("failed to list memories", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to list memories")
 		return
 	}
 
@@ -328,6 +262,15 @@ func HandleListMemories(c *gin.Context) {
 		"count":    len(memories),
 		"memories": memories,
 	})
+}
+
+// MaintenanceResponse represents the response for maintenance operations.
+// It includes a report field for partial results even on failure.
+type MaintenanceResponse struct {
+	Success bool                        `json:"success"`
+	Message string                      `json:"message,omitempty"`
+	Error   string                      `json:"error,omitempty"`
+	Report  *maintenance.MaintenanceReport `json:"report,omitempty"`
 }
 
 type ListSeedsRequest struct {
@@ -341,22 +284,15 @@ type CreateSeedRequest struct {
 	Content     string `json:"content" binding:"required"`
 }
 
-func HandleListSeeds(c *gin.Context) {
-	if gardenManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "garden manager not initialized",
-		})
+func (h *MemoryHandler) ListSeeds(c *gin.Context) {
+	if h.garden == nil {
+		respondInternalErrorWithSuccess(c, "garden manager not initialized")
 		return
 	}
 
 	var req ListSeedsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid query parameters",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Invalid query parameters")
 		return
 	}
 
@@ -368,13 +304,10 @@ func HandleListSeeds(c *gin.Context) {
 		limit = 100
 	}
 
-	seeds, err := gardenManager.ListSeeds(c.Request.Context(), limit)
+	seeds, err := h.garden.ListSeeds(c.Request.Context(), limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to list seeds",
-			"details": err.Error(),
-		})
+		slog.Error("failed to list seeds", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to list seeds")
 		return
 	}
 
@@ -385,22 +318,15 @@ func HandleListSeeds(c *gin.Context) {
 	})
 }
 
-func HandleCreateSeed(c *gin.Context) {
-	if gardenManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "garden manager not initialized",
-		})
+func (h *MemoryHandler) CreateSeed(c *gin.Context) {
+	if h.garden == nil {
+		respondInternalErrorWithSuccess(c, "garden manager not initialized")
 		return
 	}
 
 	var req CreateSeedRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Invalid request body")
 		return
 	}
 
@@ -416,12 +342,9 @@ func HandleCreateSeed(c *gin.Context) {
 		UpdatedAt:   now,
 	}
 
-	if err := gardenManager.StoreSeed(c.Request.Context(), seed); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to create seed",
-			"details": err.Error(),
-		})
+	if err := h.garden.StoreSeed(c.Request.Context(), seed); err != nil {
+		slog.Error("failed to create seed", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to create seed")
 		return
 	}
 
@@ -435,12 +358,9 @@ type ListSnapshotsRequest struct {
 	SessionID string `form:"session_id" binding:"required"`
 }
 
-func HandleListSnapshots(c *gin.Context) {
-	if gardenManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "garden manager not initialized",
-		})
+func (h *MemoryHandler) ListSnapshots(c *gin.Context) {
+	if h.garden == nil {
+		respondInternalErrorWithSuccess(c, "garden manager not initialized")
 		return
 	}
 
@@ -449,20 +369,14 @@ func HandleListSnapshots(c *gin.Context) {
 		sessionID = c.Query("session")
 	}
 	if sessionID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Session ID is required",
-		})
+		respondBadRequestWithSuccess(c, "Session ID is required")
 		return
 	}
 
-	snapshots, err := gardenManager.ListSnapshots(c.Request.Context(), sessionID)
+	snapshots, err := h.garden.ListSnapshots(c.Request.Context(), sessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to list snapshots",
-			"details": err.Error(),
-		})
+		slog.Error("failed to list snapshots", "session_id", sessionID, "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to list snapshots")
 		return
 	}
 
@@ -479,22 +393,15 @@ type CreateSnapshotRequest struct {
 	SnapshotData map[string]interface{} `json:"snapshot_data"`
 }
 
-func HandleCreateSnapshot(c *gin.Context) {
-	if gardenManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "garden manager not initialized",
-		})
+func (h *MemoryHandler) CreateSnapshot(c *gin.Context) {
+	if h.garden == nil {
+		respondInternalErrorWithSuccess(c, "garden manager not initialized")
 		return
 	}
 
 	var req CreateSnapshotRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request body",
-			"details": err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Invalid request body")
 		return
 	}
 
@@ -510,12 +417,9 @@ func HandleCreateSnapshot(c *gin.Context) {
 		CreatedAt:    time.Now(),
 	}
 
-	if err := gardenManager.StoreSnapshot(c.Request.Context(), snapshot); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to create snapshot",
-			"details": err.Error(),
-		})
+	if err := h.garden.StoreSnapshot(c.Request.Context(), snapshot); err != nil {
+		slog.Error("failed to create snapshot", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to create snapshot")
 		return
 	}
 
@@ -525,31 +429,22 @@ func HandleCreateSnapshot(c *gin.Context) {
 	})
 }
 
-func HandleRestoreSnapshot(c *gin.Context) {
-	if gardenManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "garden manager not initialized",
-		})
+func (h *MemoryHandler) RestoreSnapshot(c *gin.Context) {
+	if h.garden == nil {
+		respondInternalErrorWithSuccess(c, "garden manager not initialized")
 		return
 	}
 
 	snapshotID := c.Param("snapshot")
 	if snapshotID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Snapshot ID is required",
-		})
+		respondBadRequestWithSuccess(c, "Snapshot ID is required")
 		return
 	}
 
-	snapshot, err := gardenManager.RetrieveSnapshot(c.Request.Context(), snapshotID)
+	snapshot, err := h.garden.RetrieveSnapshot(c.Request.Context(), snapshotID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Snapshot not found",
-			"details": err.Error(),
-		})
+		slog.Warn("snapshot not found", "id", snapshotID, "error", err)
+		respondNotFoundWithSuccess(c, "Snapshot not found")
 		return
 	}
 
@@ -560,12 +455,9 @@ func HandleRestoreSnapshot(c *gin.Context) {
 	})
 }
 
-func HandleGetGardenContext(c *gin.Context) {
-	if gardenManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "garden manager not initialized",
-		})
+func (h *MemoryHandler) GetGardenContext(c *gin.Context) {
+	if h.garden == nil {
+		respondInternalErrorWithSuccess(c, "garden manager not initialized")
 		return
 	}
 
@@ -588,12 +480,9 @@ func HandleGetGardenContext(c *gin.Context) {
 	})
 }
 
-func HandleGetGardenStats(c *gin.Context) {
-	if gardenManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "garden manager not initialized",
-		})
+func (h *MemoryHandler) GetGardenStats(c *gin.Context) {
+	if h.garden == nil {
+		respondInternalErrorWithSuccess(c, "garden manager not initialized")
 		return
 	}
 
@@ -616,30 +505,21 @@ func HandleGetGardenStats(c *gin.Context) {
 	})
 }
 
-func HandleDeleteSeed(c *gin.Context) {
-	if gardenManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "garden manager not initialized",
-		})
+func (h *MemoryHandler) DeleteSeed(c *gin.Context) {
+	if h.garden == nil {
+		respondInternalErrorWithSuccess(c, "garden manager not initialized")
 		return
 	}
 
 	seedID := c.Param("id")
 	if seedID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Seed ID is required",
-		})
+		respondBadRequestWithSuccess(c, "Seed ID is required")
 		return
 	}
 
-	if err := gardenManager.DeleteSeed(c.Request.Context(), seedID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to delete seed",
-			"details": err.Error(),
-		})
+	if err := h.garden.DeleteSeed(c.Request.Context(), seedID); err != nil {
+		slog.Error("failed to delete seed", "id", seedID, "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to delete seed")
 		return
 	}
 
@@ -649,30 +529,21 @@ func HandleDeleteSeed(c *gin.Context) {
 	})
 }
 
-func HandleDeleteSnapshot(c *gin.Context) {
-	if gardenManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "garden manager not initialized",
-		})
+func (h *MemoryHandler) DeleteSnapshot(c *gin.Context) {
+	if h.garden == nil {
+		respondInternalErrorWithSuccess(c, "garden manager not initialized")
 		return
 	}
 
 	snapshotID := c.Param("id")
 	if snapshotID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Snapshot ID is required",
-		})
+		respondBadRequestWithSuccess(c, "Snapshot ID is required")
 		return
 	}
 
-	if err := gardenManager.DeleteSnapshot(c.Request.Context(), snapshotID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to delete snapshot",
-			"details": err.Error(),
-		})
+	if err := h.garden.DeleteSnapshot(c.Request.Context(), snapshotID); err != nil {
+		slog.Error("failed to delete snapshot", "id", snapshotID, "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to delete snapshot")
 		return
 	}
 
@@ -682,31 +553,22 @@ func HandleDeleteSnapshot(c *gin.Context) {
 	})
 }
 
-func HandleExportSnapshot(c *gin.Context) {
-	if gardenManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "garden manager not initialized",
-		})
+func (h *MemoryHandler) ExportSnapshot(c *gin.Context) {
+	if h.garden == nil {
+		respondInternalErrorWithSuccess(c, "garden manager not initialized")
 		return
 	}
 
 	snapshotID := c.Param("id")
 	if snapshotID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Snapshot ID is required",
-		})
+		respondBadRequestWithSuccess(c, "Snapshot ID is required")
 		return
 	}
 
-	snapshot, err := gardenManager.RetrieveSnapshot(c.Request.Context(), snapshotID)
+	snapshot, err := h.garden.RetrieveSnapshot(c.Request.Context(), snapshotID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Snapshot not found",
-			"details": err.Error(),
-		})
+		slog.Warn("snapshot not found", "snapshot_id", snapshotID, "error", err)
+		respondNotFoundWithSuccess(c, "Snapshot not found")
 		return
 	}
 
@@ -721,29 +583,26 @@ func parseLimit(s string) (int, error) {
 	return limit, err
 }
 
-func HandleRunMaintenance(c *gin.Context) {
-	if memoryMaintenance == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "memory maintenance not initialized",
-		})
+func (h *MemoryHandler) RunMaintenance(c *gin.Context) {
+	if h.maintenance == nil {
+		respondInternalErrorWithSuccess(c, "memory maintenance not initialized")
 		return
 	}
 
-	report, err := memoryMaintenance.RunMaintenance(c.Request.Context())
+	report, err := h.maintenance.RunMaintenance(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to run maintenance",
-			"details": err.Error(),
-			"report":  report,
+		slog.Error("failed to run maintenance", "error", err)
+		c.JSON(http.StatusInternalServerError, MaintenanceResponse{
+			Success: false,
+			Error:   "Failed to run maintenance",
+			Report:  report,
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Maintenance completed",
-		"report":  report,
+	c.JSON(http.StatusOK, MaintenanceResponse{
+		Success: true,
+		Message: "Maintenance completed",
+		Report:  report,
 	})
 }

@@ -18,13 +18,13 @@ func incrementRequests() {
 
 // HealthResponse is the response for GET /health.
 type HealthResponse struct {
-	Status            string                     `json:"status"`
-	Version           string                     `json:"version"`
-	Timestamp         string                     `json:"timestamp"`
-	Providers         map[string]string           `json:"providers"`
-	Dependencies      map[string]string           `json:"dependencies"`
-	UptimeSeconds     int64                       `json:"uptime_seconds"`
-	RequestsProcessed int64                       `json:"requests_processed"`
+	Status            string            `json:"status"`
+	Version           string            `json:"version"`
+	Timestamp         string            `json:"timestamp"`
+	Providers         map[string]string `json:"providers"`
+	Dependencies      map[string]string `json:"dependencies"`
+	UptimeSeconds     int64             `json:"uptime_seconds"`
+	RequestsProcessed int64             `json:"requests_processed"`
 }
 
 // handleHealth handles GET /health.

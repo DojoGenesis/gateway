@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -30,65 +31,71 @@ type QuietHour struct {
 	EndHour   int `json:"end_hour"`   // 0-23
 }
 
-var preferencesDB *sql.DB
-
-func InitializePreferencesHandlers(db *sql.DB) {
-	preferencesDB = db
+// PreferencesHandler handles user preferences HTTP requests.
+type PreferencesHandler struct {
+	db *sql.DB
 }
 
-func HandleGetUserPreferences(c *gin.Context) {
-	if preferencesDB == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Preferences database not initialized"})
+// NewPreferencesHandler creates a new PreferencesHandler.
+func NewPreferencesHandler(db *sql.DB) *PreferencesHandler {
+	return &PreferencesHandler{db: db}
+}
+
+func (h *PreferencesHandler) GetUserPreferences(c *gin.Context) {
+	if h.db == nil {
+		respondInternalError(c, "Preferences database not initialized")
 		return
 	}
 
-	prefs, err := GetUserPreferences(preferencesDB)
+	prefs, err := getUserPreferences(h.db)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get preferences: %v", err)})
+		slog.Error("failed to get preferences", "error", err)
+		respondInternalError(c, "Failed to get preferences")
 		return
 	}
 
 	c.JSON(http.StatusOK, prefs)
 }
 
-func HandleUpdateUserPreferences(c *gin.Context) {
-	if preferencesDB == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Preferences database not initialized"})
+func (h *PreferencesHandler) UpdateUserPreferences(c *gin.Context) {
+	if h.db == nil {
+		respondInternalError(c, "Preferences database not initialized")
 		return
 	}
 
 	var input UserPreferences
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid request body: %v", err)})
+		respondBadRequest(c, "Invalid request body")
 		return
 	}
 
 	if input.NotificationRateLimit < 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "notification_rate_limit must be at least 1 minute"})
+		respondBadRequest(c, "notification_rate_limit must be at least 1 minute")
 		return
 	}
 
 	for _, qh := range input.QuietHours {
 		if qh.Day < 0 || qh.Day > 6 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "quiet_hours day must be 0-6"})
+			respondBadRequest(c, "quiet_hours day must be 0-6")
 			return
 		}
 		if qh.StartHour < 0 || qh.StartHour > 23 || qh.EndHour < 0 || qh.EndHour > 23 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "quiet_hours hours must be 0-23"})
+			respondBadRequest(c, "quiet_hours hours must be 0-23")
 			return
 		}
 	}
 
-	prefs, err := UpdateUserPreferences(preferencesDB, &input)
+	prefs, err := updateUserPreferences(h.db, &input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update preferences: %v", err)})
+		slog.Error("failed to update preferences", "error", err)
+		respondInternalError(c, "Failed to update preferences")
 		return
 	}
 
 	c.JSON(http.StatusOK, prefs)
 }
 
-func GetUserPreferences(db *sql.DB) (*UserPreferences, error) {
+func getUserPreferences(db *sql.DB) (*UserPreferences, error) {
 	query := `
 		SELECT id, notify_memory_compression, notify_seeds_extracted, 
 		       notify_goal_milestone, notify_project_dormancy, notify_common_patterns,
@@ -127,7 +134,7 @@ func GetUserPreferences(db *sql.DB) (*UserPreferences, error) {
 	return &prefs, nil
 }
 
-func UpdateUserPreferences(db *sql.DB, prefs *UserPreferences) (*UserPreferences, error) {
+func updateUserPreferences(db *sql.DB, prefs *UserPreferences) (*UserPreferences, error) {
 	var quietHoursJSON interface{}
 	if len(prefs.QuietHours) > 0 {
 		data, err := json.Marshal(prefs.QuietHours)
@@ -172,5 +179,5 @@ func UpdateUserPreferences(db *sql.DB, prefs *UserPreferences) (*UserPreferences
 		return nil, fmt.Errorf("failed to update preferences: %w", err)
 	}
 
-	return GetUserPreferences(db)
+	return getUserPreferences(db)
 }

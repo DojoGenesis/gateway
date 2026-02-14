@@ -7,28 +7,32 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/secure_storage"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-var (
-	dbManager     *database.DatabaseManager
-	secureStorage secure_storage.SecureStorage
-	pluginMgr     *provider.PluginManager
-)
+// APIKeyHandler handles API key-related HTTP requests.
+type APIKeyHandler struct {
+	db      *database.DatabaseManager
+	storage secure_storage.SecureStorage
+	plugins *provider.PluginManager
+}
 
-func InitializeAPIKeyHandlers(manager *database.DatabaseManager, storage secure_storage.SecureStorage, pm *provider.PluginManager) {
-	dbManager = manager
-	secureStorage = storage
-	pluginMgr = pm
+// NewAPIKeyHandler creates a new APIKeyHandler.
+func NewAPIKeyHandler(manager *database.DatabaseManager, storage secure_storage.SecureStorage, pm *provider.PluginManager) *APIKeyHandler {
+	return &APIKeyHandler{
+		db:      manager,
+		storage: storage,
+		plugins: pm,
+	}
 }
 
 // mapAPIKeyProviderToPluginName maps the provider names used in the API key UI
@@ -98,53 +102,38 @@ func apiKeyToResponse(key *database.APIKey, apiKeyPlain string) APIKeyResponse {
 	}
 }
 
-func HandleCreateAPIKey(c *gin.Context) {
-	if dbManager == nil || secureStorage == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "API key management not initialized",
-		})
+func (h *APIKeyHandler) CreateAPIKey(c *gin.Context) {
+	if h.db == nil || h.storage == nil {
+		respondInternalErrorWithSuccess(c, "API key management not initialized")
 		return
 	}
 
 	var req CreateAPIKeyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Invalid request body: %v", err),
-		})
+		respondBadRequestWithSuccess(c, "Invalid request body")
 		return
 	}
 
 	if strings.TrimSpace(req.Provider) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Provider is required",
-		})
+		respondBadRequestWithSuccess(c, "Provider is required")
 		return
 	}
 
 	if strings.TrimSpace(req.APIKey) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "API key is required",
-		})
+		respondBadRequestWithSuccess(c, "API key is required")
 		return
 	}
 
 	userID, userType, err := getUserContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"error":   "Unauthorized: " + err.Error(),
-		})
+		respondErrorWithSuccess(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	ctx := c.Request.Context()
 
 	// Ensure user exists in local_users (required for foreign key constraint)
-	_, err = dbManager.GetUser(ctx, userID, userType)
+	_, err = h.db.GetUser(ctx, userID, userType)
 	if err != nil {
 		now := time.Now()
 		newUser := &database.User{
@@ -154,29 +143,22 @@ func HandleCreateAPIKey(c *gin.Context) {
 			LastAccessedAt:  now,
 			MigrationStatus: database.MigrationStatusNone,
 		}
-		if createErr := dbManager.CreateUser(ctx, newUser); createErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				"error":   fmt.Sprintf("Failed to create user record: %v", createErr),
-			})
+		if createErr := h.db.CreateUser(ctx, newUser); createErr != nil {
+			slog.Error("failed to create user record", "error", createErr)
+			respondInternalErrorWithSuccess(c, "Failed to create user record")
 			return
 		}
 	}
 
-	existingKey, err := dbManager.GetAPIKey(ctx, userID, req.Provider, userType)
+	existingKey, err := h.db.GetAPIKey(ctx, userID, req.Provider, userType)
 	if err == nil && existingKey != nil {
-		c.JSON(http.StatusConflict, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("API key for provider '%s' already exists", req.Provider),
-		})
+		respondErrorWithSuccess(c, http.StatusConflict, fmt.Sprintf("API key for provider '%s' already exists", req.Provider))
 		return
 	}
 
-	if err := secureStorage.Store(ctx, userID, req.Provider, req.APIKey); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to store API key securely: %v", err),
-		})
+	if err := h.storage.Store(ctx, userID, req.Provider, req.APIKey); err != nil {
+		slog.Error("failed to store API key", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to store API key")
 		return
 	}
 
@@ -188,23 +170,21 @@ func HandleCreateAPIKey(c *gin.Context) {
 		KeyName:      req.KeyName,
 		KeyHash:      keyHash,
 		EncryptedKey: []byte(keyHash), // Placeholder; actual key stored in secure storage
-		StorageType:  secureStorage.GetStorageType(),
+		StorageType:  h.storage.GetStorageType(),
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 		IsActive:     true,
 	}
 
-	if err := dbManager.StoreAPIKey(ctx, apiKey, userType); err != nil {
-		secureStorage.Delete(ctx, userID, req.Provider)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to store API key metadata: %v", err),
-		})
+	if err := h.db.StoreAPIKey(ctx, apiKey, userType); err != nil {
+		h.storage.Delete(ctx, userID, req.Provider)
+		slog.Error("failed to store API key metadata", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to store API key metadata")
 		return
 	}
 
 	// Notify plugin system about new API key — restart the plugin with the key
-	if pluginMgr != nil {
+	if h.plugins != nil {
 		pluginName := mapAPIKeyProviderToPluginName(req.Provider)
 		if pluginName != "" {
 			apiKeyValue := req.APIKey
@@ -212,10 +192,10 @@ func HandleCreateAPIKey(c *gin.Context) {
 				configUpdate := map[string]interface{}{
 					"api_key": apiKeyValue,
 				}
-				if err := pluginMgr.UpdatePluginConfig(pluginName, configUpdate); err != nil {
-					log.Printf("[APIKeys] Failed to update plugin %s with new API key: %v", pluginName, err)
+				if err := h.plugins.UpdatePluginConfig(pluginName, configUpdate); err != nil {
+					slog.Error("failed to update plugin with new API key", "plugin", pluginName, "error", err)
 				} else {
-					log.Printf("[APIKeys] Plugin %s restarted with new API key for provider %s", pluginName, req.Provider)
+					slog.Info("plugin restarted with new API key", "plugin", pluginName, "provider", req.Provider)
 				}
 			}()
 		}
@@ -227,38 +207,30 @@ func HandleCreateAPIKey(c *gin.Context) {
 	})
 }
 
-func HandleListAPIKeys(c *gin.Context) {
-	if dbManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "API key management not initialized",
-		})
+func (h *APIKeyHandler) ListAPIKeys(c *gin.Context) {
+	if h.db == nil {
+		respondInternalErrorWithSuccess(c, "API key management not initialized")
 		return
 	}
 
 	userID, userType, err := getUserContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"error":   "Unauthorized: " + err.Error(),
-		})
+		respondErrorWithSuccess(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	ctx := c.Request.Context()
 
-	keys, err := dbManager.ListAPIKeys(ctx, userID, userType)
+	keys, err := h.db.ListAPIKeys(ctx, userID, userType)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to list API keys: %v", err),
-		})
+		slog.Error("failed to list API keys", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to list API keys")
 		return
 	}
 
 	responses := make([]APIKeyResponse, 0, len(keys))
 	for _, key := range keys {
-		apiKeyPlain, err := secureStorage.Retrieve(ctx, userID, key.Provider)
+		apiKeyPlain, err := h.storage.Retrieve(ctx, userID, key.Provider)
 		preview := "***"
 		if err == nil {
 			preview = getKeyPreview(apiKeyPlain)
@@ -283,52 +255,38 @@ func HandleListAPIKeys(c *gin.Context) {
 	})
 }
 
-func HandleGetAPIKey(c *gin.Context) {
-	if dbManager == nil || secureStorage == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "API key management not initialized",
-		})
+func (h *APIKeyHandler) GetAPIKey(c *gin.Context) {
+	if h.db == nil || h.storage == nil {
+		respondInternalErrorWithSuccess(c, "API key management not initialized")
 		return
 	}
 
 	provider := c.Param("provider")
 	if strings.TrimSpace(provider) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Provider is required",
-		})
+		respondBadRequestWithSuccess(c, "Provider is required")
 		return
 	}
 
 	userID, userType, err := getUserContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"error":   "Unauthorized: " + err.Error(),
-		})
+		respondErrorWithSuccess(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	ctx := c.Request.Context()
 
-	key, err := dbManager.GetAPIKey(ctx, userID, provider, userType)
+	key, err := h.db.GetAPIKey(ctx, userID, provider, userType)
 	if err != nil {
 		if err == database.ErrAPIKeyNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"error":   fmt.Sprintf("API key for provider '%s' not found", provider),
-			})
+			respondNotFoundWithSuccess(c, fmt.Sprintf("API key for provider '%s' not found", provider))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to get API key: %v", err),
-		})
+		slog.Error("failed to get API key", "provider", provider, "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to retrieve API key")
 		return
 	}
 
-	apiKeyPlain, err := secureStorage.Retrieve(ctx, userID, provider)
+	apiKeyPlain, err := h.storage.Retrieve(ctx, userID, provider)
 	preview := "***"
 	if err == nil {
 		preview = getKeyPreview(apiKeyPlain)
@@ -349,72 +307,53 @@ func HandleGetAPIKey(c *gin.Context) {
 	})
 }
 
-func HandleUpdateAPIKey(c *gin.Context) {
-	if dbManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "API key management not initialized",
-		})
+func (h *APIKeyHandler) UpdateAPIKey(c *gin.Context) {
+	if h.db == nil {
+		respondInternalErrorWithSuccess(c, "API key management not initialized")
 		return
 	}
 
 	provider := c.Param("provider")
 	if strings.TrimSpace(provider) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Provider is required",
-		})
+		respondBadRequestWithSuccess(c, "Provider is required")
 		return
 	}
 
 	var req UpdateAPIKeyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Invalid request body: %v", err),
-		})
+		respondBadRequestWithSuccess(c, "Invalid request body")
 		return
 	}
 
 	userID, userType, err := getUserContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"error":   "Unauthorized: " + err.Error(),
-		})
+		respondErrorWithSuccess(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	ctx := c.Request.Context()
 
-	key, err := dbManager.GetAPIKey(ctx, userID, provider, userType)
+	key, err := h.db.GetAPIKey(ctx, userID, provider, userType)
 	if err != nil {
 		if err == database.ErrAPIKeyNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"error":   fmt.Sprintf("API key for provider '%s' not found", provider),
-			})
+			respondNotFoundWithSuccess(c, fmt.Sprintf("API key for provider '%s' not found", provider))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to get API key: %v", err),
-		})
+		slog.Error("failed to get API key", "provider", provider, "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to retrieve API key")
 		return
 	}
 
 	key.KeyName = req.KeyName
 	key.UpdatedAt = time.Now()
 
-	if err := dbManager.StoreAPIKey(ctx, key, userType); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to update API key: %v", err),
-		})
+	if err := h.db.StoreAPIKey(ctx, key, userType); err != nil {
+		slog.Error("failed to update API key", "provider", provider, "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to update API key")
 		return
 	}
 
-	apiKeyPlain, err := secureStorage.Retrieve(ctx, userID, provider)
+	apiKeyPlain, err := h.storage.Retrieve(ctx, userID, provider)
 	preview := "***"
 	if err == nil {
 		preview = getKeyPreview(apiKeyPlain)
@@ -435,64 +374,46 @@ func HandleUpdateAPIKey(c *gin.Context) {
 	})
 }
 
-func HandleDeleteAPIKey(c *gin.Context) {
-	if dbManager == nil || secureStorage == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "API key management not initialized",
-		})
+func (h *APIKeyHandler) DeleteAPIKey(c *gin.Context) {
+	if h.db == nil || h.storage == nil {
+		respondInternalErrorWithSuccess(c, "API key management not initialized")
 		return
 	}
 
 	provider := c.Param("provider")
 	if strings.TrimSpace(provider) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Provider is required",
-		})
+		respondBadRequestWithSuccess(c, "Provider is required")
 		return
 	}
 
 	userID, userType, err := getUserContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"error":   "Unauthorized: " + err.Error(),
-		})
+		respondErrorWithSuccess(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	ctx := c.Request.Context()
 
-	_, err = dbManager.GetAPIKey(ctx, userID, provider, userType)
+	_, err = h.db.GetAPIKey(ctx, userID, provider, userType)
 	if err != nil {
 		if err == database.ErrAPIKeyNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"error":   fmt.Sprintf("API key for provider '%s' not found", provider),
-			})
+			respondNotFoundWithSuccess(c, fmt.Sprintf("API key for provider '%s' not found", provider))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to get API key: %v", err),
-		})
+		slog.Error("failed to get API key", "provider", provider, "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to retrieve API key")
 		return
 	}
 
-	if err := dbManager.DeleteAPIKey(ctx, userID, provider, userType); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to delete API key metadata: %v", err),
-		})
+	if err := h.db.DeleteAPIKey(ctx, userID, provider, userType); err != nil {
+		slog.Error("failed to delete API key metadata", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to delete API key")
 		return
 	}
 
-	if err := secureStorage.Delete(ctx, userID, provider); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to delete API key from secure storage: %v", err),
-		})
+	if err := h.storage.Delete(ctx, userID, provider); err != nil {
+		slog.Error("failed to delete secure storage", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to delete API key")
 		return
 	}
 
@@ -502,12 +423,13 @@ func HandleDeleteAPIKey(c *gin.Context) {
 	})
 }
 
-func GetAPIKeyForProvider(ctx context.Context, userID string, userType database.UserType, provider string) (string, error) {
-	if dbManager == nil || secureStorage == nil {
+// GetAPIKeyForProvider retrieves an API key for a specific provider.
+func (h *APIKeyHandler) GetAPIKeyForProvider(ctx context.Context, userID string, userType database.UserType, provider string) (string, error) {
+	if h.db == nil || h.storage == nil {
 		return "", fmt.Errorf("API key management not initialized")
 	}
 
-	key, err := dbManager.GetAPIKey(ctx, userID, provider, userType)
+	key, err := h.db.GetAPIKey(ctx, userID, provider, userType)
 	if err != nil {
 		return "", err
 	}
@@ -516,12 +438,12 @@ func GetAPIKeyForProvider(ctx context.Context, userID string, userType database.
 		return "", fmt.Errorf("API key for provider '%s' is inactive", provider)
 	}
 
-	apiKey, err := secureStorage.Retrieve(ctx, userID, provider)
+	apiKey, err := h.storage.Retrieve(ctx, userID, provider)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve API key: %w", err)
 	}
 
-	_ = dbManager.UpdateAPIKeyLastUsed(ctx, userID, provider, userType)
+	_ = h.db.UpdateAPIKeyLastUsed(ctx, userID, provider, userType)
 
 	return apiKey, nil
 }
@@ -591,70 +513,51 @@ func getProviderTestConfig(provider string, apiKey string) (*providerTestConfig,
 	}
 }
 
-// HandleTestAPIKey tests an API key by making a lightweight request to the provider.
-func HandleTestAPIKey(c *gin.Context) {
-	if dbManager == nil || secureStorage == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "API key management not initialized",
-		})
+// TestAPIKey tests an API key by making a lightweight request to the provider.
+func (h *APIKeyHandler) TestAPIKey(c *gin.Context) {
+	if h.db == nil || h.storage == nil {
+		respondInternalErrorWithSuccess(c, "API key management not initialized")
 		return
 	}
 
 	provider := c.Param("provider")
 	if strings.TrimSpace(provider) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Provider is required",
-		})
+		respondBadRequestWithSuccess(c, "Provider is required")
 		return
 	}
 
 	userID, userType, err := getUserContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"error":   "Unauthorized: " + err.Error(),
-		})
+		respondErrorWithSuccess(c, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	ctx := c.Request.Context()
 
 	// Verify the key exists
-	_, err = dbManager.GetAPIKey(ctx, userID, provider, userType)
+	_, err = h.db.GetAPIKey(ctx, userID, provider, userType)
 	if err != nil {
 		if err == database.ErrAPIKeyNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"error":   fmt.Sprintf("API key for provider '%s' not found", provider),
-			})
+			respondNotFoundWithSuccess(c, fmt.Sprintf("API key for provider '%s' not found", provider))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to get API key: %v", err),
-		})
+		slog.Error("failed to get API key", "provider", provider, "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to retrieve API key")
 		return
 	}
 
 	// Retrieve the actual key
-	apiKey, err := secureStorage.Retrieve(ctx, userID, provider)
+	apiKey, err := h.storage.Retrieve(ctx, userID, provider)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   fmt.Sprintf("Failed to retrieve API key: %v", err),
-		})
+		slog.Error("failed to retrieve API key from secure storage", "error", err)
+		respondInternalErrorWithSuccess(c, "Failed to retrieve API key")
 		return
 	}
 
 	// Get test config for this provider
 	testConfig, err := getProviderTestConfig(provider, apiKey)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
+		respondBadRequestWithSuccess(c, "Unsupported provider")
 		return
 	}
 
@@ -690,7 +593,7 @@ func HandleTestAPIKey(c *gin.Context) {
 	responseTimeMs := time.Since(startTime).Milliseconds()
 
 	// Update last_used_at regardless of result
-	_ = dbManager.UpdateAPIKeyLastUsed(ctx, userID, provider, userType)
+	_ = h.db.UpdateAPIKeyLastUsed(ctx, userID, provider, userType)
 
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{

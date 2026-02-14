@@ -11,9 +11,9 @@ import (
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	"github.com/gin-gonic/gin"
-	_ "modernc.org/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 )
 
 func setupMemorySeedTest(t *testing.T) (*sql.DB, *memory.SeedManager, func()) {
@@ -130,10 +130,11 @@ func TestHandleGetMemorySeeds(t *testing.T) {
 			_, sm, cleanup := setupMemorySeedTest(t)
 			defer cleanup()
 
+			var h *SeedHandler
 			if tt.setupManager {
-				InitializeMemorySeedHandlers(sm)
+				h = NewSeedHandler(sm)
 			} else {
-				seedManager = nil
+				h = NewSeedHandler(nil)
 			}
 
 			if tt.setupData {
@@ -144,7 +145,7 @@ func TestHandleGetMemorySeeds(t *testing.T) {
 			}
 
 			router := gin.New()
-			router.GET("/api/v1/projects/:project_id/memory/seeds", HandleGetMemorySeeds)
+			router.GET("/api/v1/projects/:project_id/memory/seeds", h.GetMemorySeeds)
 
 			url := "/api/v1/projects/" + projectID + "/memory/seeds"
 			if tt.queryParams != "" {
@@ -236,10 +237,11 @@ func TestHandleUpdateMemorySeed(t *testing.T) {
 			db, sm, cleanup := setupMemorySeedTest(t)
 			defer cleanup()
 
+			var h *SeedHandler
 			if tt.setupManager {
-				InitializeMemorySeedHandlers(sm)
+				h = NewSeedHandler(sm)
 			} else {
-				seedManager = nil
+				h = NewSeedHandler(nil)
 			}
 
 			if tt.seedID == "seed-1" || tt.seedID == "seed-2" {
@@ -251,7 +253,7 @@ func TestHandleUpdateMemorySeed(t *testing.T) {
 			}
 
 			router := gin.New()
-			router.PUT("/api/v1/memory/seeds/:id", HandleUpdateMemorySeed)
+			router.PUT("/api/v1/memory/seeds/:id", h.UpdateMemorySeed)
 
 			reqBody := UpdateMemorySeedRequest{Content: tt.content}
 			bodyBytes, _ := json.Marshal(reqBody)
@@ -332,14 +334,15 @@ func TestHandleCreateMemorySeed(t *testing.T) {
 			_, sm, cleanup := setupMemorySeedTest(t)
 			defer cleanup()
 
+			var h *SeedHandler
 			if tt.setupManager {
-				InitializeMemorySeedHandlers(sm)
+				h = NewSeedHandler(sm)
 			} else {
-				seedManager = nil
+				h = NewSeedHandler(nil)
 			}
 
 			router := gin.New()
-			router.POST("/api/v1/projects/:project_id/memory/seeds", HandleCreateMemorySeed)
+			router.POST("/api/v1/projects/:project_id/memory/seeds", h.CreateMemorySeed)
 
 			reqBody := CreateMemorySeedRequest{
 				Content:  tt.content,
@@ -427,10 +430,11 @@ func TestHandleDeleteMemorySeed(t *testing.T) {
 			db, sm, cleanup := setupMemorySeedTest(t)
 			defer cleanup()
 
+			var h *SeedHandler
 			if tt.setupManager {
-				InitializeMemorySeedHandlers(sm)
+				h = NewSeedHandler(sm)
 			} else {
-				seedManager = nil
+				h = NewSeedHandler(nil)
 			}
 
 			if tt.createSeed {
@@ -442,7 +446,7 @@ func TestHandleDeleteMemorySeed(t *testing.T) {
 			}
 
 			router := gin.New()
-			router.DELETE("/api/v1/memory/seeds/:id", HandleDeleteMemorySeed)
+			router.DELETE("/api/v1/memory/seeds/:id", h.DeleteMemorySeed)
 
 			req, _ := http.NewRequest("DELETE", "/api/v1/memory/seeds/"+tt.seedID, nil)
 			w := httptest.NewRecorder()
@@ -476,7 +480,7 @@ func TestHandleUpdateMemorySeed_ValidationErrors(t *testing.T) {
 	_, sm, cleanup := setupMemorySeedTest(t)
 	defer cleanup()
 
-	InitializeMemorySeedHandlers(sm)
+	h := NewSeedHandler(sm)
 
 	tests := []struct {
 		name           string
@@ -504,7 +508,7 @@ func TestHandleUpdateMemorySeed_ValidationErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
-			router.PUT("/api/v1/memory/seeds/:id", HandleUpdateMemorySeed)
+			router.PUT("/api/v1/memory/seeds/:id", h.UpdateMemorySeed)
 
 			url := "/api/v1/memory/seeds/" + tt.seedID
 			req, _ := http.NewRequest("PUT", url, bytes.NewBufferString(tt.requestBody))
@@ -530,7 +534,7 @@ func TestHandleCreateMemorySeed_WithProjectID(t *testing.T) {
 	db, sm, cleanup := setupMemorySeedTest(t)
 	defer cleanup()
 
-	InitializeMemorySeedHandlers(sm)
+	h := NewSeedHandler(sm)
 
 	// Add project-123 to the database
 	projectID := "project-123"
@@ -538,7 +542,7 @@ func TestHandleCreateMemorySeed_WithProjectID(t *testing.T) {
 	require.NoError(t, err)
 
 	router := gin.New()
-	router.POST("/api/v1/projects/:project_id/memory/seeds", HandleCreateMemorySeed)
+	router.POST("/api/v1/projects/:project_id/memory/seeds", h.CreateMemorySeed)
 	reqBody := CreateMemorySeedRequest{
 		Content:  "Project-specific seed",
 		SeedType: "project_type",
@@ -567,7 +571,7 @@ func TestHandleGetMemorySeeds_WithProjectIDFilter(t *testing.T) {
 	db, sm, cleanup := setupMemorySeedTest(t)
 	defer cleanup()
 
-	InitializeMemorySeedHandlers(sm)
+	h := NewSeedHandler(sm)
 
 	projectID1 := "project-1"
 	projectID2 := "project-2"
@@ -586,7 +590,7 @@ func TestHandleGetMemorySeeds_WithProjectIDFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	router := gin.New()
-	router.GET("/api/v1/projects/:project_id/memory/seeds", HandleGetMemorySeeds)
+	router.GET("/api/v1/projects/:project_id/memory/seeds", h.GetMemorySeeds)
 
 	req, _ := http.NewRequest("GET", "/api/v1/projects/"+projectID1+"/memory/seeds", nil)
 	w := httptest.NewRecorder()
@@ -608,9 +612,9 @@ func TestHandleDeleteMemorySeed_PermissionCheck(t *testing.T) {
 	db, sm, cleanup := setupMemorySeedTest(t)
 	defer cleanup()
 
-	InitializeMemorySeedHandlers(sm)
+	h := NewSeedHandler(sm)
 
-	query := `INSERT INTO memory_seeds 
+	query := `INSERT INTO memory_seeds
 		(id, content, seed_type, source, user_editable, confidence, usage_count, created_at, updated_at, created_by)
 		VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)`
 	_, err := db.Exec(query, "seed-1", "Test content", "test_type", "user", true, 1.0, 0, "other_user")
@@ -621,7 +625,7 @@ func TestHandleDeleteMemorySeed_PermissionCheck(t *testing.T) {
 		c.Set("user_id", "test_user")
 		c.Next()
 	})
-	router.DELETE("/api/v1/memory/seeds/:id", HandleDeleteMemorySeed)
+	router.DELETE("/api/v1/memory/seeds/:id", h.DeleteMemorySeed)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/memory/seeds/seed-1", nil)
 	w := httptest.NewRecorder()
@@ -712,10 +716,11 @@ func TestHandleBulkDeleteMemorySeeds(t *testing.T) {
 			db, sm, cleanup := setupMemorySeedTest(t)
 			defer cleanup()
 
+			var h *SeedHandler
 			if tt.setupManager {
-				InitializeMemorySeedHandlers(sm)
+				h = NewSeedHandler(sm)
 			} else {
-				seedManager = nil
+				h = NewSeedHandler(nil)
 			}
 
 			if tt.createSeeds {
@@ -731,7 +736,7 @@ func TestHandleBulkDeleteMemorySeeds(t *testing.T) {
 			}
 
 			router := gin.New()
-			router.POST("/api/v1/memory/seeds/bulk-delete", HandleBulkDeleteMemorySeeds)
+			router.POST("/api/v1/memory/seeds/bulk-delete", h.BulkDeleteMemorySeeds)
 
 			reqBody := BulkDeleteSeedsRequest{SeedIDs: tt.seedIDs}
 			bodyBytes, _ := json.Marshal(reqBody)
@@ -848,10 +853,11 @@ func TestHandleSearchMemorySeeds(t *testing.T) {
 			_, sm, cleanup := setupMemorySeedTest(t)
 			defer cleanup()
 
+			var h *SeedHandler
 			if tt.setupManager {
-				InitializeMemorySeedHandlers(sm)
+				h = NewSeedHandler(sm)
 			} else {
-				seedManager = nil
+				h = NewSeedHandler(nil)
 			}
 
 			if tt.setupData {
@@ -865,7 +871,7 @@ func TestHandleSearchMemorySeeds(t *testing.T) {
 			}
 
 			router := gin.New()
-			router.GET("/api/v1/projects/:project_id/memory/seeds/search", HandleSearchMemorySeeds)
+			router.GET("/api/v1/projects/:project_id/memory/seeds/search", h.SearchMemorySeeds)
 
 			url := "/api/v1/projects/" + projectID + "/memory/seeds/search?q=" + tt.query
 			if tt.limit != "" {

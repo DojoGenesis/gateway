@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -11,13 +11,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/config"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/maintenance"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/middleware"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
@@ -52,19 +51,19 @@ type Server struct {
 	orchestrationEngine *orchestrationpkg.Engine
 	planner             orchestrationpkg.PlannerInterface
 	memoryManager       *memory.MemoryManager
-	gardenManager      *memory.GardenManager
-	primaryAgent       *agent.PrimaryAgent
-	intentClassifier   *agent.IntentClassifier
-	userRouter         *services.UserRouter
-	traceLogger        *trace.TraceLogger
-	costTracker        *services.CostTracker
-	budgetTracker      *services.BudgetTracker
-	memoryMaintenance  *maintenance.MemoryMaintenance
+	gardenManager       *memory.GardenManager
+	primaryAgent        *agent.PrimaryAgent
+	intentClassifier    *agent.IntentClassifier
+	userRouter          *services.UserRouter
+	traceLogger         *trace.TraceLogger
+	costTracker         *services.CostTracker
+	budgetTracker       *services.BudgetTracker
+	memoryMaintenance   *maintenance.MemoryMaintenance
 
 	// Phase 2 dependencies (v0.2.0)
-	toolRegistry      gateway.ToolRegistry
-	agentInitializer  gateway.AgentInitializer
-	mcpHostManager    MCPStatusProvider
+	toolRegistry     gateway.ToolRegistry
+	agentInitializer gateway.AgentInitializer
+	mcpHostManager   MCPStatusProvider
 
 	// Phase 3 gateway interface implementations
 	orchestrationExecutor gateway.OrchestrationExecutor
@@ -82,26 +81,8 @@ type Server struct {
 }
 
 // New creates a new Server with all dependencies injected.
-func New(
-	cfg *ServerConfig,
-	pm *provider.PluginManager,
-	orch *orchestrationpkg.Engine,
-	plan orchestrationpkg.PlannerInterface,
-	mm *memory.MemoryManager,
-	gm *memory.GardenManager,
-	pa *agent.PrimaryAgent,
-	ic *agent.IntentClassifier,
-	ur *services.UserRouter,
-	tl *trace.TraceLogger,
-	ct *services.CostTracker,
-	bt *services.BudgetTracker,
-	maint *maintenance.MemoryMaintenance,
-	toolReg gateway.ToolRegistry,
-	agentInit gateway.AgentInitializer,
-	mcpMgr MCPStatusProvider,
-	orchExec gateway.OrchestrationExecutor,
-	memStore gateway.MemoryStore,
-) *Server {
+func New(deps ServerDeps) *Server {
+	cfg := deps.Config
 	if cfg == nil {
 		cfg = &ServerConfig{
 			Port:            "8080",
@@ -125,23 +106,23 @@ func New(
 	s := &Server{
 		router:                gin.New(),
 		cfg:                   cfg,
-		pluginManager:         pm,
-		orchestrationEngine:   orch,
-		planner:               plan,
-		memoryManager:         mm,
-		gardenManager:         gm,
-		primaryAgent:          pa,
-		intentClassifier:      ic,
-		userRouter:            ur,
-		traceLogger:           tl,
-		costTracker:           ct,
-		budgetTracker:         bt,
-		memoryMaintenance:     maint,
-		toolRegistry:          toolReg,
-		agentInitializer:      agentInit,
-		mcpHostManager:        mcpMgr,
-		orchestrationExecutor: orchExec,
-		memoryStore:           memStore,
+		pluginManager:         deps.PluginManager,
+		orchestrationEngine:   deps.OrchestrationEngine,
+		planner:               deps.Planner,
+		memoryManager:         deps.MemoryManager,
+		gardenManager:         deps.GardenManager,
+		primaryAgent:          deps.PrimaryAgent,
+		intentClassifier:      deps.IntentClassifier,
+		userRouter:            deps.UserRouter,
+		traceLogger:           deps.TraceLogger,
+		costTracker:           deps.CostTracker,
+		budgetTracker:         deps.BudgetTracker,
+		memoryMaintenance:     deps.MemoryMaintenance,
+		toolRegistry:          deps.ToolRegistry,
+		agentInitializer:      deps.AgentInitializer,
+		mcpHostManager:        deps.MCPHostManager,
+		orchestrationExecutor: deps.OrchestrationExec,
+		memoryStore:           deps.MemoryStore,
 		orchestrations:        NewOrchestrationStore(),
 		agents:                make(map[string]*gateway.AgentConfig),
 	}
@@ -152,41 +133,22 @@ func New(
 	return s
 }
 
-// NewFromConfig creates a Server from the application Config.
-func NewFromConfig(
-	appCfg *config.Config,
-	pm *provider.PluginManager,
-	orch *orchestrationpkg.Engine,
-	plan orchestrationpkg.PlannerInterface,
-	mm *memory.MemoryManager,
-	gm *memory.GardenManager,
-	pa *agent.PrimaryAgent,
-	ic *agent.IntentClassifier,
-	ur *services.UserRouter,
-	tl *trace.TraceLogger,
-	ct *services.CostTracker,
-	bt *services.BudgetTracker,
-	maint *maintenance.MemoryMaintenance,
-	toolReg gateway.ToolRegistry,
-	agentInit gateway.AgentInitializer,
-	mcpMgr MCPStatusProvider,
-	orchExec gateway.OrchestrationExecutor,
-	memStore gateway.MemoryStore,
-) *Server {
-	serverCfg := &ServerConfig{
-		Port:            appCfg.Port,
-		AllowedOrigins:  appCfg.AllowedOrigins,
-		AuthMode:        "api_key",
-		Environment:     appCfg.Environment,
-		ShutdownTimeout: 30 * time.Second,
-	}
-
-	return New(serverCfg, pm, orch, plan, mm, gm, pa, ic, ur, tl, ct, bt, maint, toolReg, agentInit, mcpMgr, orchExec, memStore)
-}
-
 func (s *Server) setupMiddleware() {
 	// Recovery middleware (catch panics)
 	s.router.Use(gin.Recovery())
+
+	// Inject environment into context for middleware that needs it (e.g. HSTS)
+	env := s.cfg.Environment
+	s.router.Use(func(c *gin.Context) {
+		c.Set("environment", env)
+		c.Next()
+	})
+
+	// Security headers middleware
+	s.router.Use(middleware.SecurityHeadersMiddleware())
+
+	// Rate limiting middleware (per-IP token bucket)
+	s.router.Use(middleware.RateLimitMiddleware(middleware.DefaultRateLimitConfig()))
 
 	// CORS middleware
 	s.router.Use(cors.New(cors.Config{
@@ -234,18 +196,23 @@ func (s *Server) Start() error {
 	s.startTime = time.Now()
 
 	s.httpServer = &http.Server{
-		Addr:           ":" + s.cfg.Port,
-		Handler:        s.router,
-		ReadTimeout:    15 * time.Second,
-		WriteTimeout:   0, // Disable for SSE streaming
-		MaxHeaderBytes: 1 << 20,
+		Addr:              ":" + s.cfg.Port,
+		Handler:           s.router,
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      0, // Disable for SSE streaming
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
-	log.Printf("[Server] Starting Agentic Gateway v%s on %s (environment: %s)", Version, s.httpServer.Addr, s.cfg.Environment)
+	slog.Info("starting Agentic Gateway",
+		"version", Version,
+		"addr", s.httpServer.Addr,
+		"environment", s.cfg.Environment)
 
 	go func() {
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("[Server] ListenAndServe error: %v", err)
+			slog.Error("ListenAndServe error", "error", err)
 		}
 	}()
 
@@ -257,13 +224,13 @@ func (s *Server) Stop(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, s.cfg.ShutdownTimeout)
 	defer cancel()
 
-	log.Printf("[Server] Shutting down gracefully (timeout: %s)...", s.cfg.ShutdownTimeout)
+	slog.Info("shutting down gracefully", "timeout", s.cfg.ShutdownTimeout)
 
 	if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("[Server] Shutdown error: %v", err)
+		slog.Error("shutdown error", "error", err)
 		return err
 	}
 
-	log.Printf("[Server] Shutdown complete")
+	slog.Info("shutdown complete")
 	return nil
 }

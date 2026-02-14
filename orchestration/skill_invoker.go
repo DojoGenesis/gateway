@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/skill"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill"
 )
 
 // SkillInvoker wraps the base ToolInvoker to add skill execution support.

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -8,15 +10,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var agentManager *agent.AgentManager
-
-func InitializeAgentHandlers(am *agent.AgentManager) {
-	agentManager = am
+// AgentHandler handles agent-related HTTP requests.
+type AgentHandler struct {
+	manager *agent.AgentManager
 }
 
-func HandleListAgents(c *gin.Context) {
-	if agentManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "agent manager not initialized"})
+// NewAgentHandler creates a new AgentHandler.
+func NewAgentHandler(am *agent.AgentManager) *AgentHandler {
+	return &AgentHandler{manager: am}
+}
+
+func (h *AgentHandler) ListAgents(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalError(c, "agent manager not initialized")
 		return
 	}
 
@@ -30,7 +36,7 @@ func HandleListAgents(c *gin.Context) {
 		if pageStr != "" {
 			parsedPage, err := strconv.Atoi(pageStr)
 			if err != nil || parsedPage < 1 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid page parameter"})
+				respondBadRequest(c, "invalid page parameter")
 				return
 			}
 			page = parsedPage
@@ -39,15 +45,19 @@ func HandleListAgents(c *gin.Context) {
 		if limitStr != "" {
 			parsedLimit, err := strconv.Atoi(limitStr)
 			if err != nil || parsedLimit < 1 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid limit parameter"})
+				respondBadRequest(c, "invalid limit parameter")
 				return
+			}
+			if parsedLimit > 100 {
+				parsedLimit = 100
 			}
 			limit = parsedLimit
 		}
 
-		response, err := agentManager.ListAgentsPaginated(c.Request.Context(), page, limit)
+		response, err := h.manager.ListAgentsPaginated(c.Request.Context(), page, limit)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			slog.Error("failed to list agents paginated", "error", err)
+			respondInternalError(c, "Internal server error")
 			return
 		}
 
@@ -55,73 +65,77 @@ func HandleListAgents(c *gin.Context) {
 		return
 	}
 
-	agents, err := agentManager.ListAgents(c.Request.Context())
+	agents, err := h.manager.ListAgents(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		slog.Error("failed to list agents", "error", err)
+		respondInternalError(c, "Internal server error")
 		return
 	}
 
 	c.JSON(http.StatusOK, agents)
 }
 
-func HandleGetAgent(c *gin.Context) {
-	if agentManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "agent manager not initialized"})
+func (h *AgentHandler) GetAgent(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalError(c, "agent manager not initialized")
 		return
 	}
 
 	agentID := c.Param("id")
 	if agentID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "agent ID is required"})
+		respondBadRequest(c, "agent ID is required")
 		return
 	}
 
-	agent, err := agentManager.GetAgent(c.Request.Context(), agentID)
+	agentResult, err := h.manager.GetAgent(c.Request.Context(), agentID)
 	if err != nil {
-		if err.Error() == "agent not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
+		if errors.Is(err, agent.ErrAgentNotFound) {
+			respondNotFound(c, "agent")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		slog.Error("failed to get agent", "error", err, "agent_id", agentID)
+		respondInternalError(c, "Internal server error")
 		return
 	}
 
-	c.JSON(http.StatusOK, agent)
+	c.JSON(http.StatusOK, agentResult)
 }
 
-func HandleGetAgentCapabilities(c *gin.Context) {
-	if agentManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "agent manager not initialized"})
+func (h *AgentHandler) GetAgentCapabilities(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalError(c, "agent manager not initialized")
 		return
 	}
 
 	agentID := c.Param("id")
 	if agentID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "agent ID is required"})
+		respondBadRequest(c, "agent ID is required")
 		return
 	}
 
-	capabilities, err := agentManager.GetAgentCapabilities(c.Request.Context(), agentID)
+	capabilities, err := h.manager.GetAgentCapabilities(c.Request.Context(), agentID)
 	if err != nil {
-		if err.Error() == "agent not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
+		if errors.Is(err, agent.ErrAgentNotFound) {
+			respondNotFound(c, "agent")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		slog.Error("failed to get agent capabilities", "error", err, "agent_id", agentID)
+		respondInternalError(c, "Internal server error")
 		return
 	}
 
 	c.JSON(http.StatusOK, capabilities)
 }
 
-func HandleSeedAgents(c *gin.Context) {
-	if agentManager == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "agent manager not initialized"})
+func (h *AgentHandler) SeedAgents(c *gin.Context) {
+	if h.manager == nil {
+		respondInternalError(c, "agent manager not initialized")
 		return
 	}
 
-	if err := agentManager.SeedDefaultAgents(c.Request.Context()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := h.manager.SeedDefaultAgents(c.Request.Context()); err != nil {
+		slog.Error("failed to seed default agents", "error", err)
+		respondInternalError(c, "Internal server error")
 		return
 	}
 

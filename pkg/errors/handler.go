@@ -6,17 +6,17 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 )
 
 // ErrorAction represents the action to take in response to an error.
 type ErrorAction string
 
 const (
-	ActionStop     ErrorAction = "stop"      // Stop execution and return error
-	ActionContinue ErrorAction = "continue"  // Log and continue with remaining tasks
-	ActionRetry    ErrorAction = "retry"     // Retry the failed operation
-	ActionEscalate ErrorAction = "escalate"  // Ask user for guidance
+	ActionStop     ErrorAction = "stop"     // Stop execution and return error
+	ActionContinue ErrorAction = "continue" // Log and continue with remaining tasks
+	ActionRetry    ErrorAction = "retry"    // Retry the failed operation
+	ActionEscalate ErrorAction = "escalate" // Ask user for guidance
 )
 
 // ErrorDecision represents the decision made about how to handle an error.

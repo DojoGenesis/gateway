@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 )
 
 // TaskEvent represents an event that might trigger proactive suggestions.
