@@ -388,3 +388,7 @@ The orchestration package can now be:
 - Extended with new implementations via adapters
 
 **Status**: ✅ READY FOR PRODUCTION
+
+---
+
+Tagged as v0.3.0 on 2026-02-14.
