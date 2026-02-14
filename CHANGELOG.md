@@ -10,18 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0] - 2026-02-14
 
 ### Added
-- Standalone `orchestration/` package — zero external dependencies, independently importable
+- Standalone `orchestration/` package — interface-driven, independently importable
 - 5 adapter types bridging standalone orchestration to server concerns:
   - `ToolInvokerAdapter` — routes tool calls to server's tool registry
   - `TraceLoggerAdapter` — sends trace events to OTEL collector
   - `EventEmitterAdapter` — streams events to SSE clients
   - `BudgetTrackerAdapter` — tracks token usage per orchestration
   - `spanHandleAdapter` — wraps OTEL spans for the orchestration engine
-- `pkg/skill/` package — SkillRegistry, SkillExecutor, SkillInvoker
+- `skill/` package — SkillRegistry, SkillExecutor, ScriptExecutor
+- `SkillInvoker` in `orchestration/` — wraps base ToolInvoker with skill-aware dispatch
 - 44 skills ported across 7 plugin directories (28 Tier 1, 12 Tier 2, 4 Tier 3 stubs)
 - `WebToolAdapter` for web search and fetch operations
-- `ScriptExecutor` with security allowlist for bash/python execution
-- Comprehensive skill smoke testing framework (40 scenarios)
+- Comprehensive skill smoke testing framework (145 scenarios)
 
 ### Changed
 - Orchestration engine moved from `server/orchestration/` to standalone `orchestration/` package
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Race conditions in concurrent orchestration access (verified with `-race` flag)
 
 ### Metrics
-- 170+ tests total (51 orchestration + 79 skill unit + 40 smoke)
+- 295 tests total (61 orchestration + 89 skill unit + 145 smoke)
 - 100% test pass rate
 - 86.4% code coverage on skill package
 - Clean race detection
