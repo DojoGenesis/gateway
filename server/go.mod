@@ -1,14 +1,13 @@
 module github.com/TresPies-source/AgenticGatewayByDojoGenesis/server
 
-go 1.24.0
+go 1.25.6
 
 require (
 	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/chromedp/chromedp v0.14.2
 	github.com/gin-contrib/cors v1.7.6
-	github.com/golang-jwt/jwt/v5 v5.2.2
-	golang.org/x/time v0.9.0
 	github.com/gin-gonic/gin v1.11.0
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.7.0
@@ -16,6 +15,7 @@ require (
 	github.com/sergi/go-diff v1.4.0
 	github.com/stretchr/testify v1.11.1
 	github.com/wcharczuk/go-chart/v2 v2.1.2
+	golang.org/x/time v0.9.0
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1

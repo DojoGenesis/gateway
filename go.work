@@ -1,15 +1,15 @@
-go 1.24.0
+go 1.25.6
 
 use (
 	.
-	./shared
-	./events
-	./provider
-	./tools
-	./memory
-	./server
-	./mcp
-	./orchestration
 	./disposition
+	./events
+	./mcp
+	./memory
+	./orchestration
+	./provider
+	./server
+	./shared
 	./skill
+	./tools
 )

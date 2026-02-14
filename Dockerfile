@@ -1,6 +1,6 @@
 # Dockerfile — local development builds (builds from source, single-arch)
 # For production multi-arch images, Goreleaser uses Dockerfile.goreleaser
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 

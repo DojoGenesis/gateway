@@ -1,6 +1,6 @@
 module github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp
 
-go 1.24.0
+go 1.25.6
 
 require (
 	github.com/TresPies-source/AgenticGatewayByDojoGenesis v0.0.0
