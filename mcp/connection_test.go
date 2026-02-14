@@ -78,11 +78,110 @@ func TestMCPServerConnection_SSETransport(t *testing.T) {
 
 	ctx := context.Background()
 	err = conn.Connect(ctx)
-	if err == nil {
-		t.Error("Connect() with SSE should return error (not implemented)")
+	// The connection may succeed initially (actual network error happens during tool calls)
+	// The important thing is it should NOT return "not yet implemented"
+	if err != nil && err.Error() == "SSE transport not yet implemented (coming in future release)" {
+		t.Errorf("Connect() should attempt SSE connection, not return 'not implemented': %v", err)
 	}
-	if err != nil && err.Error() != "SSE transport not yet implemented (coming in future release)" {
-		t.Errorf("Connect() SSE error message incorrect: %v", err)
+
+	// If connection succeeded, verify the connection is marked healthy
+	if err == nil && !conn.IsHealthy() {
+		t.Error("Successful SSE connection should mark connection as healthy")
+	}
+}
+
+func TestMCPServerConnection_StreamableHTTPTransport(t *testing.T) {
+	config := MCPServerConfig{
+		ID:              "test",
+		NamespacePrefix: "test",
+		Transport: TransportConfig{
+			Type: "streamable_http",
+			URL:  "https://example.com/mcp",
+		},
+	}
+
+	conn, err := NewMCPServerConnection("test", config)
+	if err != nil {
+		t.Fatalf("NewMCPServerConnection() failed: %v", err)
+	}
+
+	ctx := context.Background()
+	err = conn.Connect(ctx)
+	// The connection may succeed initially (actual network error happens during tool calls)
+	// The important thing is it should NOT return "not yet implemented"
+	if err != nil && err.Error() == "streamable_http transport not yet implemented" {
+		t.Errorf("Connect() should attempt streamable_http connection, not return 'not implemented': %v", err)
+	}
+
+	// If connection succeeded, verify the connection is marked healthy
+	if err == nil && !conn.IsHealthy() {
+		t.Error("Successful streamable_http connection should mark connection as healthy")
+	}
+}
+
+func TestMCPServerConnection_SSEWithHeaders(t *testing.T) {
+	config := MCPServerConfig{
+		ID:              "test",
+		NamespacePrefix: "test",
+		Transport: TransportConfig{
+			Type: "sse",
+			URL:  "https://example.com/sse",
+			Headers: map[string]string{
+				"Authorization": "Bearer test-token",
+				"X-Client-ID":   "test-client",
+			},
+		},
+	}
+
+	conn, err := NewMCPServerConnection("test", config)
+	if err != nil {
+		t.Fatalf("NewMCPServerConnection() failed: %v", err)
+	}
+
+	ctx := context.Background()
+	err = conn.Connect(ctx)
+	// The connection may succeed initially (actual network error happens during tool calls)
+	// The important thing is headers should be passed and NOT return "not implemented"
+	if err != nil && err.Error() == "SSE transport not yet implemented (coming in future release)" {
+		t.Errorf("Connect() should attempt SSE connection with headers, not return 'not implemented': %v", err)
+	}
+
+	// If connection succeeded, verify the connection is marked healthy
+	if err == nil && !conn.IsHealthy() {
+		t.Error("Successful SSE connection with headers should mark connection as healthy")
+	}
+}
+
+func TestMCPServerConnection_StreamableHTTPWithHeaders(t *testing.T) {
+	config := MCPServerConfig{
+		ID:              "test",
+		NamespacePrefix: "test",
+		Transport: TransportConfig{
+			Type: "streamable_http",
+			URL:  "https://example.com/mcp",
+			Headers: map[string]string{
+				"Authorization": "Bearer test-token",
+				"X-API-Key":     "test-key",
+			},
+		},
+	}
+
+	conn, err := NewMCPServerConnection("test", config)
+	if err != nil {
+		t.Fatalf("NewMCPServerConnection() failed: %v", err)
+	}
+
+	ctx := context.Background()
+	err = conn.Connect(ctx)
+	// The connection may succeed initially (actual network error happens during tool calls)
+	// The important thing is headers should be passed and NOT return "not implemented"
+	if err != nil && err.Error() == "streamable_http transport not yet implemented" {
+		t.Errorf("Connect() should attempt streamable_http connection with headers, not return 'not implemented': %v", err)
+	}
+
+	// If connection succeeded, verify the connection is marked healthy
+	if err == nil && !conn.IsHealthy() {
+		t.Error("Successful streamable_http connection with headers should mark connection as healthy")
 	}
 }
 

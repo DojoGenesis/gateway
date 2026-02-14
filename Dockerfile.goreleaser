@@ -1,0 +1,14 @@
+FROM gcr.io/distroless/static-debian12
+
+COPY agentic-gateway /agentic-gateway
+
+EXPOSE 8080
+
+# Health check: the binary supports --health-check flag (self-contained HTTP probe).
+# Docker Compose uses: ["/agentic-gateway", "--health-check"]
+# No curl/wget needed — works in distroless.
+
+# Run as non-root user (nobody)
+USER 65534:65534
+
+ENTRYPOINT ["/agentic-gateway"]

@@ -267,17 +267,17 @@ We follow [Semantic Versioning](https://semver.org/):
 
 ### Module Structure
 
-The project uses Go workspaces with separate modules:
-- `shared/` — Shared types and utilities
-- `events/` — Event streaming
-- `provider/` — Provider plugin system
-- `tools/` — Tool registry and execution
-- `memory/` — Memory management
-- `orchestration/` — DAG orchestration
-- `server/` — HTTP server and handlers
-- `mcp/` — MCP host integration (Phase 2A)
-- `pkg/gateway/` — Core interfaces (Phase 1)
-- `pkg/disposition/` — Agent configuration (Phase 2B)
+The project uses Go workspaces with ten independently-versioned modules:
+- `shared/` — Cross-cutting types and error definitions
+- `events/` — Structured streaming events (SSE)
+- `provider/` — Provider plugin system (gRPC)
+- `tools/` — Tool registry and execution engine
+- `memory/` — Conversation memory with semantic compression
+- `mcp/` — MCP host integration (server lifecycle + tool bridge)
+- `orchestration/` — DAG-based task planning and execution (standalone since v0.3.0)
+- `disposition/` — Agent personality and behavior config (ADA contract)
+- `skill/` — Tiered skill executor (44 skills, Tiers 0-2)
+- `server/` — HTTP server, agent logic, handlers
 
 ### Adding New Features
 

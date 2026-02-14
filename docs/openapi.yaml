@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Agentic Gateway API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Agentic Gateway by Dojo Genesis - A production-grade AI agent gateway with MCP integration,
     disposition-driven agent configuration, and comprehensive observability.
@@ -26,7 +26,7 @@ servers:
 
 tags:
   - name: Gateway
-    description: v0.2.0 Gateway endpoints for agent and tool management
+    description: v0.3.0 Gateway endpoints for agent and tool management
   - name: Admin
     description: Administrative and monitoring endpoints
   - name: OpenAI Compatible
@@ -35,7 +35,7 @@ tags:
     description: Legacy endpoints (v0.1.x compatibility)
 
 paths:
-  # ==================== Gateway Routes (v0.2.0) ====================
+  # ==================== Gateway Routes (v0.3.0) ====================
 
   /v1/gateway/tools:
     get:
@@ -301,7 +301,7 @@ paths:
       operationId: reloadConfig
       responses:
         '501':
-          description: Not implemented (requires restart in v0.2.0)
+          description: Not implemented (requires restart in v0.3.0)
 
   /admin/metrics/prometheus:
     get:

@@ -249,7 +249,7 @@ func (mm *MemoryMaintenance) IdentifyInsights(ctx context.Context, dailyFile str
 		return nil, fmt.Errorf("failed to identify themes: %w", err)
 	}
 
-	provIface, err := mm.pluginManager.GetProvider("embedded-qwen3")
+	provIface, err := mm.pluginManager.GetProvider("ollama")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider: %w", err)
 	}
@@ -262,7 +262,7 @@ func (mm *MemoryMaintenance) IdentifyInsights(ctx context.Context, dailyFile str
 	prompt := mm.buildInsightExtractionPrompt(contentStr, themes)
 
 	req := &providerpkg.CompletionRequest{
-		Model: "embedded-qwen3",
+		Model: "ollama",
 		Messages: []providerpkg.Message{
 			{
 				Role:    "user",
@@ -280,7 +280,7 @@ func (mm *MemoryMaintenance) IdentifyInsights(ctx context.Context, dailyFile str
 			"component", "memory_maintenance",
 			"method", "IdentifyInsights",
 			"error", err,
-			"model", "embedded-qwen3",
+			"model", "ollama",
 			"file", dailyFile,
 			"content_length", len(contentStr),
 		)

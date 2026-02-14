@@ -4,7 +4,7 @@ A modular Go framework for building agentic AI systems with pluggable providers,
 
 ## Architecture
 
-The gateway is structured as a Go workspace with seven independently-versioned modules:
+The gateway is structured as a Go workspace with ten independently-versioned modules:
 
 ```
 AgenticGatewayByDojoGenesis/
@@ -13,8 +13,11 @@ AgenticGatewayByDojoGenesis/
 ├── events/                 # Structured streaming events (SSE)
 ├── provider/               # Model provider plugin system (gRPC)
 ├── tools/                  # Tool registry and execution engine
-├── orchestration/          # DAG-based task planning (stub, full impl in server/)
 ├── memory/                 # Conversation memory with semantic compression
+├── mcp/                    # MCP host integration (server lifecycle + tool bridge)
+├── orchestration/          # DAG-based task planning and execution (standalone)
+├── disposition/            # Agent personality and behavior config (ADA contract)
+├── skill/                  # Tiered skill executor (44 skills, Tiers 0-2)
 └── server/                 # HTTP server, agent logic, handlers
 ```
 
@@ -31,7 +34,13 @@ tools           (shared, provider)
   │
 memory          (shared, provider, sqlite3)
   │
-orchestration   (stub — full implementation in server/)
+mcp             (shared, tools)
+  │
+orchestration   (shared, tools — standalone DAG engine)
+  │
+disposition     (shared — agent personality config)
+  │
+skill           (shared, tools, orchestration — tiered skill executor)
   │
 server          (all modules above + gin, cors, cron, etc.)
 ```
@@ -44,8 +53,11 @@ server          (all modules above + gin, cors, cron, etc.)
 | `events` | Structured streaming events for SSE | `StreamEvent`, event constructors |
 | `provider` | Plugin-based model provider system via gRPC | `ModelProvider`, `PluginManager`, `CompletionRequest` |
 | `tools` | Tool registry, execution, and helper utilities | `ToolDefinition`, `RegisterTool`, `InvokeTool` |
-| `orchestration` | DAG-based task planning and execution | Stub module (full impl in `server/orchestration/`) |
 | `memory` | Conversation memory with semantic compression | `MemoryManager`, `CompressionService`, `EmbeddingService` |
+| `mcp` | MCP host integration, server lifecycle, tool bridge | `MCPHostManager`, `MCPServerConnection`, `MCPToolBridge` |
+| `orchestration` | DAG-based task planning and execution (standalone) | `Planner`, `Engine`, `ExecutionContext` |
+| `disposition` | Agent personality and behavior config (ADA contract) | `Disposition`, `PersonalityTraits` |
+| `skill` | Tiered skill executor (44 skills, Tiers 0-2) | `SkillExecutor`, `SkillRegistry`, `SkillLoader` |
 | `server` | HTTP API server with agent logic | `PrimaryAgent`, handlers, middleware, config |
 
 ## Installation

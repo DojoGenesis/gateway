@@ -114,8 +114,8 @@ func TestHandleListModels_Success(t *testing.T) {
 	mockProvider1 := new(MockModelProvider)
 	mockProvider1.On("ListModels", mock.Anything).Return([]provider.ModelInfo{
 		{
-			ID:          "qwen3-8b",
-			Name:        "Qwen3 8B",
+			ID:          "llama3.2",
+			Name:        "Llama 3.2",
 			ContextSize: 8192,
 			Cost:        0,
 		},
@@ -131,7 +131,7 @@ func TestHandleListModels_Success(t *testing.T) {
 		},
 	}, nil)
 
-	mockPM.AddProvider("embedded-qwen3", mockProvider1)
+	mockPM.AddProvider("ollama", mockProvider1)
 	mockPM.AddProvider("deepseek-api", mockProvider2)
 
 	h := NewModelHandler(mockPM)
@@ -239,9 +239,9 @@ func TestHandleListProviders_Success(t *testing.T) {
 
 	mockProvider1 := new(MockModelProvider)
 	mockProvider1.On("GetInfo", mock.Anything).Return(&provider.ProviderInfo{
-		Name:         "Embedded Qwen3",
-		Version:      "0.0.15",
-		Description:  "Local embedded LLM",
+		Name:         "Ollama",
+		Version:      "1.0.0",
+		Description:  "Local Ollama LLM",
 		Capabilities: []string{"completion", "streaming"},
 	}, nil)
 
@@ -253,7 +253,7 @@ func TestHandleListProviders_Success(t *testing.T) {
 		Capabilities: []string{"completion", "streaming", "tools"},
 	}, nil)
 
-	mockPM.AddProvider("embedded-qwen3", mockProvider1)
+	mockPM.AddProvider("ollama", mockProvider1)
 	mockPM.AddProvider("deepseek-api", mockProvider2)
 
 	h := NewModelHandler(mockPM)

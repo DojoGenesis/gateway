@@ -213,10 +213,10 @@ func (r *InMemorySkillRegistry) LoadFromDirectory(ctx context.Context, dirPath s
 	return nil
 }
 
-// LoadFromManifest loads skills from a plugin manifest file
-// Note: This is a placeholder for Phase 4a. Plugin manifests are not yet implemented.
+// LoadFromManifest loads skills from a plugin manifest file.
+// Not yet implemented — use LoadFromDirectory instead.
 func (r *InMemorySkillRegistry) LoadFromManifest(ctx context.Context, manifestPath string) error {
-	return fmt.Errorf("manifest loading not implemented in Phase 4a (use LoadFromDirectory instead)")
+	return fmt.Errorf("manifest loading not implemented (use LoadFromDirectory instead)")
 }
 
 // parseSkillFile reads a SKILL.md file and extracts metadata + content

@@ -48,7 +48,7 @@ func NewWebToolAdapter(config *WebToolAdapterConfig) *WebToolAdapter {
 // Search executes a web search via Brave API or fallback
 func (w *WebToolAdapter) Search(ctx context.Context, query string) (map[string]interface{}, error) {
 	if w.fallbackMode {
-		// Fallback: use gateway-native search (placeholder for Phase 4a)
+		// Fallback: use gateway-native search (Brave API key not configured)
 		return w.fallbackSearch(ctx, query)
 	}
 
@@ -70,7 +70,7 @@ func (w *WebToolAdapter) Fetch(ctx context.Context, url string, mode string) (ma
 	}
 
 	// Set user agent
-	req.Header.Set("User-Agent", "AgenticGateway/0.3.0 (Skill Executor)")
+	req.Header.Set("User-Agent", "AgenticGateway/1.0.0 (Skill Executor)")
 
 	// Execute request
 	resp, err := w.httpClient.Do(req)
@@ -93,7 +93,7 @@ func (w *WebToolAdapter) Fetch(ctx context.Context, url string, mode string) (ma
 	// Parse based on mode
 	switch mode {
 	case "markdown":
-		// Convert HTML to markdown (placeholder for Phase 4a)
+		// Convert HTML to markdown (returns raw HTML — markdown conversion not yet implemented)
 		return map[string]interface{}{
 			"content":      string(body),
 			"url":          url,
@@ -156,8 +156,7 @@ func (w *WebToolAdapter) braveSearch(ctx context.Context, query string) (map[str
 		return nil, fmt.Errorf("failed to read Brave API response: %w", err)
 	}
 
-	// Return raw JSON for now (Phase 4a)
-	// Phase 4b will add structured parsing
+	// Return raw JSON response (structured parsing available in future release)
 	return map[string]interface{}{
 		"query":   query,
 		"results": string(body),
@@ -166,11 +165,9 @@ func (w *WebToolAdapter) braveSearch(ctx context.Context, query string) (map[str
 	}, nil
 }
 
-// fallbackSearch provides a simple fallback search mechanism
-// Phase 4a: returns placeholder results
-// Phase 4b: will integrate with gateway-native search
+// fallbackSearch provides a simple fallback search mechanism when Brave API is not configured.
+// Returns a placeholder indicating fallback mode.
 func (w *WebToolAdapter) fallbackSearch(ctx context.Context, query string) (map[string]interface{}, error) {
-	// Phase 4a: Return placeholder indicating fallback mode
 	return map[string]interface{}{
 		"query":   query,
 		"results": fmt.Sprintf("Fallback search for: %s (Brave API key not configured)", query),

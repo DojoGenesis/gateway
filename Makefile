@@ -16,8 +16,22 @@ test:
 test-cover:
 	@echo "Running tests with coverage..."
 	@go test -race -coverprofile=coverage.out ./...
-	@go tool cover -html=coverage.out -o coverage.html
+	@# Exclude generated protobuf code from coverage report
+	@grep -v 'provider/pb/' coverage.out > coverage_filtered.out
+	@go tool cover -html=coverage_filtered.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
+
+# Run provider layer coverage check (targets: provider/ ≥80%, providers/ ≥85%)
+test-cover-providers:
+	@echo "Provider layer coverage..."
+	@go test ./server/services/providers/... -coverprofile=providers.out -count=1
+	@echo "---"
+	@go test ./provider -coverprofile=provider.out -count=1
+	@echo "--- server/services/providers/ ---"
+	@go tool cover -func=providers.out | tail -1
+	@echo "--- provider/ (excluding generated pb/) ---"
+	@grep -v 'provider/pb/' provider.out > provider_filtered.out || true
+	@go tool cover -func=provider_filtered.out | tail -1
 
 # Run go vet
 vet:

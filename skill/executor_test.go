@@ -361,3 +361,122 @@ func TestSetGetCallDepth(t *testing.T) {
 	executor.SetCallDepth(0)
 	assert.Equal(t, 0, executor.GetCallDepth())
 }
+
+func TestValidateDependencies_WebToolsMissing(t *testing.T) {
+	registry := NewInMemorySkillRegistry()
+	ctx := context.Background()
+
+	// Register a Tier 2 skill requiring web_tools
+	skill := &SkillDefinition{
+		Name:             "web-skill",
+		Description:      "A skill requiring web tools",
+		Triggers:         []string{"web trigger"},
+		ToolDependencies: []string{"web_tools"},
+		Tier:             2,
+		Portable:         true,
+		Agents:           []string{"agent1"},
+		Content:          "# Web Skill",
+	}
+	require.NoError(t, registry.RegisterSkill(ctx, skill))
+
+	// Mock invoker returns "not found" for web_search
+	invoker := &mockToolInvoker{
+		invokeFn: func(ctx context.Context, toolName string, params map[string]interface{}) (map[string]interface{}, error) {
+			if toolName == "web_search" {
+				return nil, errors.New("tool not found: web_search")
+			}
+			return map[string]interface{}{"status": "ok"}, nil
+		},
+	}
+
+	executor := NewSkillExecutor(registry, invoker, nil)
+
+	_, err := executor.Execute(ctx, "web-skill", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unmet dependencies")
+	assert.Contains(t, err.Error(), "web_tools adapter required but not loaded")
+}
+
+func TestValidateDependencies_ScriptExecutorMissing(t *testing.T) {
+	registry := NewInMemorySkillRegistry()
+	ctx := context.Background()
+
+	// Register a skill requiring script_execution
+	skill := &SkillDefinition{
+		Name:             "script-skill",
+		Description:      "A skill requiring script execution",
+		Triggers:         []string{"script trigger"},
+		ToolDependencies: []string{"script_execution"},
+		Tier:             2,
+		Portable:         true,
+		Agents:           []string{"agent1"},
+		Content:          "# Script Skill",
+	}
+	require.NoError(t, registry.RegisterSkill(ctx, skill))
+
+	// Mock invoker returns "not registered" for execute_script
+	invoker := &mockToolInvoker{
+		invokeFn: func(ctx context.Context, toolName string, params map[string]interface{}) (map[string]interface{}, error) {
+			if toolName == "execute_script" {
+				return nil, errors.New("tool not registered: execute_script")
+			}
+			return map[string]interface{}{"status": "ok"}, nil
+		},
+	}
+
+	executor := NewSkillExecutor(registry, invoker, nil)
+
+	_, err := executor.Execute(ctx, "script-skill", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unmet dependencies")
+	assert.Contains(t, err.Error(), "script executor required but not available")
+}
+
+func TestValidateDependencies_Tier1Portable(t *testing.T) {
+	registry := NewInMemorySkillRegistry()
+	ctx := context.Background()
+
+	// Register a Tier 1 portable skill with no web_tools or script_execution deps
+	skill := &SkillDefinition{
+		Name:             "portable-skill",
+		Description:      "A portable Tier 1 skill",
+		Triggers:         []string{"portable trigger"},
+		ToolDependencies: []string{"file_system"},
+		Tier:             1,
+		Portable:         true,
+		Agents:           []string{"agent1"},
+		Content:          "# Portable Skill",
+	}
+	require.NoError(t, registry.RegisterSkill(ctx, skill))
+
+	invoker := &mockToolInvoker{}
+	executor := NewSkillExecutor(registry, invoker, nil)
+
+	result, err := executor.Execute(ctx, "portable-skill", nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestValidateDependencies_NoDependencies(t *testing.T) {
+	registry := NewInMemorySkillRegistry()
+	ctx := context.Background()
+
+	// Register a skill with no tool dependencies
+	skill := &SkillDefinition{
+		Name:        "no-deps-skill",
+		Description: "A skill with no dependencies",
+		Triggers:    []string{"no deps trigger"},
+		Tier:        1,
+		Portable:    true,
+		Agents:      []string{"agent1"},
+		Content:     "# No Deps Skill",
+	}
+	require.NoError(t, registry.RegisterSkill(ctx, skill))
+
+	invoker := &mockToolInvoker{}
+	executor := NewSkillExecutor(registry, invoker, nil)
+
+	result, err := executor.Execute(ctx, "no-deps-skill", nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+}

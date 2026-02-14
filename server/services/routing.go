@@ -23,10 +23,10 @@ func NewUserRouter(cfg *config.Config, pm *provider.PluginManager, bt *BudgetTra
 }
 
 // cloudProviderPreference lists cloud providers in preference order for "auto" routing.
-var cloudProviderPreference = []string{"deepseek-api", "openai", "anthropic", "google", "groq", "mistral"}
+var cloudProviderPreference = []string{"deepseek-api", "openai", "anthropic", "google", "groq", "mistral", "kimi"}
 
 // localProviderPreference lists local providers in preference order for "auto" routing.
-var localProviderPreference = []string{"ollama", "embedded-qwen3"}
+var localProviderPreference = []string{"ollama"}
 
 func (ur *UserRouter) SelectProvider(userID string) (string, error) {
 	if userID == "" {
@@ -123,6 +123,28 @@ func (ur *UserRouter) GetGuestProvider() string {
 
 func (ur *UserRouter) GetAuthenticatedProvider() string {
 	return ur.resolveProvider(ur.config.Routing.AuthenticatedProvider, true)
+}
+
+// RoutingInfo describes the current routing configuration with resolved values.
+type RoutingInfo struct {
+	Default       string `json:"default"`
+	Guest         string `json:"guest"`
+	Authenticated string `json:"authenticated"`
+}
+
+// GetRoutingInfo returns the current routing config with auto-resolved provider names.
+func (ur *UserRouter) GetRoutingInfo() RoutingInfo {
+	format := func(raw, resolved string) string {
+		if raw == "auto" {
+			return fmt.Sprintf("auto (resolved: %s)", resolved)
+		}
+		return resolved
+	}
+	return RoutingInfo{
+		Default:       format(ur.config.Routing.DefaultProvider, ur.GetDefaultProvider()),
+		Guest:         format(ur.config.Routing.GuestProvider, ur.GetGuestProvider()),
+		Authenticated: format(ur.config.Routing.AuthenticatedProvider, ur.GetAuthenticatedProvider()),
+	}
 }
 
 // ResolveHandler maps a logical handler name (e.g. "llm-fast") to a real provider name

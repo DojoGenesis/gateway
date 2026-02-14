@@ -21,9 +21,8 @@ func NewCostTracker() *CostTracker {
 			"deepseek-chat":     0.0000003,
 			"deepseek-reasoner": 0.0000003,
 
-			// Embedded models are free
-			"embedded-qwen3": 0.0,
-			"qwen3-8b":       0.0,
+			// Local models are free
+			"llama3.2": 0.0,
 
 			// Ollama models are free (local)
 			"ollama": 0.0,

@@ -3,6 +3,7 @@ package orchestration
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
@@ -10,19 +11,30 @@ import (
 	"github.com/google/uuid"
 )
 
+// executionState tracks the lifecycle of a single execution.
+type executionState struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
+	completed bool
+}
+
 // GatewayOrchestrationExecutor adapts the existing orchestration.Engine
 // to implement the gateway.OrchestrationExecutor interface.
 // This allows the engine to be used through the gateway's standard interface.
 type GatewayOrchestrationExecutor struct {
 	engine  *orchestrationpkg.Engine
 	planner orchestrationpkg.PlannerInterface
+
+	mu         sync.Mutex
+	executions map[string]*executionState
 }
 
 // NewGatewayOrchestrationExecutor creates a new gateway-compatible orchestration executor.
 func NewGatewayOrchestrationExecutor(engine *orchestrationpkg.Engine, planner orchestrationpkg.PlannerInterface) *GatewayOrchestrationExecutor {
 	return &GatewayOrchestrationExecutor{
-		engine:  engine,
-		planner: planner,
+		engine:     engine,
+		planner:    planner,
+		executions: make(map[string]*executionState),
 	}
 }
 
@@ -34,6 +46,22 @@ func (e *GatewayOrchestrationExecutor) Execute(ctx context.Context, plan *gatewa
 	}
 
 	startTime := time.Now()
+
+	// Wrap context with cancellation for execution tracking
+	execCtx, cancel := context.WithCancel(ctx)
+
+	executionID := plan.ID
+	if executionID == "" {
+		executionID = uuid.New().String()
+	}
+
+	// Store the execution state for tracking and cancellation
+	e.mu.Lock()
+	e.executions[executionID] = &executionState{
+		ctx:    execCtx,
+		cancel: cancel,
+	}
+	e.mu.Unlock()
 
 	// Convert gateway.ExecutionPlan to orchestration.Plan
 	orchPlan := convertGatewayPlanToOrchestrationPlan(plan)
@@ -49,13 +77,20 @@ func (e *GatewayOrchestrationExecutor) Execute(ctx context.Context, plan *gatewa
 
 	// Execute the plan
 	// Note: Using "system" as userID since gateway interface doesn't provide it
-	err := e.engine.Execute(ctx, orchPlan, task, "system")
+	err := e.engine.Execute(execCtx, orchPlan, task, "system")
 
 	duration := time.Since(startTime).Milliseconds()
 
+	// Mark execution as completed
+	e.mu.Lock()
+	if state, ok := e.executions[executionID]; ok {
+		state.completed = true
+	}
+	e.mu.Unlock()
+
 	// Build result
 	result := &gateway.ExecutionResult{
-		ExecutionID: plan.ID,
+		ExecutionID: executionID,
 		Duration:    duration,
 		Output:      make(map[string]interface{}),
 	}
@@ -78,12 +113,39 @@ func (e *GatewayOrchestrationExecutor) Execute(ctx context.Context, plan *gatewa
 }
 
 // Cancel terminates a running execution by its unique execution ID.
-// Note: The current orchestration engine doesn't support cancellation by ID,
-// so this is a placeholder implementation.
 func (e *GatewayOrchestrationExecutor) Cancel(ctx context.Context, executionID string) error {
-	// TODO: Implement execution tracking and cancellation
-	// For now, return not implemented
-	return fmt.Errorf("execution cancellation not yet implemented (execution ID: %s)", executionID)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	state, exists := e.executions[executionID]
+	if !exists {
+		return fmt.Errorf("execution not found: %s", executionID)
+	}
+
+	state.cancel()
+	return nil
+}
+
+// Status returns the current state of an execution: "running", "completed", "cancelled", or "not_found".
+func (e *GatewayOrchestrationExecutor) Status(executionID string) (string, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	state, exists := e.executions[executionID]
+	if !exists {
+		return "not_found", fmt.Errorf("execution not found: %s", executionID)
+	}
+
+	if state.completed {
+		return "completed", nil
+	}
+
+	// Context cancelled but execution not marked complete means it was cancelled externally
+	if state.ctx.Err() != nil {
+		return "cancelled", nil
+	}
+
+	return "running", nil
 }
 
 // convertGatewayPlanToOrchestrationPlan converts a gateway.ExecutionPlan

@@ -18,7 +18,7 @@ import (
 const (
 	PluginProtocolVersion = 1
 	HandshakeKey          = "DOJO_GENESIS_PLUGIN"
-	HandshakeValue        = "v0.0.15"
+	HandshakeValue        = "v1.0.0"
 )
 
 var Handshake = plugin.HandshakeConfig{
@@ -409,6 +409,28 @@ func (pm *PluginManager) UpdatePluginConfig(name string, configUpdates map[strin
 
 	slog.Info("plugin restarted with updated config", "name", name)
 	return nil
+}
+
+// ProviderCount returns the number of currently loaded providers.
+func (pm *PluginManager) ProviderCount() int {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+	return len(pm.providers)
+}
+
+// ProviderStatuses returns a map of provider name to healthy/unhealthy status.
+func (pm *PluginManager) ProviderStatuses() map[string]bool {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	statuses := make(map[string]bool, len(pm.providers))
+	for name, p := range pm.providers {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		_, err := p.GetInfo(ctx)
+		cancel()
+		statuses[name] = err == nil
+	}
+	return statuses
 }
 
 // IsPluginLoaded returns whether a plugin with the given name is currently loaded.

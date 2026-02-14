@@ -97,6 +97,16 @@ func main() {
 	pluginManager := provider.NewPluginManager(cfg.PluginDir)
 	slog.Info("plugin manager initialized", "dir", cfg.PluginDir)
 
+	// ─── Register In-Process Providers ───────────────────────────────
+	providerResults := services.RegisterProviders(context.Background(), pluginManager, cfg, nil)
+	loadedCount := 0
+	for _, r := range providerResults {
+		if r.Available {
+			loadedCount++
+		}
+	}
+	slog.Info("provider registration complete", "loaded", loadedCount, "total_checked", len(providerResults))
+
 	// ─── Initialize Tool Registry ────────────────────────────────────
 	allTools := tools.GetAllTools()
 	toolRegistry := tools.NewContextAwareRegistry()

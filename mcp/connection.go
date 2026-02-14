@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -43,8 +44,9 @@ func (c *MCPServerConnection) Connect(ctx context.Context) error {
 	if c.config.Transport.Type == "stdio" {
 		return c.connectStdio(ctx)
 	} else if c.config.Transport.Type == "sse" {
-		// SSE transport not implemented in v0.2.0
-		return fmt.Errorf("SSE transport not yet implemented (coming in future release)")
+		return c.connectSSE(ctx)
+	} else if c.config.Transport.Type == "streamable_http" {
+		return c.connectStreamableHTTP(ctx)
 	}
 
 	return fmt.Errorf("unsupported transport: %s", c.config.Transport.Type)
@@ -66,6 +68,46 @@ func (c *MCPServerConnection) connectStdio(ctx context.Context) error {
 	)
 	if err != nil {
 		return fmt.Errorf("failed to connect to MCP server %s: %w", c.name, err)
+	}
+
+	c.client = mcpClient
+	c.healthy = true
+
+	return nil
+}
+
+// connectSSE establishes an SSE-based connection to an MCP server.
+func (c *MCPServerConnection) connectSSE(ctx context.Context) error {
+	// Build client options from headers
+	var options []transport.ClientOption
+	if len(c.config.Transport.Headers) > 0 {
+		options = append(options, transport.WithHeaders(c.config.Transport.Headers))
+	}
+
+	// Create MCP client using SSE transport
+	mcpClient, err := client.NewSSEMCPClient(c.config.Transport.URL, options...)
+	if err != nil {
+		return fmt.Errorf("failed to connect to MCP server %s via SSE: %w", c.name, err)
+	}
+
+	c.client = mcpClient
+	c.healthy = true
+
+	return nil
+}
+
+// connectStreamableHTTP establishes a streamable HTTP connection to an MCP server.
+func (c *MCPServerConnection) connectStreamableHTTP(ctx context.Context) error {
+	// Build client options from headers
+	var options []transport.StreamableHTTPCOption
+	if len(c.config.Transport.Headers) > 0 {
+		options = append(options, transport.WithHTTPHeaders(c.config.Transport.Headers))
+	}
+
+	// Create MCP client using streamable HTTP transport
+	mcpClient, err := client.NewStreamableHttpClient(c.config.Transport.URL, options...)
+	if err != nil {
+		return fmt.Errorf("failed to connect to MCP server %s via streamable HTTP: %w", c.name, err)
 	}
 
 	c.client = mcpClient

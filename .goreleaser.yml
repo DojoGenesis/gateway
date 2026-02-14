@@ -69,22 +69,47 @@ changelog:
     - title: Others
       order: 999
 
-dockers_v2:
-  - id: agentic-gateway
-    dockerfile: Dockerfile
-    images:
-      - "ghcr.io/trespies-source/agentic-gateway"
-    tags:
-      - "v{{ .Version }}"
-      - latest
-    platforms:
-      - linux/amd64
-    labels:
-      "org.opencontainers.image.created": "{{.Date}}"
-      "org.opencontainers.image.title": "{{.ProjectName}}"
-      "org.opencontainers.image.revision": "{{.FullCommit}}"
-      "org.opencontainers.image.version": "{{.Version}}"
-      "org.opencontainers.image.source": "https://github.com/TresPies-source/AgenticGatewayByDojoGenesis"
+dockers:
+  - id: agentic-gateway-amd64
+    ids: ["agentic-gateway"]
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile.goreleaser
+    image_templates:
+      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/TresPies-source/AgenticGatewayByDojoGenesis"
+    extra_files: []
+  - id: agentic-gateway-arm64
+    ids: ["agentic-gateway"]
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile.goreleaser
+    image_templates:
+      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/TresPies-source/AgenticGatewayByDojoGenesis"
+    extra_files: []
+
+docker_manifests:
+  - name_template: "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}"
+    image_templates:
+      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-amd64"
+      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-arm64"
+  - name_template: "ghcr.io/trespies-source/agentic-gateway:latest"
+    image_templates:
+      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-amd64"
+      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-arm64"
 
 release:
   github:

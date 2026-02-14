@@ -28,7 +28,7 @@ func (m *mockPluginManager) GetProvider(name string) (interface{}, error) {
 
 func (m *mockPluginManager) GetProviders() map[string]interface{} {
 	if m.prov != nil {
-		return map[string]interface{}{"embedded-qwen3": m.prov}
+		return map[string]interface{}{"ollama": m.prov}
 	}
 	return map[string]interface{}{}
 }
@@ -49,7 +49,7 @@ func (m *mockProvider) GenerateCompletion(ctx context.Context, req *provider.Com
 	}
 	return &provider.CompletionResponse{
 		Content: "INSIGHT: Test insight\nWHY: This is important\n---\nINSIGHT: Another insight\nWHY: This matters too\n---",
-		Model:   "embedded-qwen3",
+		Model:   "ollama",
 	}, nil
 }
 
@@ -77,7 +77,7 @@ func (m *mockProvider) GetInfo(ctx context.Context) (*provider.ProviderInfo, err
 func (m *mockProvider) ListModels(ctx context.Context) ([]provider.ModelInfo, error) {
 	return []provider.ModelInfo{
 		{
-			ID:   "embedded-qwen3",
+			ID:   "ollama",
 			Name: "Qwen3 Embedded",
 		},
 	}, nil

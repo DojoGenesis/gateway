@@ -1,4 +1,4 @@
-# Dojo Genesis v0.0.15 Configuration
+# AgenticGateway v1.0.0 Configuration
 
 # Server settings
 port: "8081"
@@ -20,38 +20,66 @@ providers:
     plugin_path: plugins/mock
     config: {}
 
-  # Embedded Qwen3-8B (Phase 2) - Free, local inference
-  - name: embedded-qwen3
-    enabled: true
-    priority: 1
-    plugin_path: embedded-qwen3/embedded-qwen3
-    config:
-      model_path: models_data/qwen3-8b-q4_k_m.gguf
-      context_size: 8192
-      threads: ${QWEN_THREADS:-8}
-      temperature: 0.7
-      top_p: 0.9
-
-  # DeepSeek API (Phase 3) - Cloud inference for authenticated users
+  # DeepSeek API — cloud inference
   - name: deepseek-api
     enabled: true
     priority: 2
-    plugin_path: deepseek-api/deepseek-api
     config:
       api_key: ${DEEPSEEK_API_KEY}
       base_url: https://api.deepseek.com
-      timeout: 30
 
-  # Ollama (Phase 3) - Local Ollama integration
+  # Ollama — local inference (auto-detected)
   - name: ollama
     enabled: true
     priority: 3
-    plugin_path: ollama/ollama
     config:
-      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
-      timeout: 30
+      base_url: ${OLLAMA_HOST:-http://localhost:11434}
 
-# Routing rules — "auto" means resolved dynamically at runtime based on loaded plugins
+  # Anthropic — cloud inference
+  - name: anthropic
+    enabled: true
+    priority: 2
+    config:
+      api_key: ${ANTHROPIC_API_KEY}
+
+  # OpenAI — cloud inference
+  - name: openai
+    enabled: true
+    priority: 2
+    config:
+      api_key: ${OPENAI_API_KEY}
+      base_url: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+
+  # Google Gemini — cloud inference
+  - name: google
+    enabled: true
+    priority: 2
+    config:
+      api_key: ${GOOGLE_API_KEY}
+
+  # Groq — cloud inference
+  - name: groq
+    enabled: true
+    priority: 2
+    config:
+      api_key: ${GROQ_API_KEY}
+
+  # Mistral — cloud inference
+  - name: mistral
+    enabled: true
+    priority: 2
+    config:
+      api_key: ${MISTRAL_API_KEY}
+
+  # Kimi (Moonshot AI) — cloud inference
+  - name: kimi
+    enabled: true
+    priority: 2
+    config:
+      api_key: ${KIMI_API_KEY}
+      base_url: ${KIMI_BASE_URL:-https://api.moonshot.ai/v1}
+
+# Routing rules — "auto" means resolved dynamically at runtime based on loaded providers
 routing:
   default_provider: auto                  # Best loaded provider (prefers local)
   guest_provider: auto                    # Best loaded local provider
@@ -61,4 +89,4 @@ routing:
 budget:
   query_limit: 50000       # Max tokens per query
   session_limit: 200000    # Max tokens per session
-  monthly_limit: 2000000   # Max tokens per month (~$3.00 at DeepSeek pricing)
+  monthly_limit: 2000000   # Max tokens per month

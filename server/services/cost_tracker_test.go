@@ -22,11 +22,8 @@ func TestNewCostTracker(t *testing.T) {
 	}
 
 	// Check free models
-	if !ct.IsFreeModel("embedded-qwen3") {
-		t.Error("Expected embedded-qwen3 to be free")
-	}
-	if !ct.IsFreeModel("qwen3-8b") {
-		t.Error("Expected qwen3-8b to be free")
+	if !ct.IsFreeModel("llama3.2") {
+		t.Error("Expected llama3.2 to be free")
 	}
 	if !ct.IsFreeModel("ollama") {
 		t.Error("Expected ollama to be free")
@@ -55,8 +52,8 @@ func TestGetCost(t *testing.T) {
 			expected: 3.0,
 		},
 		{
-			name:     "Embedded model (free)",
-			model:    "embedded-qwen3",
+			name:     "Local model (free)",
+			model:    "ollama",
 			tokens:   1000000,
 			expected: 0.0,
 		},
@@ -115,7 +112,7 @@ func TestGetTokensForBudget(t *testing.T) {
 		},
 		{
 			name:          "Free model (unlimited)",
-			model:         "embedded-qwen3",
+			model:         "ollama",
 			budgetDollars: 1.0,
 			expectedMin:   math.MaxInt32, // Very large number
 			expectedMax:   math.MaxInt,
@@ -158,7 +155,7 @@ func TestSetModelPricing(t *testing.T) {
 func TestIsFreeModel(t *testing.T) {
 	ct := NewCostTracker()
 
-	freeModels := []string{"embedded-qwen3", "qwen3-8b", "ollama", "mock"}
+	freeModels := []string{"llama3.2", "ollama", "mock"}
 	for _, model := range freeModels {
 		if !ct.IsFreeModel(model) {
 			t.Errorf("Expected %s to be free", model)
@@ -211,7 +208,7 @@ func TestGetBudgetRemaining(t *testing.T) {
 		},
 		{
 			name:          "Free model (budget unchanged)",
-			model:         "embedded-qwen3",
+			model:         "ollama",
 			budgetDollars: 3.0,
 			tokensUsed:    1000000,
 			expected:      3.0,
@@ -294,7 +291,7 @@ func TestGetBudgetInfo(t *testing.T) {
 		},
 		{
 			name:          "Free model",
-			model:         "embedded-qwen3",
+			model:         "ollama",
 			budgetDollars: 3.0,
 			tokensUsed:    1000000,
 			checkFunc: func(t *testing.T, info *BudgetInfo) {
@@ -358,7 +355,7 @@ func TestCostTrackerConcurrentAccess(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			ct.GetCost("deepseek-chat", 1000)
-			ct.IsFreeModel("embedded-qwen3")
+			ct.IsFreeModel("ollama")
 			ct.GetModelPricing("deepseek-chat")
 			done <- true
 		}()

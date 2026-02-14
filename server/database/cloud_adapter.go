@@ -5,7 +5,11 @@ import (
 	"errors"
 )
 
-var ErrCloudAdapterNotImplemented = errors.New("cloud adapter not yet implemented")
+// ErrCloudAdapterNotImplemented is returned by all CloudAdapter methods.
+// The cloud adapter (Supabase integration) is intentionally deferred — v1 is local-first,
+// SQLite-only. This interface is preserved for future multi-user cloud deployment.
+// The migration system handles this gracefully via errors.Is(err, ErrCloudAdapterNotImplemented).
+var ErrCloudAdapterNotImplemented = errors.New("cloud adapter: intentionally deferred (v1 is local-first, SQLite-only)")
 
 type CloudAdapter struct {
 	supabaseURL string

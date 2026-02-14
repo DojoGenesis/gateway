@@ -229,7 +229,7 @@ sqlite3 .dojo/memory.db < go_backend/migrations/20260131_v0.0.17_and_v0.0.18_rol
 **Vector Embeddings** (`memories.embedding`, `memory_seeds.embedding` - already existed, `memory_files.embedding`)
 - Stores 768-dimensional float32 vectors as binary BLOB
 - Enables semantic search via cosine similarity
-- Generated asynchronously by `embedded-qwen3` plugin
+- Generated asynchronously by the active LLM provider
 - NULL by default for existing records
 
 **Context Types** (`memories.context_type`, `memory_seeds.context_type`)

@@ -676,6 +676,58 @@ func TestPluginManager_MultipleShutdowns(t *testing.T) {
 	assert.NoError(t, err, "Multiple shutdowns should not error")
 }
 
+func TestPluginManager_ProviderCount(t *testing.T) {
+	pm := NewPluginManager(t.TempDir())
+
+	assert.Equal(t, 0, pm.ProviderCount())
+
+	pm.RegisterProvider("provider-1", &mockProvider{
+		info: &ProviderInfo{Name: "provider-1", Version: "1.0.0"},
+	})
+	assert.Equal(t, 1, pm.ProviderCount())
+
+	pm.RegisterProvider("provider-2", &mockProvider{
+		info: &ProviderInfo{Name: "provider-2", Version: "1.0.0"},
+	})
+	assert.Equal(t, 2, pm.ProviderCount())
+}
+
+func TestPluginManager_ProviderStatuses(t *testing.T) {
+	pm := NewPluginManager(t.TempDir())
+
+	// Empty
+	statuses := pm.ProviderStatuses()
+	assert.Len(t, statuses, 0)
+
+	// Register healthy provider
+	pm.RegisterProvider("healthy", &mockProvider{
+		info: &ProviderInfo{Name: "healthy", Version: "1.0.0"},
+	})
+
+	// Register unhealthy provider (GetInfo returns error)
+	pm.RegisterProvider("unhealthy", &mockProvider{
+		getInfoError: fmt.Errorf("provider down"),
+	})
+
+	statuses = pm.ProviderStatuses()
+	assert.Len(t, statuses, 2)
+	assert.True(t, statuses["healthy"])
+	assert.False(t, statuses["unhealthy"])
+}
+
+func TestPluginManager_IsPluginLoaded(t *testing.T) {
+	pm := NewPluginManager(t.TempDir())
+
+	assert.False(t, pm.IsPluginLoaded("test-provider"))
+
+	pm.RegisterProvider("test-provider", &mockProvider{
+		info: &ProviderInfo{Name: "test-provider", Version: "1.0.0"},
+	})
+
+	assert.True(t, pm.IsPluginLoaded("test-provider"))
+	assert.False(t, pm.IsPluginLoaded("other-provider"))
+}
+
 func BenchmarkPluginManager_GetProvider(b *testing.B) {
 	pluginDir := b.TempDir()
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/streaming"
 	"github.com/stretchr/testify/assert"
 )
@@ -323,9 +324,9 @@ func TestGetUserTier(t *testing.T) {
 			expected: "guest",
 		},
 		{
-			name:     "Non-empty user ID returns authenticated",
+			name:     "Non-empty user ID without DB returns free",
 			userID:   "user123",
-			expected: "authenticated",
+			expected: "free",
 		},
 	}
 
@@ -336,6 +337,123 @@ func TestGetUserTier(t *testing.T) {
 		})
 	}
 }
+
+func TestGetUserTier_WithDB(t *testing.T) {
+	t.Run("settings with tier in preferences", func(t *testing.T) {
+		h := NewChatHandler(nil, nil, nil, nil)
+		prefs := `{"tier":"premium","theme":"dark"}`
+		h.SetDB(&mockDBAdapter{
+			settings: &database.Settings{
+				UserID:      "user1",
+				Preferences: &prefs,
+			},
+		})
+
+		result := h.getUserTier("user1")
+		assert.Equal(t, "premium", result)
+	})
+
+	t.Run("settings without tier in preferences", func(t *testing.T) {
+		h := NewChatHandler(nil, nil, nil, nil)
+		prefs := `{"theme":"dark"}`
+		h.SetDB(&mockDBAdapter{
+			settings: &database.Settings{
+				UserID:      "user1",
+				Preferences: &prefs,
+			},
+		})
+
+		result := h.getUserTier("user1")
+		assert.Equal(t, "free", result)
+	})
+
+	t.Run("settings not found returns free", func(t *testing.T) {
+		h := NewChatHandler(nil, nil, nil, nil)
+		h.SetDB(&mockDBAdapter{
+			settingsErr: database.ErrSettingsNotFound,
+		})
+
+		result := h.getUserTier("user1")
+		assert.Equal(t, "free", result)
+	})
+
+	t.Run("DB error returns free", func(t *testing.T) {
+		h := NewChatHandler(nil, nil, nil, nil)
+		h.SetDB(&mockDBAdapter{
+			settingsErr: database.ErrCloudAdapterNotImplemented,
+		})
+
+		result := h.getUserTier("user1")
+		assert.Equal(t, "free", result)
+	})
+
+	t.Run("nil preferences returns free", func(t *testing.T) {
+		h := NewChatHandler(nil, nil, nil, nil)
+		h.SetDB(&mockDBAdapter{
+			settings: &database.Settings{
+				UserID:      "user1",
+				Preferences: nil,
+			},
+		})
+
+		result := h.getUserTier("user1")
+		assert.Equal(t, "free", result)
+	})
+}
+
+// mockDBAdapter implements database.DatabaseAdapter for testing
+type mockDBAdapter struct {
+	settings    *database.Settings
+	settingsErr error
+}
+
+func (m *mockDBAdapter) GetSettings(_ context.Context, _ string) (*database.Settings, error) {
+	if m.settingsErr != nil {
+		return nil, m.settingsErr
+	}
+	return m.settings, nil
+}
+
+// Unused methods — satisfy the interface
+func (m *mockDBAdapter) GetUser(_ context.Context, _ string) (*database.User, error) {
+	return nil, nil
+}
+func (m *mockDBAdapter) CreateUser(_ context.Context, _ *database.User) error { return nil }
+func (m *mockDBAdapter) UpdateUser(_ context.Context, _ *database.User) error { return nil }
+func (m *mockDBAdapter) StoreAPIKey(_ context.Context, _ *database.APIKey) error {
+	return nil
+}
+func (m *mockDBAdapter) GetAPIKey(_ context.Context, _, _ string) (*database.APIKey, error) {
+	return nil, nil
+}
+func (m *mockDBAdapter) ListAPIKeys(_ context.Context, _ string) ([]*database.APIKey, error) {
+	return nil, nil
+}
+func (m *mockDBAdapter) DeleteAPIKey(_ context.Context, _, _ string) error { return nil }
+func (m *mockDBAdapter) UpdateAPIKeyLastUsed(_ context.Context, _, _ string) error {
+	return nil
+}
+func (m *mockDBAdapter) CreateConversation(_ context.Context, _ *database.Conversation) error {
+	return nil
+}
+func (m *mockDBAdapter) GetConversation(_ context.Context, _ string) (*database.Conversation, error) {
+	return nil, nil
+}
+func (m *mockDBAdapter) ListConversations(_ context.Context, _ string) ([]*database.Conversation, error) {
+	return nil, nil
+}
+func (m *mockDBAdapter) UpdateConversation(_ context.Context, _ *database.Conversation) error {
+	return nil
+}
+func (m *mockDBAdapter) DeleteConversation(_ context.Context, _ string) error { return nil }
+func (m *mockDBAdapter) CreateSettings(_ context.Context, _ *database.Settings) error {
+	return nil
+}
+func (m *mockDBAdapter) UpdateSettings(_ context.Context, _ *database.Settings) error {
+	return nil
+}
+func (m *mockDBAdapter) Ping(_ context.Context) error { return nil }
+func (m *mockDBAdapter) Close() error                 { return nil }
 
 // TestMockProvider for testing with streaming support
 type TestMockProvider struct {

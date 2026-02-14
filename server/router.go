@@ -44,7 +44,7 @@ func (s *Server) setupRoutes() {
 		v1.POST("/orchestrate", s.handleOrchestrate)
 		v1.GET("/orchestrate/:id/events", s.handleOrchestrationEvents)
 
-		// ─── Gateway Routes (v0.2.0 - New) ───────────────────────────
+		// ─── Gateway Routes (v1.0.0) ─────────────────────────────────
 		gateway := v1.Group("/gateway")
 		{
 			// Tool discovery with MCP namespace support
@@ -83,13 +83,16 @@ func (s *Server) setupRoutes() {
 		v1.POST("/maintenance/run", memoryHandler.RunMaintenance)
 	}
 
-	// ─── Admin Routes (v0.2.0 - New) ─────────────────────────────────
+	// ─── Admin Routes (v1.0.0) ───────────────────────────────────────
 	admin := s.router.Group("/admin")
 	{
 		// Health and diagnostics
 		admin.GET("/health", s.handleAdminHealth)
 		admin.GET("/config", s.handleAdminConfig)
 		admin.POST("/config/reload", s.handleAdminConfigReload)
+
+		// Provider status
+		admin.GET("/providers", s.handleAdminProviders)
 
 		// Metrics
 		admin.GET("/metrics/prometheus", s.handleAdminMetrics)

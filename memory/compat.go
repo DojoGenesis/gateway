@@ -194,7 +194,7 @@ func (cs *CompressionService) CompressHistory(ctx context.Context, sessionID str
 	content := BuildOriginalContent(memories)
 	prompt := BuildCompressionPrompt(content)
 
-	prov, err := cs.pluginManager.GetProvider("embedded-qwen3")
+	prov, err := cs.pluginManager.GetProvider("ollama")
 	if err != nil {
 		// Fallback: simple concatenation
 		return &CompressedHistory{
@@ -237,7 +237,7 @@ func (cs *CompressionService) CompressHistory(ctx context.Context, sessionID str
 
 // IdentifyKeyThemes extracts key themes from content for maintenance.
 func (cs *CompressionService) IdentifyKeyThemes(ctx context.Context, content string) ([]string, error) {
-	prov, err := cs.pluginManager.GetProvider("embedded-qwen3")
+	prov, err := cs.pluginManager.GetProvider("ollama")
 	if err != nil {
 		return []string{"general"}, nil
 	}

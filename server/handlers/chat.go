@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/streaming"
 	"github.com/gin-gonic/gin"
@@ -27,7 +30,7 @@ var cloudProviders = []string{"deepseek-api", "openai", "anthropic", "google", "
 
 // localProviders lists provider names considered "local" (low latency, free).
 // Order determines preference — first loaded wins for fast tasks.
-var localProviders = []string{"ollama", "embedded-qwen3"}
+var localProviders = []string{"ollama"}
 
 // ChatHandler handles chat-related HTTP requests.
 type ChatHandler struct {
@@ -37,6 +40,7 @@ type ChatHandler struct {
 	cache      *agent.ResponseCache
 	streaming  *streaming.StreamingAgentWithEvents
 	pluginMgr  *provider.PluginManager
+	db         database.DatabaseAdapter
 }
 
 // NewChatHandler creates a new ChatHandler with the specified dependencies.
@@ -50,6 +54,11 @@ func NewChatHandler(ic *agent.IntentClassifier, pa *agent.PrimaryAgent, ur *serv
 		streaming:  streaming.NewStreamingAgentWithEvents(pa),
 		pluginMgr:  pm,
 	}
+}
+
+// SetDB sets the database adapter for user tier lookups.
+func (h *ChatHandler) SetDB(db database.DatabaseAdapter) {
+	h.db = db
 }
 
 type ChatRequest struct {
@@ -519,7 +528,37 @@ func (h *ChatHandler) getUserTier(userID string) string {
 	if userID == "" {
 		return "guest"
 	}
-	// TODO: Implement proper user tier lookup from database
-	// For now, all authenticated users are considered "authenticated" tier
-	return "authenticated"
+
+	if h.db != nil {
+		if tier := h.lookupUserTier(context.Background(), userID); tier != "" {
+			return tier
+		}
+	}
+
+	// Falls back to "free" tier when DB unavailable or user has no settings
+	return "free"
+}
+
+// lookupUserTier attempts to resolve the user's tier from database settings.
+// Returns the tier string if found, or empty string on any error.
+func (h *ChatHandler) lookupUserTier(ctx context.Context, userID string) string {
+	settings, err := h.db.GetSettings(ctx, userID)
+	if err != nil {
+		return ""
+	}
+
+	if settings.Preferences == nil {
+		return ""
+	}
+
+	var prefs map[string]interface{}
+	if err := json.Unmarshal([]byte(*settings.Preferences), &prefs); err != nil {
+		return ""
+	}
+
+	if tier, ok := prefs["tier"].(string); ok && tier != "" {
+		return tier
+	}
+
+	return ""
 }

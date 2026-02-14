@@ -12,8 +12,8 @@ func setupTestRouter(t *testing.T) (*UserRouter, *BudgetTracker, *provider.Plugi
 	cfg := &config.Config{
 		PluginDir: "testdata/plugins",
 		Routing: config.RoutingConfig{
-			DefaultProvider:       "embedded-qwen3",
-			GuestProvider:         "embedded-qwen3",
+			DefaultProvider:       "ollama",
+			GuestProvider:         "ollama",
 			AuthenticatedProvider: "deepseek-api",
 		},
 		Budget: config.BudgetConfig{
@@ -66,8 +66,8 @@ func TestSelectProviderGuestUser(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if provider != "embedded-qwen3" {
-		t.Errorf("Expected embedded-qwen3 for guest user, got %s", provider)
+	if provider != "ollama" {
+		t.Errorf("Expected ollama for guest user, got %s", provider)
 	}
 }
 
@@ -84,7 +84,7 @@ func TestSelectProviderAuthenticatedUserWithBudget(t *testing.T) {
 		t.Skip("Budget already exhausted")
 	}
 
-	if provider != "embedded-qwen3" {
+	if provider != "ollama" {
 		t.Logf("Expected deepseek-api, got %s (provider may not be loaded)", provider)
 	}
 }
@@ -99,8 +99,8 @@ func TestSelectProviderAuthenticatedUserBudgetExceeded(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if provider != "embedded-qwen3" {
-		t.Errorf("Expected embedded-qwen3 when budget exceeded, got %s", provider)
+	if provider != "ollama" {
+		t.Errorf("Expected ollama when budget exceeded, got %s", provider)
 	}
 }
 
@@ -114,8 +114,8 @@ func TestSelectProviderFallbackOnProviderError(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if provider != "embedded-qwen3" {
-		t.Errorf("Expected fallback to embedded-qwen3, got %s", provider)
+	if provider != "ollama" {
+		t.Errorf("Expected fallback to ollama, got %s", provider)
 	}
 }
 
@@ -124,8 +124,8 @@ func TestGetDefaultProvider(t *testing.T) {
 
 	provider := router.GetDefaultProvider()
 
-	if provider != "embedded-qwen3" {
-		t.Errorf("Expected embedded-qwen3, got %s", provider)
+	if provider != "ollama" {
+		t.Errorf("Expected ollama, got %s", provider)
 	}
 }
 
@@ -134,8 +134,8 @@ func TestGetGuestProvider(t *testing.T) {
 
 	provider := router.GetGuestProvider()
 
-	if provider != "embedded-qwen3" {
-		t.Errorf("Expected embedded-qwen3, got %s", provider)
+	if provider != "ollama" {
+		t.Errorf("Expected ollama, got %s", provider)
 	}
 }
 
@@ -157,8 +157,8 @@ func TestSelectProviderForModelWithoutModel(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if provider != "embedded-qwen3" {
-		t.Errorf("Expected embedded-qwen3 for empty model, got %s", provider)
+	if provider != "ollama" {
+		t.Errorf("Expected ollama for empty model, got %s", provider)
 	}
 }
 
@@ -183,15 +183,15 @@ func TestMultipleUsersRouting(t *testing.T) {
 	_, _ = router.SelectProvider("user2")
 	guestProvider, _ := router.SelectProvider("")
 
-	if guestProvider != "embedded-qwen3" {
-		t.Errorf("Expected embedded-qwen3 for guest, got %s", guestProvider)
+	if guestProvider != "ollama" {
+		t.Errorf("Expected ollama for guest, got %s", guestProvider)
 	}
 
 	bt.TrackUsage("user2", 11000)
 
 	user2ProviderAfter, _ := router.SelectProvider("user2")
-	if user2ProviderAfter != "embedded-qwen3" {
-		t.Errorf("Expected embedded-qwen3 for user2 after budget exceeded, got %s", user2ProviderAfter)
+	if user2ProviderAfter != "ollama" {
+		t.Errorf("Expected ollama for user2 after budget exceeded, got %s", user2ProviderAfter)
 	}
 
 	user1ProviderAfter, _ := router.SelectProvider("user1")
@@ -248,8 +248,8 @@ func TestBudgetCheckIntegration(t *testing.T) {
 	}
 
 	provider3, _ := router.SelectProvider("user1")
-	if provider3 != "embedded-qwen3" {
-		t.Errorf("Expected fallback to embedded-qwen3, got %s", provider3)
+	if provider3 != "ollama" {
+		t.Errorf("Expected fallback to ollama, got %s", provider3)
 	}
 }
 

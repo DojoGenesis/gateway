@@ -42,7 +42,7 @@ type SkillDefinition struct {
 	// Agents lists which agents can invoke this skill
 	Agents []string `json:"agents"`
 
-	// RequiredVersion specifies minimum gateway version (e.g., "0.3.0")
+	// RequiredVersion specifies minimum gateway version (e.g., "1.0.0")
 	RequiredVersion string `json:"required_version,omitempty"`
 
 	// PythonScripts lists Python scripts required by this skill
