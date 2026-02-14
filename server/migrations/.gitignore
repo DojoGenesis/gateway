@@ -1,0 +1,3 @@
+# Test artifacts
+test_migration.db
+*.db

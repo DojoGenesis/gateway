@@ -1,0 +1,64 @@
+# Dojo Genesis v0.0.15 Configuration
+
+# Server settings
+port: "8081"
+python_backend_url: "http://localhost:8001"
+environment: "development"
+plugin_dir: "plugins"
+
+# CORS allowed origins
+allowed_origins:
+  - "http://localhost:3000"
+  - "http://localhost:3003"
+
+# Model provider plugins
+providers:
+  # Mock provider (for testing only)
+  - name: mock
+    enabled: false
+    priority: 4
+    plugin_path: plugins/mock
+    config: {}
+
+  # Embedded Qwen3-8B (Phase 2) - Free, local inference
+  - name: embedded-qwen3
+    enabled: true
+    priority: 1
+    plugin_path: embedded-qwen3/embedded-qwen3
+    config:
+      model_path: models_data/qwen3-8b-q4_k_m.gguf
+      context_size: 8192
+      threads: ${QWEN_THREADS:-8}
+      temperature: 0.7
+      top_p: 0.9
+
+  # DeepSeek API (Phase 3) - Cloud inference for authenticated users
+  - name: deepseek-api
+    enabled: true
+    priority: 2
+    plugin_path: deepseek-api/deepseek-api
+    config:
+      api_key: ${DEEPSEEK_API_KEY}
+      base_url: https://api.deepseek.com
+      timeout: 30
+
+  # Ollama (Phase 3) - Local Ollama integration
+  - name: ollama
+    enabled: true
+    priority: 3
+    plugin_path: ollama/ollama
+    config:
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+      timeout: 30
+
+# Routing rules — "auto" means resolved dynamically at runtime based on loaded plugins
+routing:
+  default_provider: auto                  # Best loaded provider (prefers local)
+  guest_provider: auto                    # Best loaded local provider
+  authenticated_provider: auto            # Best loaded cloud provider (falls back to local)
+
+# Budget limits (in tokens)
+budget:
+  query_limit: 50000       # Max tokens per query
+  session_limit: 200000    # Max tokens per session
+  monthly_limit: 2000000   # Max tokens per month (~$3.00 at DeepSeek pricing)

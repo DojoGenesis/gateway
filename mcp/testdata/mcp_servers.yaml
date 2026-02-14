@@ -1,0 +1,89 @@
+# MCP Host Configuration (per gateway-mcp-contract.md spec)
+version: "1.0"
+mcp:
+  global:
+    default_tool_timeout: 30
+    reconnect:
+      max_retries: 3
+      initial_backoff_ms: 1000
+      max_backoff_ms: 30000
+      backoff_multiplier: 2.0
+    health_check_interval: 60
+    response_buffer_size: 1048576
+
+  servers:
+    - id: "composio"
+      display_name: "Composio Integration"
+      namespace_prefix: "composio"
+
+      transport:
+        type: "stdio"
+        command: "python"
+        args:
+          - "-m"
+          - "composio.client"
+        env:
+          COMPOSIO_API_KEY: ${COMPOSIO_API_KEY}
+
+      tools:
+        allowlist: []  # empty means allow all
+        blocklist: []
+
+      timeouts:
+        startup: 10
+        tool_default: 60
+        health_check: 5
+
+      health_check:
+        enabled: true
+        path: "/health"
+        interval_sec: 30
+
+      retry_policy:
+        max_attempts: 3
+        backoff_multiplier: 2.0
+        max_backoff_ms: 5000
+
+    - id: "example"
+      display_name: "Example MCP Server"
+      namespace_prefix: "example"
+
+      transport:
+        type: "stdio"
+        command: "node"
+        args:
+          - "/path/to/example-mcp-server.js"
+        env:
+          API_KEY: ${EXAMPLE_API_KEY}
+          DEBUG: "true"
+
+      tools:
+        allowlist:
+          - "search"
+          - "fetch"
+        blocklist:
+          - "dangerous_*"
+
+      timeouts:
+        startup: 10
+        tool_default: 30
+        health_check: 5
+
+      health_check:
+        enabled: true
+        path: "/health"
+        interval_sec: 60
+
+      retry_policy:
+        max_attempts: 2
+        backoff_multiplier: 2.0
+        max_backoff_ms: 3000
+
+  observability:
+    enabled: true
+    trace_provider: "otel"
+    attributes:
+      service.name: "agentic-gateway"
+      mcp.host.enabled: "true"
+    log_level: "info"
+    tool_span_sample_rate: 1.0

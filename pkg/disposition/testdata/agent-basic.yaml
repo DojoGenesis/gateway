@@ -1,0 +1,29 @@
+agent_id: basic_agent
+name: Basic Test Agent
+description: A basic agent configuration for testing
+
+validation:
+  enabled: true
+  min_response_length: 10
+  max_response_length: 1000
+  confidence_threshold: 0.7
+  allowed_models:
+    - claude-opus-4.6
+    - claude-sonnet-4.5
+  schema_validation: false
+
+error_handling:
+  enabled: true
+  fallback_behavior: retry
+  retry_limit: 3
+  timeout_sec: 30
+  backoff_strategy: exponential
+  initial_backoff_ms: 500
+  max_backoff_ms: 10000
+
+collaboration:
+  enabled: false
+  max_agents: 1
+
+reflection:
+  enabled: false

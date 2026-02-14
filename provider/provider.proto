@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package plugin;
+
+option go_package = "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider/pb";
+
+service ModelProvider {
+  rpc GetInfo(GetInfoRequest) returns (ProviderInfo);
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
+  rpc GenerateCompletion(CompletionRequest) returns (CompletionResponse);
+  rpc GenerateCompletionStream(CompletionRequest) returns (stream CompletionChunk);
+  rpc CallTool(ToolCallRequest) returns (ToolCallResponse);
+  rpc GenerateEmbedding(EmbeddingRequest) returns (EmbeddingResponse);
+}
+
+message GetInfoRequest {}
+
+message ProviderInfo {
+  string name = 1;
+  string version = 2;
+  string description = 3;
+  repeated string capabilities = 4;
+}
+
+message ListModelsRequest {}
+
+message ListModelsResponse {
+  repeated ModelInfo models = 1;
+}
+
+message ModelInfo {
+  string id = 1;
+  string name = 2;
+  string provider = 3;
+  int32 context_size = 4;
+  double cost = 5;
+}
+
+message CompletionRequest {
+  string model = 1;
+  repeated Message messages = 2;
+  double temperature = 3;
+  int32 max_tokens = 4;
+  repeated Tool tools = 5;
+  bool stream = 6;
+}
+
+message CompletionResponse {
+  string id = 1;
+  string model = 2;
+  string content = 3;
+  Usage usage = 4;
+  repeated ToolCall tool_calls = 5;
+}
+
+message CompletionChunk {
+  string id = 1;
+  string delta = 2;
+  bool done = 3;
+}
+
+message Message {
+  string role = 1;
+  string content = 2;
+}
+
+message Tool {
+  string name = 1;
+  string description = 2;
+  bytes parameters = 3;
+}
+
+message Usage {
+  int32 input_tokens = 1;
+  int32 output_tokens = 2;
+  int32 total_tokens = 3;
+}
+
+message ToolCall {
+  string id = 1;
+  string name = 2;
+  bytes arguments = 3;
+}
+
+message ToolCallRequest {
+  ToolCall tool_call = 1;
+  bytes context = 2;
+}
+
+message ToolCallResponse {
+  bytes result = 1;
+  string error = 2;
+}
+
+message EmbeddingRequest {
+  string text = 1;
+}
+
+message EmbeddingResponse {
+  repeated float embedding = 1;
+}

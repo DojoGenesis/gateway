@@ -1,0 +1,52 @@
+agent_id: multi_mode_agent
+name: Multi-Mode Agent
+description: An agent with multiple mode configurations
+
+validation:
+  enabled: true
+  min_response_length: 50
+  max_response_length: 5000
+  confidence_threshold: 0.8
+
+error_handling:
+  enabled: true
+  fallback_behavior: retry
+  retry_limit: 3
+  timeout_sec: 60
+  backoff_strategy: exponential
+  initial_backoff_ms: 1000
+  max_backoff_ms: 30000
+
+collaboration:
+  enabled: false
+
+reflection:
+  enabled: false
+
+modes:
+  debug:
+    validation:
+      min_response_length: 10
+      max_response_length: 100
+      confidence_threshold: 0.5
+    error_handling:
+      retry_limit: 1
+      timeout_sec: 10
+    pacing:
+      enabled: true
+      inter_tool_delay_ms: 500
+
+  prod:
+    validation:
+      min_response_length: 100
+      confidence_threshold: 0.9
+    error_handling:
+      retry_limit: 5
+      timeout_sec: 120
+      circuit_breaker_enabled: true
+      circuit_breaker_threshold: 3
+      circuit_breaker_reset_sec: 300
+    reflection:
+      enabled: true
+      frequency: per_task
+      store_reflections: true

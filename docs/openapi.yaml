@@ -1,0 +1,512 @@
+openapi: 3.0.3
+info:
+  title: Agentic Gateway API
+  version: 0.2.0
+  description: |
+    Agentic Gateway by Dojo Genesis - A production-grade AI agent gateway with MCP integration,
+    disposition-driven agent configuration, and comprehensive observability.
+
+    ## Features
+    - OpenAI-compatible chat completions API
+    - MCP (Model Context Protocol) server integration
+    - Agent disposition system (ADA contract)
+    - DAG-based orchestration
+    - Memory management with compression
+    - OTEL trace export
+
+  contact:
+    name: Dojo Genesis
+    url: https://github.com/TresPies-source/AgenticGatewayByDojoGenesis
+
+servers:
+  - url: http://localhost:8081
+    description: Development server
+  - url: https://gateway.example.com
+    description: Production server
+
+tags:
+  - name: Gateway
+    description: v0.2.0 Gateway endpoints for agent and tool management
+  - name: Admin
+    description: Administrative and monitoring endpoints
+  - name: OpenAI Compatible
+    description: OpenAI-compatible endpoints
+  - name: Legacy
+    description: Legacy endpoints (v0.1.x compatibility)
+
+paths:
+  # ==================== Gateway Routes (v0.2.0) ====================
+
+  /v1/gateway/tools:
+    get:
+      tags: [Gateway]
+      summary: List all registered tools
+      description: Returns all tools including built-in and MCP-sourced tools with namespace information
+      operationId: listGatewayTools
+      responses:
+        '200':
+          description: List of tools
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolInfo'
+                  count:
+                    type: integer
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/gateway/agents:
+    post:
+      tags: [Gateway]
+      summary: Create a new agent
+      description: Initialize an agent with disposition configuration from workspace
+      operationId: createAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workspace_root]
+              properties:
+                workspace_root:
+                  type: string
+                  description: Absolute path to workspace directory
+                  example: /Users/user/project
+                active_mode:
+                  type: string
+                  description: Optional mode for disposition overrides
+                  example: debug
+      responses:
+        '201':
+          description: Agent created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agent_id:
+                    type: string
+                    format: uuid
+                  config:
+                    $ref: '#/components/schemas/AgentConfig'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/gateway/agents/{id}:
+    get:
+      tags: [Gateway]
+      summary: Get agent status
+      description: Retrieve current agent configuration and status
+      operationId: getAgent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agent_id:
+                    type: string
+                  config:
+                    $ref: '#/components/schemas/AgentConfig'
+                  status:
+                    type: string
+                    enum: [active, paused, stopped]
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/gateway/agents/{id}/chat:
+    post:
+      tags: [Gateway]
+      summary: Chat with agent
+      description: Send a message to a specific agent using its disposition
+      operationId: chatWithAgent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  description: User message
+      responses:
+        '200':
+          description: Agent response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agent_id:
+                    type: string
+                  response:
+                    type: string
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/gateway/orchestrate:
+    post:
+      tags: [Gateway]
+      summary: Submit orchestration plan
+      description: Execute a DAG-based tool orchestration plan
+      operationId: submitOrchestration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan]
+              properties:
+                plan:
+                  $ref: '#/components/schemas/ExecutionPlan'
+                user_id:
+                  type: string
+      responses:
+        '202':
+          description: Orchestration accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  execution_id:
+                    type: string
+                  plan_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [submitted]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /v1/gateway/orchestrate/{id}/dag:
+    get:
+      tags: [Gateway]
+      summary: Get orchestration DAG
+      description: Retrieve DAG structure and execution status
+      operationId: getOrchestrationDAG
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DAG structure
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  execution_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [running, completed, failed]
+                  dag:
+                    type: object
+
+  /v1/gateway/traces/{id}:
+    get:
+      tags: [Gateway]
+      summary: Get trace details
+      description: Retrieve OTEL trace information (if OTEL enabled)
+      operationId: getTrace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trace details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trace_id:
+                    type: string
+                  spans:
+                    type: array
+                    items:
+                      type: object
+
+  # ==================== Admin Routes ====================
+
+  /admin/health:
+    get:
+      tags: [Admin]
+      summary: Detailed health check
+      description: Returns comprehensive health information
+      operationId: adminHealth
+      responses:
+        '200':
+          description: Health details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /admin/config:
+    get:
+      tags: [Admin]
+      summary: Get current configuration
+      description: Returns sanitized configuration (no secrets)
+      operationId: getConfig
+      responses:
+        '200':
+          description: Configuration
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /admin/config/reload:
+    post:
+      tags: [Admin]
+      summary: Reload configuration
+      description: Reload YAML configuration from disk
+      operationId: reloadConfig
+      responses:
+        '501':
+          description: Not implemented (requires restart in v0.2.0)
+
+  /admin/metrics/prometheus:
+    get:
+      tags: [Admin]
+      summary: Prometheus metrics
+      description: Returns metrics in Prometheus text format
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /admin/mcp/servers:
+    get:
+      tags: [Admin]
+      summary: List MCP servers
+      description: Returns status of all MCP server connections
+      operationId: listMCPServers
+      responses:
+        '200':
+          description: MCP server list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  server_count:
+                    type: integer
+                  servers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MCPServerStatus'
+
+  # ==================== OpenAI Compatible ====================
+
+  /v1/chat/completions:
+    post:
+      tags: [OpenAI Compatible]
+      summary: Chat completions
+      description: OpenAI-compatible chat completions endpoint
+      operationId: chatCompletions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              # OpenAI chat completion schema
+      responses:
+        '200':
+          description: Chat completion response
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas:
+    AgentConfig:
+      type: object
+      description: Agent disposition configuration
+      properties:
+        pacing:
+          type: string
+          enum: [deliberate, measured, responsive, rapid]
+          description: Execution pacing preference
+        depth:
+          type: string
+          enum: [surface, functional, thorough, exhaustive]
+          description: Analysis depth preference
+        tone:
+          type: string
+          enum: [formal, professional, conversational, casual]
+        initiative:
+          type: string
+          enum: [reactive, responsive, proactive, autonomous]
+
+    ToolInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        parameters:
+          type: object
+        namespace:
+          type: string
+          description: Tool namespace (e.g., "composio", "github", "builtin")
+
+    ExecutionPlan:
+      type: object
+      required: [id, name, dag]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        dag:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolInvocation'
+
+    ToolInvocation:
+      type: object
+      required: [id, tool_name, input]
+      properties:
+        id:
+          type: string
+        tool_name:
+          type: string
+        input:
+          type: object
+        depends_on:
+          type: array
+          items:
+            type: string
+
+    MCPServerStatus:
+      type: object
+      properties:
+        name:
+          type: string
+        connected:
+          type: boolean
+        tool_count:
+          type: integer
+        last_error:
+          type: string
+        last_checked:
+          type: string
+          format: date-time
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        version:
+          type: string
+        uptime:
+          type: string
+        system:
+          type: object
+        memory:
+          type: object
+        tools:
+          type: object
+        mcp:
+          type: object
+        agents:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    ServiceUnavailable:
+      description: Service unavailable
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: API key authentication
+
+security:
+  - ApiKeyAuth: []

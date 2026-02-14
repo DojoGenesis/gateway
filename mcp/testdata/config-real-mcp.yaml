@@ -1,0 +1,58 @@
+# MCP Integration Test Configuration
+# Used by mcp/integration_test.go for testing with real MCPByDojoGenesis binary
+# Shorter timeouts than production for faster test execution
+
+version: "1.0"
+
+mcp:
+  global:
+    default_tool_timeout: 15  # Reduced for tests
+    reconnect:
+      max_retries: 2  # Fewer retries for tests
+      initial_backoff_ms: 500
+      max_backoff_ms: 2000
+      backoff_multiplier: 2.0
+    health_check_interval: 30
+    response_buffer_size: 1048576
+
+  servers:
+    # MCPByDojoGenesis: expects binary in PATH
+    - id: "mcp_by_dojo"
+      display_name: "MCP By Dojo Genesis (Test)"
+      namespace_prefix: "mcp_by_dojo"
+
+      transport:
+        type: "stdio"
+        # For integration tests, binary must be in PATH
+        command: "mcp-by-dojo-genesis"
+        args: []
+        env:
+          LOG_LEVEL: "info"
+
+      tools:
+        allowlist: []
+        blocklist: []
+
+      timeouts:
+        startup: 5       # Faster startup for tests
+        tool_default: 15 # Shorter timeout for tests
+        health_check: 3
+
+      health_check:
+        enabled: true
+        path: "/health"
+        interval_sec: 30  # Less frequent for tests
+
+      retry_policy:
+        max_attempts: 2
+        backoff_multiplier: 2.0
+        max_backoff_ms: 3000
+
+  observability:
+    enabled: true
+    trace_provider: "otel"
+    attributes:
+      service.name: "agentic-gateway-test"
+      mcp.host.enabled: "true"
+    log_level: "info"
+    tool_span_sample_rate: 1.0

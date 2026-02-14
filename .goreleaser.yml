@@ -1,0 +1,104 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# ADR-008: Binary name = agentic-gateway, container registry = GHCR
+
+version: 2
+
+project_name: agentic-gateway
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: agentic-gateway
+    main: ./main.go
+    binary: agentic-gateway
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.Commit={{.Commit}}
+      - -X main.Date={{.Date}}
+    ignore: []
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - README.md
+      - LICENSE*
+      - CHANGELOG.md
+      - CONTRIBUTING.md
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - 'README'
+  groups:
+    - title: Features
+      regexp: '^feat:'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^fix:'
+      order: 1
+    - title: Others
+      order: 999
+
+dockers_v2:
+  - id: agentic-gateway
+    dockerfile: Dockerfile
+    images:
+      - "ghcr.io/trespies-source/agentic-gateway"
+    tags:
+      - "v{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+    labels:
+      "org.opencontainers.image.created": "{{.Date}}"
+      "org.opencontainers.image.title": "{{.ProjectName}}"
+      "org.opencontainers.image.revision": "{{.FullCommit}}"
+      "org.opencontainers.image.version": "{{.Version}}"
+      "org.opencontainers.image.source": "https://github.com/TresPies-source/AgenticGatewayByDojoGenesis"
+
+release:
+  github:
+    owner: TresPies-source
+    name: AgenticGatewayByDojoGenesis
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"
+  header: |
+    ## Agentic Gateway v{{.Version}}
+
+    See [CHANGELOG.md](CHANGELOG.md) for full release notes.
+  footer: |
+    **Full Changelog**: https://github.com/TresPies-source/AgenticGatewayByDojoGenesis/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+    ---
+    **Docker:** `docker pull ghcr.io/trespies-source/agentic-gateway:{{ .Version }}`

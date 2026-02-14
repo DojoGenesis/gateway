@@ -1,0 +1,26 @@
+agent_id: invalid_agent
+name: Invalid Test Agent
+description: An agent with invalid configuration values
+
+validation:
+  enabled: true
+  min_response_length: 1000
+  max_response_length: 100  # Invalid: min > max
+  confidence_threshold: 1.5  # Invalid: must be between 0.0 and 1.0
+
+error_handling:
+  enabled: true
+  fallback_behavior: invalid_behavior  # Invalid: not a valid enum
+  retry_limit: -5  # Invalid: must be >= 0
+  timeout_sec: -10  # Invalid: must be >= 0
+  backoff_strategy: invalid_strategy  # Invalid: not a valid enum
+
+collaboration:
+  enabled: true
+  max_agents: -2  # Invalid: must be >= 0
+  handoff_protocol: invalid_protocol  # Invalid: not a valid enum
+
+reflection:
+  enabled: true
+  frequency: invalid_frequency  # Invalid: not a valid enum
+  improvement_threshold: 2.0  # Invalid: must be between 0.0 and 1.0

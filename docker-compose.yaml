@@ -1,0 +1,164 @@
+version: '3.8'
+
+# Production Docker Compose Configuration
+# Includes: Gateway, MCPByDojoGenesis, OTEL Collector, Langfuse observability stack
+# Phase 3: MCP Server Wiring
+
+services:
+  # ─── AgenticGateway (Main Service) ─────────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      # Server configuration
+      PORT: "8080"
+      ENVIRONMENT: "production"
+
+      # MCP configuration
+      MCP_CONFIG_PATH: "/etc/gateway/gateway-config.yaml"
+      MCP_BY_DOJO_BINARY: "/opt/mcp-servers/mcp-by-dojo-genesis"
+
+      # OTEL configuration
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_SERVICE_NAME: "agentic-gateway"
+      OTEL_SAMPLING_RATE: "1.0"
+
+      # Memory configuration
+      MEMORY_DB_PATH: "/app/data/dojo_memory.db"
+
+    volumes:
+      # Mount gateway MCP configuration
+      - ./gateway-config.yaml:/etc/gateway/gateway-config.yaml:ro
+
+      # Shared volume for MCP server binaries
+      - mcp-bin:/opt/mcp-servers:ro
+
+      # Persistent storage for memory
+      - gateway-data:/app/data
+
+    depends_on:
+      mcp-by-dojo:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - agentic-stack
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ─── MCPByDojoGenesis (MCP Server Binary Provider) ────────────────────
+  # This service copies the MCP server binary to a shared volume and exits
+  # The gateway starts the binary as a subprocess via stdio transport
+  mcp-by-dojo:
+    image: ghcr.io/trespies-source/mcpbydojogenesis:latest
+    volumes:
+      - mcp-bin:/opt/mcp-servers
+    # Copy binary to shared volume and exit
+    entrypoint: ["sh", "-c", "cp /usr/local/bin/mcp-by-dojo-genesis /opt/mcp-servers/ && chmod +x /opt/mcp-servers/mcp-by-dojo-genesis && ls -la /opt/mcp-servers/"]
+    networks:
+      - agentic-stack
+
+  # ─── OTEL Collector (Observability Pipeline) ──────────────────────────
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4317:4317"  # OTLP gRPC receiver
+      - "4318:4318"  # OTLP HTTP receiver
+      - "8888:8888"  # Prometheus metrics (collector internal)
+      - "8889:8889"  # Prometheus exporter metrics
+    volumes:
+      - ./otel-config.yaml:/etc/otel/config.yaml:ro
+    command:
+      - "--config=/etc/otel/config.yaml"
+    networks:
+      - agentic-stack
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Langfuse (Observability UI & Trace Storage) ──────────────────────
+  langfuse:
+    image: langfuse/langfuse:latest
+    ports:
+      - "3000:3000"
+    environment:
+      # Database connection
+      DATABASE_URL: "postgresql://langfuse:langfuse_password@postgres:5432/langfuse"
+
+      # NextAuth configuration (required for Langfuse)
+      NEXTAUTH_URL: "http://localhost:3000"
+      NEXTAUTH_SECRET: "${LANGFUSE_NEXTAUTH_SECRET:-changeme-random-secret-key-minimum-32-characters-required}"
+
+      # Langfuse salt (for encryption)
+      SALT: "${LANGFUSE_SALT:-changeme-random-salt-minimum-32-characters-required}"
+
+      # Optional: Langfuse API keys for programmatic access
+      # LANGFUSE_SECRET_KEY: "${LANGFUSE_SECRET_KEY}"
+      # LANGFUSE_PUBLIC_KEY: "${LANGFUSE_PUBLIC_KEY}"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - agentic-stack
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ─── PostgreSQL (Langfuse Database) ────────────────────────────────────
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse_password
+      POSTGRES_DB: langfuse
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - agentic-stack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+# ─── Networks ────────────────────────────────────────────────────────────
+networks:
+  agentic-stack:
+    driver: bridge
+
+# ─── Volumes ─────────────────────────────────────────────────────────────
+volumes:
+  # Shared volume for MCP server binaries
+  mcp-bin:
+    driver: local
+
+  # Gateway persistent data (memory database)
+  gateway-data:
+    driver: local
+
+  # Langfuse/PostgreSQL data
+  postgres-data:
+    driver: local

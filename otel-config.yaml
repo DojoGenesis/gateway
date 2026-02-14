@@ -1,0 +1,94 @@
+# OpenTelemetry Collector Configuration
+# Receives traces from Gateway and exports to Langfuse/stdout
+# Phase 3: MCP Server Wiring — OTEL Integration
+
+receivers:
+  # OTLP receiver for traces from the gateway
+  otlp:
+    protocols:
+      # gRPC endpoint (port 4317)
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+      # HTTP endpoint (port 4318) — used by gateway
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "*"
+
+processors:
+  # Batch processor for efficient export
+  batch:
+    timeout: 10s
+    send_batch_size: 100
+    send_batch_max_size: 1000
+
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+
+  # Resource detection (adds host info to spans)
+  resourcedetection:
+    detectors: [env, system, docker]
+    timeout: 5s
+
+  # Attributes processor — add custom attributes
+  attributes:
+    actions:
+      - key: service.environment
+        value: production
+        action: insert
+
+      - key: deployment.name
+        value: agentic-gateway-stack
+        action: insert
+
+exporters:
+  # Logging exporter for debugging (writes to stdout)
+  logging:
+    loglevel: info
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # OTLP HTTP exporter for Langfuse
+  # Langfuse supports OTLP ingestion via HTTP
+  otlphttp/langfuse:
+    endpoint: http://langfuse:3000/api/public/ingestion
+    headers:
+      # Add Langfuse API keys if using programmatic access
+      # X-Langfuse-Public-Key: "${LANGFUSE_PUBLIC_KEY}"
+      # X-Langfuse-Secret-Key: "${LANGFUSE_SECRET_KEY}"
+    compression: gzip
+    timeout: 30s
+
+  # Prometheus exporter for metrics
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: gateway
+    const_labels:
+      service: agentic-gateway
+
+service:
+  # Health check endpoint
+  extensions: [health_check]
+
+  # Pipeline configuration
+  pipelines:
+    # Traces pipeline
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, attributes, batch]
+      exporters: [logging, otlphttp/langfuse]
+
+    # Metrics pipeline (optional — for future use)
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [logging, prometheus]
+
+extensions:
+  # Health check extension (exposes /health endpoint on port 13133)
+  health_check:
+    endpoint: 0.0.0.0:13133

@@ -1,0 +1,58 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+
+  resource:
+    attributes:
+      - key: service.name
+        value: agentic-gateway
+        action: upsert
+
+exporters:
+  # Export to Langfuse for LLM observability
+  otlphttp/langfuse:
+    endpoint: http://langfuse:3000/api/public
+    headers:
+      # In production, use actual Langfuse API keys
+      # Authorization: "Bearer ${LANGFUSE_PUBLIC_KEY}"
+    compression: gzip
+
+  # Debug exporter - logs to console
+  logging:
+    loglevel: debug
+
+  # Prometheus metrics exporter
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: agentic_gateway
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, resource]
+      exporters: [logging, otlphttp/langfuse]
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [logging, prometheus]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      address: 0.0.0.0:8888

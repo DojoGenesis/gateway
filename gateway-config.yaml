@@ -1,0 +1,135 @@
+# Gateway MCP Configuration (Production)
+# MCP Host Configuration per gateway-mcp-contract.md specification
+# Version: 1.0.0
+# Target: Phase 3 — MCP Server Wiring
+
+version: "1.0"
+
+mcp:
+  # ─── Global MCP Settings ──────────────────────────────────────────────
+  global:
+    # Default timeout for all MCP tool calls (seconds)
+    default_tool_timeout: 30
+
+    # Reconnection strategy for lost connections
+    reconnect:
+      max_retries: 3
+      initial_backoff_ms: 1000
+      max_backoff_ms: 30000
+      backoff_multiplier: 2.0
+
+    # Health check interval (seconds)
+    health_check_interval: 60
+
+    # Buffer size for streamed responses
+    response_buffer_size: 1048576  # 1 MB
+
+  # ─── Individual MCP Server Definitions ────────────────────────────────
+  servers:
+    # MCPByDojoGenesis: Local stdio server providing Dojo skills and knowledge
+    - id: "mcp_by_dojo"
+      display_name: "MCP By Dojo Genesis"
+      namespace_prefix: "mcp_by_dojo"
+
+      # Transport: stdio (local binary)
+      transport:
+        type: "stdio"
+        # Command to start the server (supports env var expansion)
+        # Default path: /opt/mcp-servers/mcp-by-dojo-genesis
+        # Override with environment variable: MCP_BY_DOJO_BINARY
+        command: "${MCP_BY_DOJO_BINARY:-/opt/mcp-servers/mcp-by-dojo-genesis}"
+
+        # Command line arguments
+        args: []
+
+        # Environment variables for the MCP server
+        env:
+          LOG_LEVEL: "${MCP_LOG_LEVEL:-info}"
+
+      # Tool filtering (optional)
+      tools:
+        # Allowlist: empty = allow all tools from this server
+        allowlist: []
+        # Blocklist: tools to exclude from registration
+        blocklist: []
+
+      # Connection timeouts (seconds)
+      timeouts:
+        startup: 10         # Time to establish connection
+        tool_default: 30    # Per-tool invocation timeout
+        health_check: 5     # Health check timeout
+
+      # Health check configuration
+      health_check:
+        enabled: true
+        path: "/health"     # MCP health endpoint (if applicable)
+        interval_sec: 60    # Check every 60 seconds
+
+      # Retry policy for failed tool invocations
+      retry_policy:
+        max_attempts: 2
+        backoff_multiplier: 2.0
+        max_backoff_ms: 5000
+
+    # ─── Composio Integration (Commented Out — Future Use) ──────────────
+    # Uncomment and configure when Composio API key is available
+    # See docs/composio-setup.md for detailed setup instructions
+    #
+    # - id: "composio"
+    #   display_name: "Composio Integration"
+    #   namespace_prefix: "composio"
+    #
+    #   # Transport: SSE over HTTP
+    #   transport:
+    #     type: "sse"
+    #     # Composio SSE endpoint
+    #     url: "https://api.composio.dev/v1/mcp/sse"
+    #     # Authentication headers (use environment variable for API key)
+    #     headers:
+    #       Authorization: "Bearer ${COMPOSIO_API_KEY}"
+    #       X-Client-ID: "agentic-gateway-prod"
+    #
+    #   # Tool filtering
+    #   tools:
+    #     allowlist: []   # Empty = allow all
+    #     blocklist:
+    #       # Block dangerous operations
+    #       - "composio:admin:delete_org"
+    #       - "composio:admin:modify_config"
+    #
+    #   # Timeouts for remote service
+    #   timeouts:
+    #     startup: 15
+    #     tool_default: 30
+    #     health_check: 10
+    #
+    #   # Health checks (less frequent for remote service)
+    #   health_check:
+    #     enabled: true
+    #     interval_sec: 120
+    #
+    #   # Retry policy
+    #   retry_policy:
+    #     max_attempts: 3
+    #     backoff_multiplier: 1.5
+    #     max_backoff_ms: 10000
+
+  # ─── Observability Configuration ──────────────────────────────────────
+  observability:
+    # Enable OTEL tracing for MCP tool invocations
+    enabled: true
+
+    # Trace provider (currently only "otel" is supported)
+    trace_provider: "otel"
+
+    # Attributes added to all MCP-related spans
+    attributes:
+      service.name: "agentic-gateway"
+      mcp.host.enabled: "true"
+      mcp.host.version: "v0.2.0"
+
+    # Log level for MCP events
+    log_level: "info"
+
+    # Tool span sample rate (0.0-1.0, 1.0 = trace all tool invocations)
+    tool_span_sample_rate: 1.0

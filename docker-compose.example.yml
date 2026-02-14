@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  gateway:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      ENVIRONMENT: "production"
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
+      OTEL_SERVICE_NAME: "agentic-gateway"
+      OTEL_SAMPLING_RATE: "1.0"
+    depends_on:
+      - otel-collector
+      - postgres
+    networks:
+      - agentic-stack
+    volumes:
+      - ./config:/app/config:ro
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4317:4317"  # OTLP gRPC receiver
+      - "4318:4318"  # OTLP HTTP receiver
+      - "8888:8888"  # Prometheus metrics
+      - "8889:8889"  # Prometheus exporter metrics
+    volumes:
+      - ./deployments/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    command:
+      - "--config=/etc/otel-collector-config.yaml"
+    networks:
+      - agentic-stack
+
+  langfuse:
+    image: langfuse/langfuse:latest
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://langfuse:langfuse_password@postgres:5432/langfuse"
+      NEXTAUTH_URL: "http://localhost:3000"
+      NEXTAUTH_SECRET: "changeme-random-secret-key-min-32-chars"
+      SALT: "changeme-random-salt-min-32-chars"
+    depends_on:
+      - postgres
+    networks:
+      - agentic-stack
+
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse_password
+      POSTGRES_DB: langfuse
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - agentic-stack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  agentic-stack:
+    driver: bridge
+
+volumes:
+  postgres-data:
