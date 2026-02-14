@@ -16,7 +16,7 @@ linters:
       excludes:
         - G104  # unhandled errors — covered by errcheck
 
-issues:
-  exclude-dirs:
-    - vendor
-    - docs
+  exclusions:
+    paths:
+      - vendor
+      - docs

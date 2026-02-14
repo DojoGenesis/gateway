@@ -5,7 +5,7 @@ FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
 # Copy workspace and module files
-COPY go.work go.work.sum ./
+COPY go.work go.work.sum* ./
 COPY go.mod go.sum ./
 COPY shared/go.mod shared/go.sum* ./shared/
 COPY events/go.mod events/go.sum* ./events/

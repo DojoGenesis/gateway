@@ -41,8 +41,8 @@ vendor/
 .DS_Store
 Thumbs.db
 
-# Go workspace (local)
-go.work.sum
+# Go workspace
+# Note: go.work.sum is tracked for reproducible Docker/CI builds
 
 # Test artifacts
 .test_*
