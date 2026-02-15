@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/apps"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
@@ -145,6 +146,22 @@ func main() {
 		slog.Info("MCP configuration not found, skipping", "path", mcpConfigPath)
 	}
 
+	// ─── Initialize MCP Apps Manager (v1.1.0) ──────────────────────
+	var appManager *apps.AppManager
+	if cfg.MCPApps.Enabled {
+		allowedOrigins := cfg.MCPApps.AllowedOrigins
+		if len(allowedOrigins) == 0 {
+			allowedOrigins = cfg.AllowedOrigins
+		}
+		appManager = apps.NewAppManager(apps.AppManagerConfig{
+			AllowedOrigins:     allowedOrigins,
+			DefaultToolTimeout: 30 * time.Second,
+		}, toolRegistry)
+		slog.Info("MCP Apps manager initialized")
+	} else {
+		slog.Info("MCP Apps disabled (set MCP_APPS_ENABLED=true to enable)")
+	}
+
 	// ─── Initialize Disposition / Agent Initializer ──────────────────
 	dispositionCacheTTL := 5 * time.Minute
 	agentInitializer := pkgdisposition.NewAgentInitializer(dispositionCacheTTL)
@@ -261,6 +278,7 @@ func main() {
 		MCPHostManager:      mcpHostManager,
 		OrchestrationExec:   orchestrationExecutor,
 		MemoryStore:         memoryStore,
+		AppManager:          appManager,
 	})
 
 	if err := server.Start(); err != nil {

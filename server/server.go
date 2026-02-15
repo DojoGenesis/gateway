@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/apps"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
@@ -23,7 +24,7 @@ import (
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
 )
 
-const Version = "1.0.0"
+const Version = "1.1.0"
 
 // MCPStatusProvider is the interface used by the server to query MCP status.
 // *mcp.MCPHostManager satisfies this interface.
@@ -68,6 +69,9 @@ type Server struct {
 	// Orchestration and memory interfaces
 	orchestrationExecutor gateway.OrchestrationExecutor
 	memoryStore           gateway.MemoryStore
+
+	// MCP Apps (v1.1.0)
+	appManager *apps.AppManager
 
 	// Orchestration state
 	orchestrations *OrchestrationStore
@@ -123,6 +127,7 @@ func New(deps ServerDeps) *Server {
 		mcpHostManager:        deps.MCPHostManager,
 		orchestrationExecutor: deps.OrchestrationExec,
 		memoryStore:           deps.MemoryStore,
+		appManager:            deps.AppManager,
 		orchestrations:        NewOrchestrationStore(),
 		agents:                make(map[string]*gateway.AgentConfig),
 	}

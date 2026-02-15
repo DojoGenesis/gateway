@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/apps"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
@@ -32,4 +33,5 @@ type ServerDeps struct {
 	MCPHostManager      MCPStatusProvider
 	OrchestrationExec   gateway.OrchestrationExecutor
 	MemoryStore         gateway.MemoryStore
+	AppManager          *apps.AppManager
 }

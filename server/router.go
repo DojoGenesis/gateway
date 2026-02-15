@@ -61,6 +61,18 @@ func (s *Server) setupRoutes() {
 
 			// Trace inspection (if OTEL enabled)
 			gateway.GET("/traces/:id", s.handleGatewayGetTrace)
+
+			// ─── MCP Apps (v1.1.0) ─────────────────────────────────
+			appsGroup := gateway.Group("/apps")
+			{
+				appsGroup.POST("/launch", s.handleLaunchApp)
+				appsGroup.POST("/close", s.handleCloseApp)
+				appsGroup.GET("", s.handleListApps)
+				appsGroup.POST("/tool-call", s.handleProxyToolCall)
+				appsGroup.GET("/status", s.handleAppStatus)
+			}
+			// Resource serving (separate from apps group for cleaner URLs)
+			gateway.GET("/resources", s.handleGetResource)
 		}
 
 		// ─── Legacy endpoints (preserving existing routes) ───────────

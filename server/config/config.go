@@ -19,6 +19,13 @@ type Config struct {
 	Routing        RoutingConfig    `yaml:"routing"`
 	Budget         BudgetConfig     `yaml:"budget"`
 	OTEL           OTELConfig       `yaml:"otel"`
+	MCPApps        MCPAppsConfig    `yaml:"mcp_apps"`
+}
+
+// MCPAppsConfig configures MCP Apps host infrastructure (v1.1.0).
+type MCPAppsConfig struct {
+	Enabled        bool     `json:"enabled" yaml:"enabled"`
+	AllowedOrigins []string `json:"allowed_origins" yaml:"allowed_origins"`
 }
 
 type ProviderConfig struct {
@@ -162,6 +169,10 @@ func (c *Config) applyEnvironmentOverrides() {
 		}
 	}
 
+	// Handle MCP Apps configuration
+	if mcpAppsEnabled := os.Getenv("MCP_APPS_ENABLED"); mcpAppsEnabled != "" {
+		c.MCPApps.Enabled = mcpAppsEnabled == "true" || mcpAppsEnabled == "1"
+	}
 }
 
 func (c *Config) Validate() error {

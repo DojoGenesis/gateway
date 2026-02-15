@@ -18,6 +18,7 @@ AgenticGatewayByDojoGenesis/
 ├── orchestration/          # DAG-based task planning and execution (standalone)
 ├── disposition/            # Agent personality and behavior config (ADA contract)
 ├── skill/                  # Tiered skill executor (44 skills, Tiers 0-2)
+├── apps/                   # MCP Apps host infrastructure (resource serving, tool proxy)
 └── server/                 # HTTP server, agent logic, handlers
 ```
 
@@ -58,6 +59,7 @@ server          (all modules above + gin, cors, cron, etc.)
 | `orchestration` | DAG-based task planning and execution (standalone) | `Planner`, `Engine`, `ExecutionContext` |
 | `disposition` | Agent personality and behavior config (ADA contract) | `Disposition`, `PersonalityTraits` |
 | `skill` | Tiered skill executor (44 skills, Tiers 0-2) | `SkillExecutor`, `SkillRegistry`, `SkillLoader` |
+| `apps` | MCP Apps host infrastructure (beta) | `AppManager`, `ResourceRegistry`, `ToolCallProxy` |
 | `server` | HTTP API server with agent logic | `PrimaryAgent`, handlers, middleware, config |
 
 ## Installation

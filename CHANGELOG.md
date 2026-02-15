@@ -5,6 +5,22 @@ All notable changes to AgenticGateway will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-15
+
+### Added (MCP Apps Bridge — The App Bridge)
+- MCP Apps host infrastructure (beta)
+- Resource serving for `ui://` URIs via `GET /v1/gateway/resources`
+- App lifecycle management (launch, close, list) via `/v1/gateway/apps/*`
+- Tool call proxying with authorization for MCP Apps
+- Security enforcement: CSP headers, permission validation, sandbox headers
+- `apps/` module with ResourceRegistry, AppRegistry, AuthorizationPolicy, ToolCallProxy, SecurityPolicy, AppManager
+- `ReadResource` method on `MCPServerConnection` for fetching MCP resources
+- `MCPResourceLoader` for loading `ui://` resources from MCP servers
+- Feature flag: `MCP_APPS_ENABLED` (default: false)
+- `MCPAppsConfig` in server config with YAML and environment variable support
+- Integration tests covering full app lifecycle, concurrent tool calls, and security headers
+- Performance benchmarks: resource serving ~15ns, proxy overhead ~400ns
+
 ## [1.0.0] - 2026-02-14
 
 ### Added (Provider Layer v1 — The Living Grid)

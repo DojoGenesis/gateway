@@ -243,6 +243,58 @@ func (c *MCPServerConnection) GetName() string {
 	return c.name
 }
 
+// ResourceContent holds the content returned from an MCP server resource read.
+type ResourceContent struct {
+	URI      string
+	MimeType string
+	Text     *string // Non-nil for text resources
+	Blob     *string // Non-nil for binary (base64) resources
+}
+
+// ReadResource reads a specific resource from the MCP server by URI.
+func (c *MCPServerConnection) ReadResource(ctx context.Context, uri string) ([]ResourceContent, error) {
+	c.mu.RLock()
+	mcpClient := c.client
+	c.mu.RUnlock()
+
+	if mcpClient == nil {
+		return nil, fmt.Errorf("not connected to MCP server %s", c.name)
+	}
+
+	request := mcp.ReadResourceRequest{
+		Params: mcp.ReadResourceParams{
+			URI: uri,
+		},
+	}
+
+	result, err := mcpClient.ReadResource(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read resource %s from %s: %w", uri, c.name, err)
+	}
+
+	var contents []ResourceContent
+	for _, rc := range result.Contents {
+		switch v := rc.(type) {
+		case mcp.TextResourceContents:
+			text := v.Text
+			contents = append(contents, ResourceContent{
+				URI:      v.URI,
+				MimeType: v.MIMEType,
+				Text:     &text,
+			})
+		case mcp.BlobResourceContents:
+			blob := v.Blob
+			contents = append(contents, ResourceContent{
+				URI:      v.URI,
+				MimeType: v.MIMEType,
+				Blob:     &blob,
+			})
+		}
+	}
+
+	return contents, nil
+}
+
 // Tool represents an MCP tool discovered from a server.
 type Tool struct {
 	Name        string
