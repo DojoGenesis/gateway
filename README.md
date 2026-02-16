@@ -1,6 +1,29 @@
-# Agentic Gateway by Dojo Genesis
+# Agentic Gateway
 
-A modular Go framework for building agentic AI systems with pluggable providers, tool execution, DAG-based orchestration, and persistent memory.
+**Your AI infrastructure. Your servers. Your rules.**
+
+Building with AI agents today means choosing between renting from Big Tech (goodbye privacy), building from scratch ($2M and 12 months), or duct-taping research prototypes (good luck in production).
+
+Agentic Gateway is the fourth option: a production-ready Go framework for self-hosted agentic AI. Multi-provider LLM routing, DAG-based task orchestration, 44 built-in skills, MCP tool integration, and semantic memory — running on your infrastructure, not someone else's.
+
+**83,000+ lines of Go. 10 independently-versioned modules. Zero vendor lock-in.**
+
+## Quick Start
+
+```bash
+# Download and run (macOS Apple Silicon)
+curl -L https://github.com/TresPies-source/AgenticGatewayByDojoGenesis/releases/latest/download/agentic-gateway_darwin_arm64.tar.gz | tar xz
+./agentic-gateway
+
+# Or with Docker
+docker-compose up -d
+```
+
+> **What you get:** Multi-provider LLM routing | DAG orchestration | 44 skills | MCP integration (14+ tools) | Semantic memory with compression | OTEL observability | Agent personality system (ADA) | Plugin architecture
+
+## Why This Exists
+
+Every serious AI deployment hits the same wall: you need orchestration, memory, tool access, observability, and cost control — and no single hosted service gives you all of it without owning your data. Agentic Gateway is the missing infrastructure layer. Like nginx for web servers or postgres for databases — except for agentic AI.
 
 ## Architecture
 
