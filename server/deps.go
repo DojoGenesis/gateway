@@ -1,6 +1,8 @@
 package server
 
 import (
+	"database/sql"
+
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/apps"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
@@ -34,4 +36,5 @@ type ServerDeps struct {
 	OrchestrationExec   gateway.OrchestrationExecutor
 	MemoryStore         gateway.MemoryStore
 	AppManager          *apps.AppManager
+	AuthDB              *sql.DB
 }

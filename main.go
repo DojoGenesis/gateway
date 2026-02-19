@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -26,6 +28,8 @@ import (
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
 
 	srv "github.com/TresPies-source/AgenticGatewayByDojoGenesis/server"
+
+	_ "modernc.org/sqlite"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -252,6 +256,44 @@ func main() {
 		slog.Info("gateway memory store initialized")
 	}
 
+	// ─── Initialize Auth Database (Portal v1.0) ─────────────────────
+	var authDB *sql.DB
+	authDBDir := getEnv("AUTH_DB_DIR", ".dojo")
+	if err := os.MkdirAll(authDBDir, 0o755); err != nil {
+		slog.Warn("failed to create auth DB directory", "dir", authDBDir, "error", err)
+	}
+	authDBPath := filepath.Join(authDBDir, "dojo.db")
+	authDB, err = sql.Open("sqlite", authDBPath)
+	if err != nil {
+		slog.Warn("failed to open auth database", "path", authDBPath, "error", err)
+	} else {
+		// Apply portal auth migration if not yet applied.
+		// Check schema_migrations — if table doesn't exist or row not found, apply migration.
+		needsMigration := true
+		var migrationVersion string
+		row := authDB.QueryRow("SELECT version FROM schema_migrations WHERE version = '20260219_v1.0.0_portal_auth'")
+		if scanErr := row.Scan(&migrationVersion); scanErr == nil {
+			needsMigration = false
+			slog.Info("portal auth migration already applied")
+		}
+		if needsMigration {
+			slog.Info("applying portal auth migration")
+			stmts := []string{
+				"ALTER TABLE local_users ADD COLUMN email TEXT",
+				"ALTER TABLE local_users ADD COLUMN password_hash TEXT",
+				"ALTER TABLE local_users ADD COLUMN display_name TEXT",
+				"CREATE UNIQUE INDEX IF NOT EXISTS idx_local_users_email ON local_users(email) WHERE email IS NOT NULL",
+				"INSERT OR IGNORE INTO schema_migrations (version, applied_at, description) VALUES ('20260219_v1.0.0_portal_auth', datetime('now'), 'Portal auth: add email, password_hash, display_name to local_users')",
+			}
+			for _, stmt := range stmts {
+				if _, execErr := authDB.Exec(stmt); execErr != nil {
+					slog.Warn("portal auth migration statement failed (may already exist)", "stmt", stmt, "error", execErr)
+				}
+			}
+			slog.Info("portal auth migration applied")
+		}
+	}
+
 	// ─── Create and Start Server ─────────────────────────────────────
 	server := srv.New(srv.ServerDeps{
 		Config: &srv.ServerConfig{
@@ -279,6 +321,7 @@ func main() {
 		OrchestrationExec:   orchestrationExecutor,
 		MemoryStore:         memoryStore,
 		AppManager:          appManager,
+		AuthDB:              authDB,
 	})
 
 	if err := server.Start(); err != nil {
@@ -313,6 +356,13 @@ func main() {
 	if err := server.Stop(ctx); err != nil {
 		slog.Error("shutdown error", "error", err)
 		os.Exit(1)
+	}
+
+	// Close auth database
+	if authDB != nil {
+		if err := authDB.Close(); err != nil {
+			slog.Warn("auth database close error", "error", err)
+		}
 	}
 
 	// Shutdown OTEL tracer provider

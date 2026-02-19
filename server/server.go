@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -73,6 +74,9 @@ type Server struct {
 	// MCP Apps (v1.1.0)
 	appManager *apps.AppManager
 
+	// Auth database (Portal v1.0)
+	authDB *sql.DB
+
 	// Orchestration state
 	orchestrations *OrchestrationStore
 
@@ -128,6 +132,7 @@ func New(deps ServerDeps) *Server {
 		orchestrationExecutor: deps.OrchestrationExec,
 		memoryStore:           deps.MemoryStore,
 		appManager:            deps.AppManager,
+		authDB:                deps.AuthDB,
 		orchestrations:        NewOrchestrationStore(),
 		agents:                make(map[string]*gateway.AgentConfig),
 	}

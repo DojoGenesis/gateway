@@ -11,6 +11,16 @@ func (s *Server) setupRoutes() {
 	chatHandler := handlers.NewChatHandler(s.intentClassifier, s.primaryAgent, s.userRouter, s.pluginManager)
 	memoryHandler := handlers.NewMemoryHandler(s.memoryManager, s.gardenManager, s.memoryMaintenance)
 
+	// ─── Auth (Portal v1.0) ──────────────────────────────────────────────────────
+	// Routes are public — no AuthMiddleware applied.
+	// Rate limiting is provided by the global RateLimitMiddleware.
+	auth := s.router.Group("/auth")
+	{
+		auth.POST("/register", s.handleAuthRegister)
+		auth.POST("/login", s.handleAuthLogin)
+		auth.POST("/refresh", s.handleAuthRefresh)
+	}
+
 	// ─── Infrastructure ──────────────────────────────────────────────
 	s.router.GET("/health", s.handleHealth)
 	s.router.GET("/metrics", s.handleMetrics)

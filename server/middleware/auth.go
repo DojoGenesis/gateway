@@ -259,6 +259,35 @@ func validateAdminRole(tokenString string, userID string) (bool, error) {
 	return claims.Role == "admin", nil
 }
 
+// GetJWTSecret returns the configured JWT secret for use by token-issuing handlers.
+// This is the only function in this file that should be exported for issuance.
+func GetJWTSecret() []byte {
+	return jwtSecret
+}
+
+// ValidateRefreshToken validates a refresh token and returns the user ID.
+// Returns error if the token is expired, malformed, or not a refresh token.
+func ValidateRefreshToken(tokenString string) (string, error) {
+	claims := &GatewayClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		return "", jwt.ErrSignatureInvalid
+	}
+	if claims.Role != "refresh" {
+		return "", jwt.ErrTokenInvalidClaims
+	}
+	subject, err := claims.GetSubject()
+	if err != nil || subject == "" {
+		return "", jwt.ErrTokenInvalidSubject
+	}
+	return subject, nil
+}
+
 func getEnvDefault(key, defaultValue string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
