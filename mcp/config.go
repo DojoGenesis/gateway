@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -283,6 +284,37 @@ func (s *MCPServerConfig) IsToolAllowed(toolName string) bool {
 	}
 
 	return false
+}
+
+// ValidateExpansions checks for empty-string expansions that indicate missing
+// environment variables. This catches the common issue where ${ZEN_SCI_SERVERS_ROOT}
+// or ${PYTHON_PATH} is not set, which silently produces broken subprocess args.
+// Returns the number of warnings logged. Does not return an error — MCP startup
+// is intentionally non-fatal so the gateway can still serve non-MCP traffic.
+func (c *MCPConfig) ValidateExpansions() int {
+	warnings := 0
+	for _, srv := range c.Servers {
+		if srv.Transport.Type != "stdio" {
+			continue
+		}
+		// Check args for empty or bare-slash paths (indicates unexpanded var)
+		for i, arg := range srv.Transport.Args {
+			if arg == "" || strings.HasPrefix(arg, "/") && strings.Contains(arg, "//") {
+				slog.Warn("MCP server has empty or suspicious arg — likely missing env var",
+					"server", srv.ID, "arg_index", i, "arg_value", arg)
+				warnings++
+			}
+		}
+		// Check env values for empty strings that were likely ${VAR} expansions
+		for k, v := range srv.Transport.Env {
+			if v == "" && k != "LOG_LEVEL" {
+				slog.Warn("MCP server env var expanded to empty — check that the variable is set",
+					"server", srv.ID, "env_key", k)
+				warnings++
+			}
+		}
+	}
+	return warnings
 }
 
 // expandEnvVars expands environment variables in the format ${VAR_NAME}.

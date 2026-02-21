@@ -67,8 +67,10 @@ func (tl *TraceLogger) StartTrace(ctx context.Context, sessionID string) (string
 		Status:    "active",
 	}
 
-	if err := tl.storage.StoreTrace(ctx, trace); err != nil {
-		return "", fmt.Errorf("failed to store trace: %w", err)
+	if tl.storage != nil {
+		if err := tl.storage.StoreTrace(ctx, trace); err != nil {
+			return "", fmt.Errorf("failed to store trace: %w", err)
+		}
 	}
 
 	return traceID, nil
@@ -77,8 +79,10 @@ func (tl *TraceLogger) StartTrace(ctx context.Context, sessionID string) (string
 func (tl *TraceLogger) EndTrace(ctx context.Context, traceID string, status string) error {
 	endTime := time.Now()
 
-	if err := tl.storage.UpdateTraceStatus(ctx, traceID, status, endTime); err != nil {
-		return fmt.Errorf("failed to end trace: %w", err)
+	if tl.storage != nil {
+		if err := tl.storage.UpdateTraceStatus(ctx, traceID, status, endTime); err != nil {
+			return fmt.Errorf("failed to end trace: %w", err)
+		}
 	}
 
 	return nil
@@ -96,8 +100,10 @@ func (tl *TraceLogger) StartSpan(ctx context.Context, traceID string, name strin
 		span = sb.NewSpan(name, inputs)
 	}
 
-	if err := tl.storage.StoreSpan(ctx, span); err != nil {
-		return nil, fmt.Errorf("failed to store span: %w", err)
+	if tl.storage != nil {
+		if err := tl.storage.StoreSpan(ctx, span); err != nil {
+			return nil, fmt.Errorf("failed to store span: %w", err)
+		}
 	}
 
 	tl.mu.Lock()
@@ -153,8 +159,10 @@ func (tl *TraceLogger) EndSpan(ctx context.Context, span *Span, outputs map[stri
 		}
 	}
 
-	if err := tl.storage.StoreSpan(ctx, span); err != nil {
-		return fmt.Errorf("failed to update span: %w", err)
+	if tl.storage != nil {
+		if err := tl.storage.StoreSpan(ctx, span); err != nil {
+			return fmt.Errorf("failed to update span: %w", err)
+		}
 	}
 
 	tl.mu.Lock()
@@ -188,8 +196,10 @@ func (tl *TraceLogger) FailSpan(ctx context.Context, span *Span, errorMsg string
 
 	span.Fail(errorMsg)
 
-	if err := tl.storage.StoreSpan(ctx, span); err != nil {
-		return fmt.Errorf("failed to update span: %w", err)
+	if tl.storage != nil {
+		if err := tl.storage.StoreSpan(ctx, span); err != nil {
+			return fmt.Errorf("failed to update span: %w", err)
+		}
 	}
 
 	tl.mu.Lock()
@@ -224,6 +234,9 @@ func (tl *TraceLogger) GetActiveSpans() []*Span {
 }
 
 func (tl *TraceLogger) GetTraceSpans(ctx context.Context, traceID string) ([]Span, error) {
+	if tl.storage == nil {
+		return nil, nil
+	}
 	spans, err := tl.storage.ListSpansByTrace(ctx, traceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve trace spans: %w", err)
@@ -233,6 +246,9 @@ func (tl *TraceLogger) GetTraceSpans(ctx context.Context, traceID string) ([]Spa
 }
 
 func (tl *TraceLogger) GetTrace(ctx context.Context, traceID string) (*Trace, error) {
+	if tl.storage == nil {
+		return nil, fmt.Errorf("trace storage not initialized")
+	}
 	trace, err := tl.storage.RetrieveTrace(ctx, traceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve trace: %w", err)

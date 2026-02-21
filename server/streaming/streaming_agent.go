@@ -89,7 +89,7 @@ func (sa *StreamingAgent) streamQuery(ctx context.Context, req agent.QueryReques
 	elapsedMs := time.Since(startTime).Milliseconds()
 
 	if response.Content != "" {
-		chunks := splitIntoChunks(response.Content, ChunkSize)
+		chunks := SplitIntoChunks(response.Content, ChunkSize)
 		for _, chunk := range chunks {
 			select {
 			case eventChan <- NewResponseChunkEvent(chunk):
@@ -253,7 +253,7 @@ func (sa *StreamingAgentWithEvents) streamQueryWithDetailedEvents(ctx context.Co
 	}
 
 	if response.Content != "" {
-		chunks := splitIntoChunks(response.Content, ChunkSize)
+		chunks := SplitIntoChunks(response.Content, ChunkSize)
 		for _, chunk := range chunks {
 			select {
 			case eventChan <- NewResponseChunkEvent(chunk):
@@ -416,7 +416,9 @@ func isRetryableError(err error) bool {
 		strings.Contains(msg, "unavailable")
 }
 
-func splitIntoChunks(text string, chunkSize int) []string {
+// SplitIntoChunks splits text into word-boundary chunks of approximately
+// chunkSize characters. Exported for use by the gateway streaming handler.
+func SplitIntoChunks(text string, chunkSize int) []string {
 	if text == "" {
 		return []string{}
 	}

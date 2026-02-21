@@ -299,7 +299,21 @@ func (p *Planner) parsePlanFromLLMResponse(response string, taskID string) (*orc
 }
 
 func (p *Planner) callLLM(ctx context.Context, prompt string) (string, error) {
-	provider, err := p.pluginManager.GetProvider(p.providerName)
+	providerName := p.providerName
+
+	// Resolve "auto" to the first available provider
+	if providerName == "auto" || providerName == "" {
+		providers := p.pluginManager.GetProviders()
+		if len(providers) == 0 {
+			return "", fmt.Errorf("no providers available")
+		}
+		for name := range providers {
+			providerName = name
+			break
+		}
+	}
+
+	provider, err := p.pluginManager.GetProvider(providerName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get provider: %w", err)
 	}

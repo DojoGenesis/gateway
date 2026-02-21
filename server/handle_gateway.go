@@ -1,16 +1,396 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/streaming"
 )
+
+// ─── Agent chat types ────────────────────────────────────────────────────────
+
+// PatchIntent represents a structured document edit proposal embedded in an
+// agent response. The agent emits a fenced JSON block; parsePatchIntent extracts
+// it and stripPatchIntent removes it from the visible response text.
+type PatchIntent struct {
+	Operation   string  `json:"operation"`             // "replace" | "insert" | "append"
+	SectionID   *string `json:"section_id,omitempty"`  // target section; nil = whole document
+	Content     string  `json:"content"`               // the new text to apply
+	Description string  `json:"description,omitempty"` // human-readable summary shown in UI
+}
+
+// DocumentContext carries optional document data the caller passes into the chat
+// request so the agent can ground its responses on the current document state.
+type DocumentContext struct {
+	ID      string `json:"id"`
+	Content string `json:"content"`
+}
+
+// patchIntentPattern matches a fenced JSON block the agent uses to signal edits:
+//
+//	```patch_intent
+//	{ … }
+//	```
+var patchIntentPattern = regexp.MustCompile("(?s)```patch_intent\\s*(\\{.*?\\})\\s*```")
+
+// parsePatchIntent scans the agent's raw response text for an embedded
+// patch_intent block and, if found, deserialises it into a PatchIntent.
+// Returns nil when no block is present; never returns an error (malformed
+// blocks are silently ignored so the chat still succeeds).
+func parsePatchIntent(text string) *PatchIntent {
+	m := patchIntentPattern.FindStringSubmatch(text)
+	if len(m) < 2 {
+		return nil
+	}
+	var pi PatchIntent
+	if err := json.Unmarshal([]byte(m[1]), &pi); err != nil {
+		return nil
+	}
+	if pi.Operation == "" || pi.Content == "" {
+		return nil
+	}
+	return &pi
+}
+
+// stripPatchIntent removes the raw patch_intent fenced block from the agent
+// response so the frontend only displays the human-readable text.
+func stripPatchIntent(text string) string {
+	cleaned := patchIntentPattern.ReplaceAllString(text, "")
+	return strings.TrimSpace(cleaned)
+}
+
+// ─── runAgentLoop ─────────────────────────────────────────────────────────────
+
+// runAgentLoop drives the LLM ↔ tool agentic loop:
+//  1. Call GenerateCompletion with the accumulated messages + available tools.
+//  2. If the LLM returns tool calls, execute each one via the gateway ToolRegistry.
+//  3. Append tool results as tool-role messages and repeat.
+//  4. Stop when no more tool calls are requested or maxIter is reached.
+//
+// Returns the final CompletionResponse (last LLM turn without tool calls).
+func (s *Server) runAgentLoop(
+	ctx context.Context,
+	llmProvider provider.ModelProvider,
+	messages []provider.Message,
+	tools []provider.Tool,
+) (*provider.CompletionResponse, error) {
+	const maxIter = 8
+
+	for i := 0; i < maxIter; i++ {
+		req := &provider.CompletionRequest{
+			Messages: messages,
+			Tools:    tools,
+		}
+
+		resp, err := llmProvider.GenerateCompletion(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+
+		// No tool calls → we have the final answer
+		if len(resp.ToolCalls) == 0 {
+			return resp, nil
+		}
+
+		// Append the assistant turn (with tool calls) to history
+		assistantMsg := provider.Message{
+			Role:      "assistant",
+			Content:   resp.Content,
+			ToolCalls: resp.ToolCalls,
+		}
+		messages = append(messages, assistantMsg)
+
+		// Execute each tool call and collect results
+		for _, tc := range resp.ToolCalls {
+			result := s.executeToolCall(ctx, tc)
+			toolMsg := provider.Message{
+				Role:       "tool",
+				Content:    result,
+				ToolCallID: tc.ID,
+			}
+			messages = append(messages, toolMsg)
+		}
+	}
+
+	// maxIter reached — do one final completion without tools to get a response
+	finalResp, err := llmProvider.GenerateCompletion(ctx, &provider.CompletionRequest{
+		Messages: messages,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return finalResp, nil
+}
+
+// executeToolCall dispatches a single tool call through the gateway ToolRegistry.
+// Returns a JSON-encoded result string (or an error description) suitable for
+// inclusion in a tool-role message.
+func (s *Server) executeToolCall(ctx context.Context, tc provider.ToolCall) string {
+	if s.toolRegistry == nil {
+		return `{"error":"tool registry not available"}`
+	}
+
+	toolDef, err := s.toolRegistry.Get(ctx, tc.Name)
+	if err != nil {
+		return fmt.Sprintf(`{"error":"tool not found: %s"}`, tc.Name)
+	}
+
+	toolCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	result, err := toolDef.Function(toolCtx, tc.Arguments)
+	if err != nil {
+		return fmt.Sprintf(`{"error":"%s"}`, err.Error())
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return `{"error":"failed to marshal tool result"}`
+	}
+	return string(data)
+}
+
+// buildToolList converts ToolRegistry entries into the provider.Tool slice
+// required by CompletionRequest.
+func (s *Server) buildToolList(ctx context.Context) []provider.Tool {
+	if s.toolRegistry == nil {
+		return nil
+	}
+	defs, err := s.toolRegistry.List(ctx)
+	if err != nil || len(defs) == 0 {
+		return nil
+	}
+	tools := make([]provider.Tool, 0, len(defs))
+	for _, d := range defs {
+		tools = append(tools, provider.Tool{
+			Name:        d.Name,
+			Description: d.Description,
+			Parameters:  d.Parameters,
+		})
+	}
+	return tools
+}
+
+// ─── v1.2 Streaming Agent Chat ──────────────────────────────────────────────
+
+// agentChatRequest is the shared request type for both streaming and
+// non-streaming agent chat. The Stream field determines the response format.
+type agentChatRequest struct {
+	Message         string `json:"message" binding:"required"`
+	UserID          string `json:"user_id"`
+	DocumentID      string `json:"document_id,omitempty"`
+	DocumentContent string `json:"document_content,omitempty"`
+	Stream          bool   `json:"stream"`
+}
+
+// buildAgentSystemPrompt constructs the system prompt with disposition context
+// and optional document context. Used by both streaming and non-streaming paths.
+func (s *Server) buildAgentSystemPrompt(agentConfig *gateway.AgentConfig, documentID, documentContent string) string {
+	systemPrompt := fmt.Sprintf(
+		"You are a helpful scientific writing assistant. "+
+			"Pacing: %s. Depth: %s. "+
+			"Respond concisely and helpfully to the user's message.\n\n"+
+			"When you want to propose a specific edit to the document, embed EXACTLY ONE patch_intent "+
+			"fenced code block in your response. The block MUST use this format (no extra keys, no markdown inside the JSON):\n\n"+
+			"```patch_intent\n"+
+			"{\"operation\":\"replace\",\"section_id\":\"<section id or null>\",\"content\":\"<new text>\",\"description\":\"<short summary>\"}\n"+
+			"```\n\n"+
+			"Supported operations: replace, insert, append.\n\n"+
+			"EXAMPLE — user asks to fix a typo in the introduction:\n\n"+
+			"Sure, I found the typo in the second sentence. Here is the corrected version:\n\n"+
+			"```patch_intent\n"+
+			"{\"operation\":\"replace\",\"section_id\":\"intro-1\",\"content\":\"The experiment confirmed the hypothesis.\",\"description\":\"Fix typo: confrimed → confirmed\"}\n"+
+			"```\n\n"+
+			"Place the block at the end of your response. Do NOT wrap it in another code fence.",
+		agentConfig.Pacing, agentConfig.Depth,
+	)
+
+	if documentContent != "" {
+		systemPrompt += fmt.Sprintf(
+			"\n\n--- CURRENT DOCUMENT (id: %s) ---\n%s\n--- END DOCUMENT ---",
+			documentID, documentContent,
+		)
+	}
+	return systemPrompt
+}
+
+// writeSSEEvent marshals a StreamEvent to SSE wire format and flushes.
+func (s *Server) writeSSEEvent(w http.ResponseWriter, flusher http.Flusher, evt events.StreamEvent) {
+	data, _ := json.Marshal(evt)
+	fmt.Fprintf(w, "event: %s\ndata: %s\n\n", evt.Type, data)
+	flusher.Flush()
+}
+
+// handleGatewayAgentChatStream handles the SSE streaming variant of agent chat.
+// Invoked when the request includes "stream": true.
+func (s *Server) handleGatewayAgentChatStream(c *gin.Context, agentID string, req *agentChatRequest, agentConfig *gateway.AgentConfig) {
+	eventChan := make(chan events.StreamEvent, 100)
+
+	// SSE headers
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Streaming not supported")
+		return
+	}
+
+	llmProvider, err := s.resolveProvider("")
+	if err != nil {
+		s.writeSSEEvent(c.Writer, flusher, events.NewErrorEvent(err.Error(), "PROVIDER_ERROR"))
+		fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
+		flusher.Flush()
+		return
+	}
+
+	systemPrompt := s.buildAgentSystemPrompt(agentConfig, req.DocumentID, req.DocumentContent)
+	messages := []provider.Message{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: req.Message},
+	}
+	toolList := s.buildToolList(c.Request.Context())
+
+	llmCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+
+	// Launch the streaming agent loop in a goroutine
+	go func() {
+		defer cancel()
+		s.runAgentLoopStreaming(llmCtx, agentID, llmProvider, messages, toolList, eventChan)
+	}()
+
+	// Drain the event channel into SSE
+	for evt := range eventChan {
+		s.writeSSEEvent(c.Writer, flusher, evt)
+	}
+
+	// Terminator
+	fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
+	flusher.Flush()
+}
+
+// runAgentLoopStreaming drives the LLM ↔ tool agentic loop while emitting
+// SSE events for each phase: thinking, tool invocations, response chunks,
+// patch_intent, and the final complete event.
+func (s *Server) runAgentLoopStreaming(
+	ctx context.Context,
+	agentID string,
+	llmProvider provider.ModelProvider,
+	messages []provider.Message,
+	tools []provider.Tool,
+	eventChan chan<- events.StreamEvent,
+) {
+	defer close(eventChan)
+	startTime := time.Now()
+	const maxIter = 8
+
+	// Thinking indicator
+	eventChan <- events.NewThinkingEvent("Processing your request...")
+
+	var finalResp *provider.CompletionResponse
+
+	for i := 0; i < maxIter; i++ {
+		resp, err := llmProvider.GenerateCompletion(ctx, &provider.CompletionRequest{
+			Messages: messages,
+			Tools:    tools,
+		})
+		if err != nil {
+			eventChan <- events.NewErrorEvent(err.Error(), "LLM_ERROR")
+			return
+		}
+
+		if len(resp.ToolCalls) == 0 {
+			finalResp = resp
+			break
+		}
+
+		// Append the assistant turn (with tool calls) to history
+		assistantMsg := provider.Message{
+			Role:      "assistant",
+			Content:   resp.Content,
+			ToolCalls: resp.ToolCalls,
+		}
+		messages = append(messages, assistantMsg)
+
+		// Execute each tool call and emit events
+		for _, tc := range resp.ToolCalls {
+			eventChan <- events.NewToolInvokedEvent(tc.Name, tc.Arguments)
+			tcStart := time.Now()
+			result := s.executeToolCall(ctx, tc)
+			durationMs := time.Since(tcStart).Milliseconds()
+			eventChan <- events.NewToolCompletedEvent(tc.Name, result, durationMs)
+
+			messages = append(messages, provider.Message{
+				Role:       "tool",
+				Content:    result,
+				ToolCallID: tc.ID,
+			})
+		}
+	}
+
+	if finalResp == nil {
+		// maxIter reached — one final completion without tools
+		resp, err := llmProvider.GenerateCompletion(ctx, &provider.CompletionRequest{
+			Messages: messages,
+		})
+		if err != nil {
+			eventChan <- events.NewErrorEvent(err.Error(), "LLM_ERROR")
+			return
+		}
+		finalResp = resp
+	}
+
+	rawText := finalResp.Content
+	if rawText == "" {
+		rawText = "I received your message but couldn't generate a response."
+	}
+
+	// Parse patch_intent from the complete response, then stream the clean text
+	patchIntent := parsePatchIntent(rawText)
+	cleanText := stripPatchIntent(rawText)
+
+	chunks := streaming.SplitIntoChunks(cleanText, 50)
+	for _, chunk := range chunks {
+		eventChan <- events.NewResponseChunkEvent(chunk)
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Emit patch_intent as a dedicated event (if present)
+	if patchIntent != nil {
+		eventChan <- events.NewPatchIntentEvent(
+			patchIntent.Operation,
+			patchIntent.SectionID,
+			patchIntent.Content,
+			patchIntent.Description,
+		)
+	}
+
+	// Complete event with usage stats
+	elapsed := time.Since(startTime).Milliseconds()
+	eventChan <- events.NewCompleteEvent(map[string]interface{}{
+		"agent_id":      agentID,
+		"input_tokens":  finalResp.Usage.InputTokens,
+		"output_tokens": finalResp.Usage.OutputTokens,
+		"total_tokens":  finalResp.Usage.TotalTokens,
+		"duration_ms":   elapsed,
+	})
+}
 
 // handleGatewayListTools returns all registered tools with namespace info and MCP server origin.
 // GET /v1/gateway/tools
@@ -108,15 +488,18 @@ func (s *Server) handleGatewayGetAgent(c *gin.Context) {
 }
 
 // handleGatewayAgentChat handles chat interactions with a specific agent.
+// It runs a full LLM ↔ tool agentic loop via runAgentLoop, populates
+// patch_intent when the response contains an embedded edit proposal, and
+// injects document context into the system prompt when provided.
+//
+// When the request includes "stream": true, the response is delivered as
+// an SSE event stream instead of a single JSON response (v1.2).
+//
 // POST /v1/gateway/agents/:id/chat
 func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 	agentID := c.Param("id")
 
-	var req struct {
-		Message string `json:"message" binding:"required"`
-		UserID  string `json:"user_id"`
-	}
-
+	var req agentChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.errorResponse(c, http.StatusBadRequest, "invalid_request", fmt.Sprintf("Invalid request: %v", err))
 		return
@@ -131,73 +514,85 @@ func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 		return
 	}
 
-	if s.orchestrationEngine == nil {
-		s.errorResponse(c, http.StatusServiceUnavailable, "service_unavailable", "Orchestration engine not available")
+	if s.pluginManager == nil {
+		s.errorResponse(c, http.StatusServiceUnavailable, "service_unavailable", "Plugin manager not available")
 		return
 	}
 
-	// Create a task from the chat message
-	userID := req.UserID
-	if userID == "" {
-		userID = "anonymous"
+	// v1.2: Streaming path — delegate to SSE handler
+	if req.Stream {
+		s.handleGatewayAgentChatStream(c, agentID, &req, agentConfig)
+		return
 	}
-	task := orchestrationpkg.NewTask(userID, req.Message)
 
-	// Generate plan from the task using the planner
-	// Note: The planner needs to be accessible through the server
-	// The orchestration engine should have access to it via its internal planner
-	// For now, we'll create a simple manual plan for chat processing
-	// In a production system, this would call the planner's GeneratePlan method
-	plan := orchestrationpkg.NewPlan(task.ID)
+	// ── Non-streaming path (unchanged from v1.1) ────────────────────────────
 
-	// Add a simple chat processing node
-	// In a real implementation, the planner would decompose this into appropriate tool calls
-	chatNode := orchestrationpkg.NewPlanNode(
-		"process_chat_message",
-		map[string]interface{}{
-			"message":    req.Message,
-			"agent_id":   agentID,
-			"pacing":     agentConfig.Pacing,
-			"depth":      agentConfig.Depth,
-			"user_id":    userID,
-		},
-		[]string{}, // No dependencies for single-node plan
-	)
-	plan.Nodes = append(plan.Nodes, chatNode)
+	// Resolve the LLM provider (empty model = use first available/default)
+	llmProvider, err := s.resolveProvider("")
+	if err != nil {
+		s.errorResponse(c, http.StatusServiceUnavailable, "provider_unavailable", fmt.Sprintf("No LLM provider available: %v", err))
+		return
+	}
 
-	// Execute the plan synchronously for chat (blocking for response)
-	execErr := s.orchestrationEngine.Execute(c.Request.Context(), plan, task, userID)
+	systemPrompt := s.buildAgentSystemPrompt(agentConfig, req.DocumentID, req.DocumentContent)
 
-	if execErr != nil {
-		s.errorResponseWithDetails(c, http.StatusInternalServerError, "execution_failed",
-			fmt.Sprintf("Chat processing failed: %v", execErr),
+	// Use a generous context for LLM calls (5 minutes) — Ollama can be slow on first load
+	llmCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	// Build tool list from registry (nil-safe; returns nil when no registry)
+	toolList := s.buildToolList(llmCtx)
+
+	messages := []provider.Message{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: req.Message},
+	}
+
+	// Run the agentic loop (tool calling + final completion)
+	completionResp, err := s.runAgentLoop(llmCtx, llmProvider, messages, toolList)
+	if err != nil {
+		s.errorResponseWithDetails(c, http.StatusInternalServerError, "llm_error",
+			fmt.Sprintf("LLM completion failed: %v", err),
 			gin.H{"agent_id": agentID})
 		return
 	}
 
-	// Extract result from completed node
-	var responseText string
-	if chatNode.State == orchestrationpkg.NodeStateSuccess && chatNode.Result != nil {
-		if response, ok := chatNode.Result["response"].(string); ok {
-			responseText = response
-		} else {
-			responseText = fmt.Sprintf("Processed with %s pacing and %s depth", agentConfig.Pacing, agentConfig.Depth)
-		}
-	} else {
-		responseText = "Chat processing completed"
+	rawText := completionResp.Content
+	if rawText == "" {
+		rawText = "I received your message but couldn't generate a response."
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"agent_id":   agentID,
-		"response":   responseText,
-		"task_id":    task.ID,
-		"plan_id":    plan.ID,
-		"message":    req.Message,
+	// Extract and strip patch_intent block from the visible response
+	patchIntent := parsePatchIntent(rawText)
+	responseText := stripPatchIntent(rawText)
+
+	// Build tool_calls summary for the response
+	toolCallsSummary := make([]map[string]interface{}, 0, len(completionResp.ToolCalls))
+	for _, tc := range completionResp.ToolCalls {
+		toolCallsSummary = append(toolCallsSummary, map[string]interface{}{
+			"id":   tc.ID,
+			"name": tc.Name,
+		})
+	}
+
+	taskID := uuid.New().String()
+
+	resp := gin.H{
+		"agent_id": agentID,
+		"response": responseText,
+		"task_id":  taskID,
+		"message":  req.Message,
 		"disposition": map[string]interface{}{
 			"pacing": agentConfig.Pacing,
 			"depth":  agentConfig.Depth,
 		},
-	})
+		"tool_calls": toolCallsSummary,
+	}
+	if patchIntent != nil {
+		resp["patch_intent"] = patchIntent
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // handleGatewayOrchestrate submits an orchestration plan and returns execution ID.
@@ -397,7 +792,137 @@ func (s *Server) handleGatewayGetTrace(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// Helper functions
+// ─── Document fetch ───────────────────────────────────────────────────────────
+
+// handleGetDocument returns the raw content of a document from the data dir.
+// The document is stored under ~/.zen-sci/documents/<id>.json by the portal's
+// Rust backend; this endpoint lets the agent loop fetch it without the portal
+// being in the request path.
+// GET /v1/gateway/documents/:id
+func (s *Server) handleGetDocument(c *gin.Context) {
+	docID := c.Param("id")
+	if docID == "" {
+		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "document id is required")
+		return
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", "cannot determine home directory")
+		return
+	}
+
+	docPath := filepath.Join(home, ".zen-sci", "documents", docID+".json")
+	data, err := os.ReadFile(docPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			s.errorResponse(c, http.StatusNotFound, "not_found", fmt.Sprintf("document not found: %s", docID))
+		} else {
+			s.errorResponse(c, http.StatusInternalServerError, "server_error", fmt.Sprintf("failed to read document: %v", err))
+		}
+		return
+	}
+
+	// Parse to validate and re-emit as JSON
+	var doc map[string]interface{}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", "document file is corrupt")
+		return
+	}
+
+	c.JSON(http.StatusOK, doc)
+}
+
+// ─── Provider key management ──────────────────────────────────────────────────
+
+// providerKeysPath returns the path to the provider keys file.
+func providerKeysPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".zen-sci", "provider_keys.json"), nil
+}
+
+// handleSetProviderKey stores or clears a provider API key.
+// POST /v1/settings/providers
+func (s *Server) handleSetProviderKey(c *gin.Context) {
+	var req struct {
+		Provider string `json:"provider" binding:"required"`
+		Key      string `json:"key"` // empty string = remove key
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.errorResponse(c, http.StatusBadRequest, "invalid_request", fmt.Sprintf("invalid request: %v", err))
+		return
+	}
+
+	path, err := providerKeysPath()
+	if err != nil {
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", "cannot determine data directory")
+		return
+	}
+
+	// Read existing keys (if any)
+	keys := make(map[string]string)
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &keys) // ignore parse errors — just start fresh
+	}
+
+	if req.Key == "" {
+		delete(keys, req.Provider)
+	} else {
+		keys[req.Provider] = req.Key
+
+		// Apply the key to the live provider immediately when possible
+		if s.pluginManager != nil {
+			if prov, ok := s.pluginManager.GetProviders()[req.Provider]; ok {
+				type keySettable interface {
+					SetAPIKey(string)
+				}
+				if ks, ok := prov.(keySettable); ok {
+					ks.SetAPIKey(req.Key)
+				}
+			}
+		}
+	}
+
+	// Persist
+	data, _ := json.MarshalIndent(keys, "", "  ")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", "cannot create data directory")
+		return
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", fmt.Sprintf("failed to write keys: %v", err))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "provider": req.Provider, "configured": req.Key != ""})
+}
+
+// handleGetProviderSettings returns which providers have keys configured (no key values).
+// GET /v1/settings/providers
+func (s *Server) handleGetProviderSettings(c *gin.Context) {
+	path, err := providerKeysPath()
+	if err != nil {
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", "cannot determine data directory")
+		return
+	}
+
+	keys := make(map[string]string)
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &keys)
+	}
+
+	configured := make(map[string]bool)
+	for k, v := range keys {
+		configured[k] = v != ""
+	}
+
+	c.JSON(http.StatusOK, gin.H{"providers": configured})
+}
+
+// ─── Helper functions ─────────────────────────────────────────────────────────
 
 func extractNamespace(toolName string) string {
 	// Extract namespace from tool name (e.g., "composio.create_task" → "composio")

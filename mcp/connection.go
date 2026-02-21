@@ -70,6 +70,22 @@ func (c *MCPServerConnection) connectStdio(ctx context.Context) error {
 		return fmt.Errorf("failed to connect to MCP server %s: %w", c.name, err)
 	}
 
+	// Complete the MCP initialize handshake — required before ListTools or CallTool.
+	// The MCP spec mandates: client sends initialize → server responds → client sends
+	// initialized notification → normal operation. Skipping this step causes
+	// "client not initialized" errors on all subsequent requests.
+	startupTimeout := 10 * time.Second
+	if c.config.Timeouts.Startup > 0 {
+		startupTimeout = time.Duration(c.config.Timeouts.Startup) * time.Second
+	}
+	initCtx, cancel := context.WithTimeout(ctx, startupTimeout)
+	defer cancel()
+
+	if _, err := mcpClient.Initialize(initCtx, mcp.InitializeRequest{}); err != nil {
+		_ = mcpClient.Close()
+		return fmt.Errorf("MCP initialize handshake failed for server %s: %w", c.name, err)
+	}
+
 	c.client = mcpClient
 	c.healthy = true
 

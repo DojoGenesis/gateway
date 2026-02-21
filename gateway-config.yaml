@@ -4,6 +4,30 @@
 
 version: "1.0"
 
+# ─── Feature Flags ────────────────────────────────────────────────────────────
+# Controls which v1.1 capabilities are active at runtime.
+# Set to false to disable a feature without removing its code.
+features:
+  # Enable the full LLM ↔ tool agentic loop in handleGatewayAgentChat.
+  # When false the handler falls back to a single GenerateCompletion call.
+  tool_calling: true
+
+  # Expose the GET /v1/gateway/documents/:id endpoint and register the
+  # built-in get_document tool so agents can fetch document content directly.
+  get_document_tool: true
+
+  # Parse and return patch_intent blocks from agent responses.
+  # When false the raw response text is returned as-is without extraction.
+  patch_intent: true
+
+  # Allow POST /v1/settings/providers to accept and store provider API keys.
+  provider_key_management: true
+
+  # Route Ollama models without native tool support through the text-mode
+  # tool fallback (generateWithTextToolFallback). Disable to skip the
+  # model capability check and always use the standard path.
+  ollama_tool_fallback: true
+
 mcp:
   # ─── Global MCP Settings ──────────────────────────────────────────────
   global:
@@ -25,50 +49,251 @@ mcp:
 
   # ─── Individual MCP Server Definitions ────────────────────────────────
   servers:
-    # MCPByDojoGenesis: Local stdio server providing Dojo skills and knowledge
-    - id: "mcp_by_dojo"
-      display_name: "MCP By Dojo Genesis"
-      namespace_prefix: "mcp_by_dojo"
+    # MCPByDojoGenesis: disabled for ZenithScience dev — binary not present on this machine.
+    # Re-enable by setting MCP_BY_DOJO_BINARY and restoring this block.
+    # - id: "mcp_by_dojo"
+    #   display_name: "MCP By Dojo Genesis"
+    #   namespace_prefix: "mcp_by_dojo"
+    #   transport:
+    #     type: "stdio"
+    #     command: "${MCP_BY_DOJO_BINARY}"
+    #     args: []
+    #     env:
+    #       LOG_LEVEL: "info"
+    #   tools:
+    #     allowlist: []
+    #     blocklist: []
+    #   timeouts:
+    #     startup: 10
+    #     tool_default: 30
+    #     health_check: 5
+    #   health_check:
+    #     enabled: true
+    #     interval_sec: 60
+    #   retry_policy:
+    #     max_attempts: 2
+    #     backoff_multiplier: 2.0
+    #     max_backoff_ms: 5000
 
-      # Transport: stdio (local binary)
+    # ─── ZenSci Servers ───────────────────────────────────────────────────
+    # Six zen-sci MCP servers, each with its own namespace prefix for
+    # full tool-level observability and orchestration control.
+    #
+    # Fully-qualified tool names exposed by this Gateway:
+    #   zen_sci_latex:convert_to_pdf         zen_sci_latex:validate_document    zen_sci_latex:check_citations
+    #   zen_sci_blog:convert_to_html         zen_sci_blog:generate_feed         zen_sci_blog:validate_post
+    #   zen_sci_slides:convert_to_slides     zen_sci_slides:validate_deck       zen_sci_slides:list_slide_themes
+    #   zen_sci_newsletter:convert_to_email  zen_sci_newsletter:validate_email
+    #   zen_sci_grant:generate_proposal      zen_sci_grant:validate_compliance  zen_sci_grant:check_format
+    #   zen_sci_paper:convert_to_paper       zen_sci_paper:validate_submission  zen_sci_paper:list_templates
+    #
+    # Path configuration:
+    #   Development:  export ZEN_SCI_SERVERS_ROOT=/path/to/zen-sci/servers
+    #                 Uses esbuild-bundled index.bundle.js (self-contained, no node_modules needed).
+    #                 Build bundles with: esbuild src/index.ts --bundle --platform=node
+    #                   --format=esm --outfile=dist/index.bundle.js  (run per-server)
+    #   Production:   dist/index.bundle.js files are bundled as Tauri resources alongside
+    #                 the agentic-gateway binary; the portal sets ZEN_SCI_SERVERS_ROOT
+    #                 to the Tauri resource extraction path at launch.
+    #
+    # Python engine configuration:
+    #   Set PYTHON_PATH to the venv python3 so MCP servers use the correct interpreter
+    #   regardless of the shell's PATH. The var is passed explicitly via each server's env:
+    #   block so it survives any context (new terminal, CI, Tauri sidecar).
+    #   Development:  export PYTHON_PATH=/path/to/zen-sci/.venv/bin/python3
+    #   Production:   Tauri portal injects this before spawning the gateway sidecar.
+
+    - id: "zen_sci_latex"
+      display_name: "ZenSci LaTeX MCP"
+      namespace_prefix: "zen_sci_latex"
+      # convert_to_pdf (App tool), validate_document, check_citations
+
       transport:
         type: "stdio"
-        # Command to start the server (supports env var expansion)
-        # Default path: /opt/mcp-servers/mcp-by-dojo-genesis
-        # Override with environment variable: MCP_BY_DOJO_BINARY
-        command: "${MCP_BY_DOJO_BINARY:-/opt/mcp-servers/mcp-by-dojo-genesis}"
-
-        # Command line arguments
-        args: []
-
-        # Environment variables for the MCP server
+        command: "node"
+        args: ["${ZEN_SCI_SERVERS_ROOT}/latex-mcp/dist/index.bundle.js"]
         env:
-          LOG_LEVEL: "${MCP_LOG_LEVEL:-info}"
+          LOG_LEVEL: "info"
+          PYTHON_PATH: "${PYTHON_PATH}"
+          PATH: "${PATH}"
 
-      # Tool filtering (optional)
       tools:
-        # Allowlist: empty = allow all tools from this server
         allowlist: []
-        # Blocklist: tools to exclude from registration
         blocklist: []
 
-      # Connection timeouts (seconds)
       timeouts:
-        startup: 10         # Time to establish connection
-        tool_default: 30    # Per-tool invocation timeout
-        health_check: 5     # Health check timeout
+        startup: 15
+        tool_default: 120       # LaTeX compilation can take 30-90s on complex documents
+        health_check: 5
 
-      # Health check configuration
       health_check:
         enabled: true
-        path: "/health"     # MCP health endpoint (if applicable)
-        interval_sec: 60    # Check every 60 seconds
+        interval_sec: 60
 
-      # Retry policy for failed tool invocations
       retry_policy:
         max_attempts: 2
         backoff_multiplier: 2.0
-        max_backoff_ms: 5000
+        max_backoff_ms: 10000
+
+    - id: "zen_sci_blog"
+      display_name: "ZenSci Blog MCP"
+      namespace_prefix: "zen_sci_blog"
+      # convert_to_html (App tool), generate_feed, validate_post
+
+      transport:
+        type: "stdio"
+        command: "node"
+        args: ["${ZEN_SCI_SERVERS_ROOT}/blog-mcp/dist/index.bundle.js"]
+        env:
+          LOG_LEVEL: "info"
+          PYTHON_PATH: "${PYTHON_PATH}"
+          PATH: "${PATH}"
+
+      tools:
+        allowlist: []
+        blocklist: []
+
+      timeouts:
+        startup: 15
+        tool_default: 60        # HTML rendering; headroom for large posts
+        health_check: 5
+
+      health_check:
+        enabled: true
+        interval_sec: 60
+
+      retry_policy:
+        max_attempts: 2
+        backoff_multiplier: 2.0
+        max_backoff_ms: 10000
+
+    - id: "zen_sci_slides"
+      display_name: "ZenSci Slides MCP"
+      namespace_prefix: "zen_sci_slides"
+      # convert_to_slides (App tool), validate_deck, list_slide_themes
+
+      transport:
+        type: "stdio"
+        command: "node"
+        args: ["${ZEN_SCI_SERVERS_ROOT}/slides-mcp/dist/index.bundle.js"]
+        env:
+          LOG_LEVEL: "info"
+          PYTHON_PATH: "${PYTHON_PATH}"
+          PATH: "${PATH}"
+
+      tools:
+        allowlist: []
+        blocklist: []
+
+      timeouts:
+        startup: 15
+        tool_default: 120       # Beamer compilation is heavy; Reveal.js is fast
+        health_check: 5
+
+      health_check:
+        enabled: true
+        interval_sec: 60
+
+      retry_policy:
+        max_attempts: 2
+        backoff_multiplier: 2.0
+        max_backoff_ms: 10000
+
+    - id: "zen_sci_newsletter"
+      display_name: "ZenSci Newsletter MCP"
+      namespace_prefix: "zen_sci_newsletter"
+      # convert_to_email (App tool), validate_email
+
+      transport:
+        type: "stdio"
+        command: "node"
+        args: ["${ZEN_SCI_SERVERS_ROOT}/newsletter-mcp/dist/index.bundle.js"]
+        env:
+          LOG_LEVEL: "info"
+          PYTHON_PATH: "${PYTHON_PATH}"
+          PATH: "${PATH}"
+
+      tools:
+        allowlist: []
+        blocklist: []
+
+      timeouts:
+        startup: 15
+        tool_default: 60        # HTML email rendering
+        health_check: 5
+
+      health_check:
+        enabled: true
+        interval_sec: 60
+
+      retry_policy:
+        max_attempts: 2
+        backoff_multiplier: 2.0
+        max_backoff_ms: 10000
+
+    - id: "zen_sci_grant"
+      display_name: "ZenSci Grant MCP"
+      namespace_prefix: "zen_sci_grant"
+      # generate_proposal (App tool), validate_compliance, check_format
+
+      transport:
+        type: "stdio"
+        command: "node"
+        args: ["${ZEN_SCI_SERVERS_ROOT}/grant-mcp/dist/index.bundle.js"]
+        env:
+          LOG_LEVEL: "info"
+          PYTHON_PATH: "${PYTHON_PATH}"
+          PATH: "${PATH}"
+
+      tools:
+        allowlist: []
+        blocklist: []
+
+      timeouts:
+        startup: 15
+        tool_default: 120       # NIH/NSF/ERC LaTeX grant compilation
+        health_check: 5
+
+      health_check:
+        enabled: true
+        interval_sec: 60
+
+      retry_policy:
+        max_attempts: 2
+        backoff_multiplier: 2.0
+        max_backoff_ms: 10000
+
+    - id: "zen_sci_paper"
+      display_name: "ZenSci Paper MCP"
+      namespace_prefix: "zen_sci_paper"
+      # convert_to_paper (App tool), validate_submission, list_templates
+
+      transport:
+        type: "stdio"
+        command: "node"
+        args: ["${ZEN_SCI_SERVERS_ROOT}/paper-mcp/dist/index.bundle.js"]
+        env:
+          LOG_LEVEL: "info"
+          PYTHON_PATH: "${PYTHON_PATH}"
+          PATH: "${PATH}"
+
+      tools:
+        allowlist: []
+        blocklist: []
+
+      timeouts:
+        startup: 15
+        tool_default: 120       # IEEE/ACM/arXiv LaTeX compilation
+        health_check: 5
+
+      health_check:
+        enabled: true
+        interval_sec: 60
+
+      retry_policy:
+        max_attempts: 2
+        backoff_multiplier: 2.0
+        max_backoff_ms: 10000
 
     # ─── Example: Remote MCP Server via SSE ──────────────────────────────
     # Example configuration for a remote MCP server using SSE transport

@@ -532,14 +532,14 @@ func TestStreamingAgentWithEvents_WithToolCalls(t *testing.T) {
 }
 
 func TestSplitIntoChunks_EmptyString(t *testing.T) {
-	chunks := splitIntoChunks("", 50)
+	chunks := SplitIntoChunks("", 50)
 	if len(chunks) != 0 {
 		t.Errorf("Expected 0 chunks for empty string, got %d", len(chunks))
 	}
 }
 
 func TestSplitIntoChunks_SingleWord(t *testing.T) {
-	chunks := splitIntoChunks("hello", 50)
+	chunks := SplitIntoChunks("hello", 50)
 	if len(chunks) != 1 {
 		t.Errorf("Expected 1 chunk, got %d", len(chunks))
 	}
@@ -550,7 +550,7 @@ func TestSplitIntoChunks_SingleWord(t *testing.T) {
 
 func TestSplitIntoChunks_MultipleWords(t *testing.T) {
 	text := "The quick brown fox jumps over the lazy dog"
-	chunks := splitIntoChunks(text, 20)
+	chunks := SplitIntoChunks(text, 20)
 
 	if len(chunks) < 2 {
 		t.Errorf("Expected multiple chunks for text longer than chunk size, got %d", len(chunks))
@@ -570,7 +570,7 @@ func TestSplitIntoChunks_MultipleWords(t *testing.T) {
 
 func TestSplitIntoChunks_ZeroChunkSize(t *testing.T) {
 	text := "hello world"
-	chunks := splitIntoChunks(text, 0)
+	chunks := SplitIntoChunks(text, 0)
 
 	if len(chunks) == 0 {
 		t.Error("Expected chunks with default size when chunkSize=0")
@@ -579,7 +579,7 @@ func TestSplitIntoChunks_ZeroChunkSize(t *testing.T) {
 
 func TestSplitIntoChunks_LongWords(t *testing.T) {
 	text := "supercalifragilisticexpialidocious is a long word"
-	chunks := splitIntoChunks(text, 10)
+	chunks := SplitIntoChunks(text, 10)
 
 	if len(chunks) == 0 {
 		t.Error("Expected at least one chunk")

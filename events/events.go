@@ -26,6 +26,8 @@ const (
 	ArtifactUpdated EventType = "artifact_updated"
 	ProjectSwitched EventType = "project_switched"
 	DiagramRendered EventType = "diagram_rendered"
+	// v1.2: Agent Chat Streaming events
+	PatchIntentEvent EventType = "patch_intent"
 	// Orchestration Engine events
 	OrchestrationPlanCreated EventType = "orchestration_plan_created"
 	OrchestrationNodeStart   EventType = "orchestration_node_start"
@@ -195,6 +197,23 @@ func FromJSON(data []byte) (*StreamEvent, error) {
 		return nil, err
 	}
 	return &event, nil
+}
+
+// v1.2: Agent Chat Streaming event constructor
+func NewPatchIntentEvent(operation string, sectionID *string, content, description string) StreamEvent {
+	data := map[string]interface{}{
+		"operation":   operation,
+		"content":     content,
+		"description": description,
+	}
+	if sectionID != nil {
+		data["section_id"] = *sectionID
+	}
+	return StreamEvent{
+		Type:      PatchIntentEvent,
+		Data:      data,
+		Timestamp: time.Now(),
+	}
 }
 
 // Artifact Engine event constructors

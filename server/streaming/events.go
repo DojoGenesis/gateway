@@ -19,6 +19,8 @@ const (
 	Error            = events.Error
 	TraceSpanStart   = events.TraceSpanStart
 	TraceSpanEnd     = events.TraceSpanEnd
+	// v1.2: Agent Chat Streaming events
+	PatchIntentEvent = events.PatchIntentEvent
 	// v0.0.18: Artifact Engine events
 	ArtifactCreated = events.ArtifactCreated
 	ArtifactUpdated = events.ArtifactUpdated
@@ -48,6 +50,8 @@ var (
 	NewErrorEvent            = events.NewErrorEvent
 	NewTraceSpanStartEvent   = events.NewTraceSpanStartEvent
 	NewTraceSpanEndEvent     = events.NewTraceSpanEndEvent
+	// v1.2: Agent Chat Streaming event constructors
+	NewPatchIntentEvent = events.NewPatchIntentEvent
 	// v0.0.18: Artifact Engine event constructors
 	NewArtifactCreatedEvent = events.NewArtifactCreatedEvent
 	NewArtifactUpdatedEvent = events.NewArtifactUpdatedEvent

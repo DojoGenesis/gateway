@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
@@ -27,7 +29,7 @@ func NewOllamaProvider() *OllamaProvider {
 				Timeout: 10 * time.Minute, // Local models can be slow
 			},
 		},
-		defaultModel: envOrDefault("OLLAMA_DEFAULT_MODEL", "llama3.2"),
+		defaultModel: os.Getenv("OLLAMA_DEFAULT_MODEL"), // empty = auto-detect first available
 	}
 }
 
@@ -109,10 +111,29 @@ type ollamaResponse struct {
 	Done    bool          `json:"done"`
 }
 
+// resolveModel returns a model name, falling back to the first available Ollama model
+// if the configured default is empty.
+func (p *OllamaProvider) resolveModel(ctx context.Context, requested string) string {
+	if requested != "" {
+		return requested
+	}
+	if p.defaultModel != "" {
+		return p.defaultModel
+	}
+	// Auto-detect: pick the first available model
+	models, err := p.ListModels(ctx)
+	if err == nil && len(models) > 0 {
+		return models[0].ID
+	}
+	return "llama3.2" // last-resort fallback
+}
+
 func (p *OllamaProvider) GenerateCompletion(ctx context.Context, req *provider.CompletionRequest) (*provider.CompletionResponse, error) {
-	model := req.Model
-	if model == "" {
-		model = p.defaultModel
+	model := p.resolveModel(ctx, req.Model)
+
+	// Route through text-mode tool fallback for models without native tool support
+	if len(req.Tools) > 0 && !p.modelSupportsTools(model) {
+		return p.generateWithTextToolFallback(ctx, req)
 	}
 
 	oReq := ollamaRequest{
@@ -146,10 +167,7 @@ func (p *OllamaProvider) GenerateCompletion(ctx context.Context, req *provider.C
 }
 
 func (p *OllamaProvider) GenerateCompletionStream(ctx context.Context, req *provider.CompletionRequest) (<-chan *provider.CompletionChunk, error) {
-	model := req.Model
-	if model == "" {
-		model = p.defaultModel
-	}
+	model := p.resolveModel(ctx, req.Model)
 
 	oReq := ollamaRequest{
 		Model: model, Messages: convertToOllamaMessages(req.Messages), Stream: true,
@@ -187,6 +205,85 @@ func (p *OllamaProvider) GenerateCompletionStream(ctx context.Context, req *prov
 		}
 	}()
 	return ch, nil
+}
+
+// modelSupportsTools returns true when the resolved Ollama model name is known
+// to support native function/tool calling via the Ollama /api/chat tools field.
+// Models confirmed to support tools: llama3.1, llama3.2, mistral-nemo, firefunction-v2,
+// command-r, command-r-plus, smollm2. All others fall back to text-mode tool descriptions.
+func (p *OllamaProvider) modelSupportsTools(modelName string) bool {
+	supported := []string{
+		"llama3.1", "llama3.2", "llama3.3",
+		"mistral-nemo", "mistral-large",
+		"firefunction-v2",
+		"command-r", "command-r-plus",
+		"smollm2",
+		"qwen2.5", "qwen2.5-coder",
+		"hermes3",
+	}
+	for _, s := range supported {
+		if strings.Contains(strings.ToLower(modelName), s) {
+			return true
+		}
+	}
+	return false
+}
+
+// generateWithTextToolFallback builds a text description of available tools and
+// appends it to the system prompt so models without native tool-calling can still
+// use tools through a structured text protocol.  The model is asked to respond
+// with a JSON block when it wants to invoke a tool:
+//
+//	```tool_call
+//	{"name":"<tool>","arguments":{...}}
+//	```
+//
+// The caller (runAgentLoop) already handles native tool calls; for Ollama models
+// that don't support them natively, GenerateCompletion is called without a Tools
+// slice but with this augmented system message.
+func (p *OllamaProvider) generateWithTextToolFallback(
+	ctx context.Context,
+	req *provider.CompletionRequest,
+) (*provider.CompletionResponse, error) {
+	if len(req.Tools) == 0 {
+		return p.GenerateCompletion(ctx, req)
+	}
+
+	// Build human-readable tool catalogue
+	var sb strings.Builder
+	sb.WriteString("\n\n--- AVAILABLE TOOLS ---\n")
+	sb.WriteString("You can invoke tools by responding with a JSON block in this format:\n")
+	sb.WriteString("```tool_call\n{\"name\":\"<tool_name>\",\"arguments\":{...}}\n```\n\n")
+	sb.WriteString("Tools:\n")
+	for _, t := range req.Tools {
+		sb.WriteString(fmt.Sprintf("- %s: %s\n", t.Name, t.Description))
+	}
+	sb.WriteString("--- END TOOLS ---")
+
+	// Inject into the system message (or prepend one)
+	augmented := make([]provider.Message, 0, len(req.Messages))
+	injected := false
+	for _, m := range req.Messages {
+		if m.Role == "system" && !injected {
+			augmented = append(augmented, provider.Message{
+				Role:    "system",
+				Content: m.Content + sb.String(),
+			})
+			injected = true
+		} else {
+			augmented = append(augmented, m)
+		}
+	}
+	if !injected {
+		augmented = append([]provider.Message{{Role: "system", Content: sb.String()}}, augmented...)
+	}
+
+	// Strip native tools — model doesn't support them
+	fallbackReq := *req
+	fallbackReq.Tools = nil
+	fallbackReq.Messages = augmented
+
+	return p.GenerateCompletion(ctx, &fallbackReq)
 }
 
 func (p *OllamaProvider) CallTool(ctx context.Context, req *provider.ToolCallRequest) (*provider.ToolCallResponse, error) {

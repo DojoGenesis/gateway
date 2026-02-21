@@ -119,7 +119,7 @@ func main() {
 
 	// ─── Initialize MCP Host (if configured) ─────────────────────────
 	var mcpHostManager *mcp.MCPHostManager
-	mcpConfigPath := getEnv("MCP_CONFIG_PATH", "config/mcp_servers.yaml")
+	mcpConfigPath := getEnv("MCP_CONFIG_PATH", "gateway-config.yaml")
 	if _, err := os.Stat(mcpConfigPath); err == nil {
 		slog.Info("loading MCP configuration", "path", mcpConfigPath)
 
@@ -127,6 +127,10 @@ func main() {
 		if err != nil {
 			slog.Warn("failed to load MCP config", "error", err)
 		} else {
+			// Preflight: warn about env vars that expanded to empty strings.
+			if w := mcpHostCfg.MCP.ValidateExpansions(); w > 0 {
+				slog.Warn("MCP config has missing env var expansions — some servers may fail to start", "warnings", w)
+			}
 			mcpHostManager, err = mcp.NewMCPHostManager(&mcpHostCfg.MCP, toolRegistry)
 			if err != nil {
 				slog.Warn("failed to create MCP host manager", "error", err)
@@ -295,6 +299,14 @@ func main() {
 	}
 
 	// ─── Create and Start Server ─────────────────────────────────────
+	// Guard against the Go interface nil trap: assigning a typed nil (*mcp.MCPHostManager)(nil)
+	// to MCPStatusProvider produces a non-nil interface, breaking the nil check inside the server.
+	// Only set the interface when we have a real manager.
+	var mcpProvider srv.MCPStatusProvider
+	if mcpHostManager != nil {
+		mcpProvider = mcpHostManager
+	}
+
 	server := srv.New(srv.ServerDeps{
 		Config: &srv.ServerConfig{
 			Port:            cfg.Port,
@@ -317,7 +329,7 @@ func main() {
 		MemoryMaintenance:   nil,
 		ToolRegistry:        toolRegistry,
 		AgentInitializer:    agentInitializer,
-		MCPHostManager:      mcpHostManager,
+		MCPHostManager:      mcpProvider,
 		OrchestrationExec:   orchestrationExecutor,
 		MemoryStore:         memoryStore,
 		AppManager:          appManager,

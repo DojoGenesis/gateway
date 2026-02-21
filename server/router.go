@@ -72,6 +72,9 @@ func (s *Server) setupRoutes() {
 			// Trace inspection (if OTEL enabled)
 			gateway.GET("/traces/:id", s.handleGatewayGetTrace)
 
+			// ─── Document fetch (v1.1.0) ───────────────────────────
+			gateway.GET("/documents/:id", s.handleGetDocument)
+
 			// ─── MCP Apps (v1.1.0) ─────────────────────────────────
 			appsGroup := gateway.Group("/apps")
 			{
@@ -103,6 +106,13 @@ func (s *Server) setupRoutes() {
 		v1.DELETE("/snapshots/:id", memoryHandler.DeleteSnapshot)
 		v1.GET("/snapshots/export/:id", memoryHandler.ExportSnapshot)
 		v1.POST("/maintenance/run", memoryHandler.RunMaintenance)
+	}
+
+	// ─── Settings (v1.1.0) ───────────────────────────────────────────
+	settings := v1.Group("/settings")
+	{
+		settings.POST("/providers", s.handleSetProviderKey)
+		settings.GET("/providers", s.handleGetProviderSettings)
 	}
 
 	// ─── Admin Routes (v1.0.0) ───────────────────────────────────────

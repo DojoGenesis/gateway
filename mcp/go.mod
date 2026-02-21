@@ -5,7 +5,7 @@ go 1.25.6
 require (
 	github.com/TresPies-source/AgenticGatewayByDojoGenesis v0.0.0
 	github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools v0.0.0
-	github.com/mark3labs/mcp-go v0.43.2
+	github.com/mark3labs/mcp-go v0.44.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0
