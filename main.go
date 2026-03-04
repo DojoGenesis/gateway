@@ -24,6 +24,7 @@ import (
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/logging"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
+	svcproviders "github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services/providers"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
 
@@ -105,12 +106,45 @@ func main() {
 	// ─── Register In-Process Providers ───────────────────────────────
 	providerResults := services.RegisterProviders(context.Background(), pluginManager, cfg, nil)
 	loadedCount := 0
+	ollamaLoadedAtStartup := false
 	for _, r := range providerResults {
 		if r.Available {
 			loadedCount++
+			if r.Name == "ollama" {
+				ollamaLoadedAtStartup = true
+			}
 		}
 	}
 	slog.Info("provider registration complete", "loaded", loadedCount, "total_checked", len(providerResults))
+
+	// ─── Local Provider Retry Loop ────────────────────────────────────
+	// If Ollama wasn't reachable at startup (e.g. still loading, or Tauri app
+	// launched before Ollama was ready), poll every 30s and register it as
+	// soon as it becomes available.  This prevents the "0 providers" state
+	// that blocks all chat requests when the gateway starts before Ollama.
+	if !ollamaLoadedAtStartup {
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				// Stop retrying once it's loaded (e.g. via plugin or prior tick).
+				if pluginManager.IsPluginLoaded("ollama") {
+					slog.Info("ollama provider already registered — stopping retry loop")
+					return
+				}
+				ollamaProvider := svcproviders.NewOllamaProvider()
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				available := ollamaProvider.IsAvailable(ctx)
+				cancel()
+				if available {
+					pluginManager.RegisterProvider("ollama", ollamaProvider)
+					slog.Info("ollama provider registered (late — was not available at startup)")
+					return
+				}
+				slog.Debug("ollama still not available — will retry in 30s")
+			}
+		}()
+	}
 
 	// ─── Initialize Tool Registry ────────────────────────────────────
 	allTools := tools.GetAllTools()
