@@ -7,7 +7,11 @@ use (
 	./channel/discord
 	./channel/email
 	./channel/slack
+	./channel/sms
+	./channel/teams
 	./channel/telegram
+	./channel/webchat
+	./channel/whatsapp
 	./cmd/dojo
 	./disposition
 	./events
