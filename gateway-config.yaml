@@ -443,3 +443,26 @@ channel_bridge:
     # Catch-all: any unmatched Discord message → default responder.
     - platform: "discord"
       workflow: "default-responder"
+
+# ─── Storage Backend (Era 3 Cloud Sync) ───────────────────────────────────────
+# Controls which storage backend the Gateway uses for CAS and Audit.
+# Set backend to "d1" to route all skill/workflow/audit writes to Cloudflare D1.
+# Credentials are read from environment variables; never commit tokens here.
+#
+# D1 database IDs (provisioned 2026-04-05):
+#   cas:   a5d9d6c5-edb7-42a6-afa3-0065916fe8d5  (dojo-cas)
+#   audit: a1b0824f-2d5c-43bd-ac6f-a410a38be27e  (dojo-audit)
+storage:
+  # "local"  — SQLite on disk (default, no network required)
+  # "d1"     — Cloudflare D1 via REST API (requires CF credentials below)
+  backend: "local"
+
+  local:
+    cas_db_path: "./data/cas.db"
+    audit_db_path: "./data/audit.db"
+
+  d1:
+    account_id: "${CLOUDFLARE_ACCOUNT_ID}"
+    api_token: "${CLOUDFLARE_D1_TOKEN}"
+    cas_database_id: "a5d9d6c5-edb7-42a6-afa3-0065916fe8d5"
+    audit_database_id: "a1b0824f-2d5c-43bd-ac6f-a410a38be27e"
