@@ -352,3 +352,94 @@ mcp:
 
     # Tool span sample rate (0.0-1.0, 1.0 = trace all tool invocations)
     tool_span_sample_rate: 1.0
+
+# ─── Channel Bridge (Era 3) ────────────────────────────────────────────────────
+# Flywheel configuration: HTTP webhook → WebhookGateway → InProcessBus
+# → ChannelBridge → WorkflowExecutor → adapter.Send(reply)
+#
+# Each entry under `channels` maps to a registered WebhookAdapter or
+# ActorAdapter in the WebhookGateway.  The bridge uses the same platform
+# name to route replies back.
+#
+# Webhook path: POST /webhooks/{platform}
+
+channel_bridge:
+  # Backend event bus.  "inprocess" is synchronous and suitable for single-
+  # node deployments.  "nats" uses the embedded NATS bus from runtime/event.
+  bus: "inprocess"   # inprocess | nats
+
+  channels:
+    - platform: "slack"
+      type: "webhook"
+      enabled: false
+      credentials:
+        token: "${SLACK_BOT_TOKEN}"
+        signing_secret: "${SLACK_SIGNING_SECRET}"
+
+    - platform: "discord"
+      type: "actor"
+      enabled: false
+      credentials:
+        token: "${DISCORD_BOT_TOKEN}"
+        public_key: "${DISCORD_PUBLIC_KEY}"
+
+    - platform: "telegram"
+      type: "webhook"
+      enabled: false
+      credentials:
+        token: "${TELEGRAM_BOT_TOKEN}"
+
+    - platform: "email"
+      type: "webhook"
+      enabled: false
+      credentials:
+        api_key: "${SENDGRID_API_KEY}"
+
+    - platform: "sms"
+      type: "webhook"
+      enabled: false
+      credentials:
+        account_sid: "${TWILIO_ACCOUNT_SID}"
+        auth_token: "${TWILIO_AUTH_TOKEN}"
+
+    - platform: "webchat"
+      type: "webhook"
+      enabled: false
+      credentials:
+        token: "${WEBCHAT_TOKEN}"
+
+    - platform: "teams"
+      type: "webhook"
+      enabled: false
+      credentials:
+        token: "${TEAMS_BOT_TOKEN}"
+        tenant_id: "${TEAMS_TENANT_ID}"
+
+    - platform: "whatsapp"
+      type: "webhook"
+      enabled: false
+      credentials:
+        token: "${WHATSAPP_TOKEN}"
+        phone_number_id: "${WHATSAPP_PHONE_NUMBER_ID}"
+
+  # Workflow trigger rules evaluated by ChannelBridge.
+  # Evaluated in order; the first match wins.
+  #
+  # Fields:
+  #   platform  — adapter name to match, or "*" for any platform
+  #   pattern   — Go regexp matched against message text (omit = match all)
+  #   workflow  — CAS workflow name to execute on match
+  triggers:
+    # Route Slack "dojo:" commands to the command-dispatcher workflow.
+    - platform: "slack"
+      pattern: "(?i)dojo:"
+      workflow: "command-dispatcher"
+
+    # Route design-review requests to the design-review pipeline.
+    - platform: "slack"
+      pattern: "(?i)design[- ]review"
+      workflow: "design-review-pipeline"
+
+    # Catch-all: any unmatched Discord message → default responder.
+    - platform: "discord"
+      workflow: "default-responder"
