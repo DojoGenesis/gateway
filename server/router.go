@@ -115,6 +115,13 @@ func (s *Server) setupRoutes() {
 		settings.GET("/providers", s.handleGetProviderSettings)
 	}
 
+	// ─── Workflow Builder SPA (Era 3) ────────────────────────────────
+	// Served from embedded dist/ compiled by `make build-spa`.
+	// SvelteKit base path is /workflow, so all internal links resolve here.
+	wbHandler := s.workflowBuilderHandler()
+	s.router.GET("/workflow", wbHandler)
+	s.router.GET("/workflow/*filepath", wbHandler)
+
 	// ─── Admin Routes (v1.0.0) ───────────────────────────────────────
 	admin := s.router.Group("/admin")
 	{

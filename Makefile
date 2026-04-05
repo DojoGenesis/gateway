@@ -1,6 +1,16 @@
-.PHONY: build test test-cover vet lint docker docker-compose-up docker-compose-down clean generate-openapi
+.PHONY: build build-spa test test-cover vet lint docker docker-compose-up docker-compose-down clean generate-openapi
 
-# Build the binary
+# Build the Workflow Builder SPA and embed it into the Go binary.
+# Must be run before `make build` when the SPA has changed.
+build-spa:
+	@echo "Building Workflow Builder SPA..."
+	@cd workflow-builder && npm run build
+	@echo "Copying SPA output to server/workflowui/dist/ ..."
+	@rm -rf server/workflowui/dist
+	@cp -r workflow-builder/build server/workflowui/dist
+	@echo "SPA embedded: server/workflowui/dist/ ($$(find server/workflowui/dist -type f | wc -l | tr -d ' ') files)"
+
+# Build the binary (run `make build-spa` first if the SPA has changed)
 build:
 	@echo "Building agentic-gateway..."
 	@mkdir -p bin
