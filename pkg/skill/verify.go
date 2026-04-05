@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -58,6 +59,8 @@ type cosignPayload struct {
 	Optional struct {
 		Subject string `json:"subject"`
 		Issuer  string `json:"Issuer"`
+		// Bundle holds the Rekor transparency log entry embedded by cosign.
+		Bundle *cosignBundle `json:"Bundle"`
 	} `json:"optional"`
 	Critical struct {
 		Identity struct {
@@ -69,6 +72,19 @@ type cosignPayload struct {
 		Type string `json:"type"`
 	} `json:"critical"`
 }
+
+// cosignBundle is the Rekor bundle embedded in cosign verify output.
+type cosignBundle struct {
+	SignedEntryTimestamp string `json:"SignedEntryTimestamp"`
+	Payload              struct {
+		Body           string `json:"body"`
+		IntegratedTime int64  `json:"integratedTime"`
+		LogIndex       int64  `json:"logIndex"`
+		LogID          string `json:"logID"`
+	} `json:"Payload"`
+}
+
+const rekorSearchBaseURL = "https://search.sigstore.dev"
 
 // VerifySkill checks the Cosign signature of an OCI artifact referenced by ref.
 //
@@ -145,13 +161,116 @@ func parseCosignOutput(data []byte) (*VerifyResult, error) {
 		tier = TierOfficial
 	}
 
-	return &VerifyResult{
+	result := &VerifyResult{
 		Verified:  true,
 		TrustTier: tier,
 		Identity:  identity,
 		Issuer:    issuer,
 		Timestamp: time.Now().UTC(),
-	}, nil
+	}
+
+	// Extract Rekor transparency log entry URL and timestamp from bundle.
+	if b := p.Optional.Bundle; b != nil {
+		if b.Payload.LogIndex > 0 {
+			result.RekorEntry = fmt.Sprintf("%s/?logIndex=%d", rekorSearchBaseURL, b.Payload.LogIndex)
+		}
+		if b.Payload.IntegratedTime > 0 {
+			result.Timestamp = time.Unix(b.Payload.IntegratedTime, 0).UTC()
+		}
+	}
+
+	return result, nil
+}
+
+// VerifyCASBlob verifies the Cosign signature of a raw CAS blob.
+//
+// data is the blob content. bundleJSON is the cosign bundle JSON produced by
+// `cosign sign-blob --bundle bundle.json <file>`. Both are written to temp
+// files; cosign verify-blob is then invoked against them.
+//
+// Returns a VerifyResult with Verified=false (TierCommunity) when the
+// signature is absent or invalid, without returning an error — identical
+// to VerifySkill's behavior for unsigned artifacts.
+func VerifyCASBlob(ctx context.Context, data []byte, bundleJSON []byte) (*VerifyResult, error) {
+	cosignPath, err := exec.LookPath("cosign")
+	if err != nil {
+		return nil, buildCosignNotFoundError()
+	}
+
+	dataFile, err := os.CreateTemp("", "cas-blob-*")
+	if err != nil {
+		return nil, fmt.Errorf("cosign verify-blob: create data temp: %w", err)
+	}
+	defer os.Remove(dataFile.Name())
+	if _, err := dataFile.Write(data); err != nil {
+		dataFile.Close()
+		return nil, fmt.Errorf("cosign verify-blob: write data: %w", err)
+	}
+	dataFile.Close()
+
+	bundleFile, err := os.CreateTemp("", "cas-bundle-*.json")
+	if err != nil {
+		return nil, fmt.Errorf("cosign verify-blob: create bundle temp: %w", err)
+	}
+	defer os.Remove(bundleFile.Name())
+	if _, err := bundleFile.Write(bundleJSON); err != nil {
+		bundleFile.Close()
+		return nil, fmt.Errorf("cosign verify-blob: write bundle: %w", err)
+	}
+	bundleFile.Close()
+
+	args := []string{
+		"verify-blob",
+		"--bundle", bundleFile.Name(),
+		"--certificate-identity-regexp", ".*",
+		"--certificate-oidc-issuer", "https://token.actions.githubusercontent.com",
+		dataFile.Name(),
+	}
+	cmd := exec.CommandContext(ctx, cosignPath, args...)
+	if err := cmd.Run(); err != nil {
+		// Non-zero exit means verification failed (unsigned or invalid signature).
+		return &VerifyResult{
+			Verified:  false,
+			TrustTier: TierCommunity,
+		}, nil
+	}
+
+	// Signature verified. Extract identity from bundle JSON for tier determination.
+	result := &VerifyResult{
+		Verified:  true,
+		TrustTier: TierVerified,
+		Timestamp: time.Now().UTC(),
+	}
+	if tier, identity, rekorEntry, ts, ok := parseBundleJSON(bundleJSON); ok {
+		result.TrustTier = tier
+		result.Identity = identity
+		result.RekorEntry = rekorEntry
+		if !ts.IsZero() {
+			result.Timestamp = ts
+		}
+	}
+	return result, nil
+}
+
+// parseBundleJSON extracts trust tier, identity, Rekor URL and timestamp from
+// a cosign sign-blob bundle JSON (Old "Payload" format).
+//
+// Returns ok=false when the bundle is not parseable; callers treat that as
+// a successful verification at TierVerified with no identity detail.
+func parseBundleJSON(bundleJSON []byte) (tier int, identity, rekorEntry string, ts time.Time, ok bool) {
+	var b cosignBundle
+	if err := json.Unmarshal(bundleJSON, &b); err != nil {
+		return 0, "", "", time.Time{}, false
+	}
+	if b.Payload.IntegratedTime > 0 {
+		ts = time.Unix(b.Payload.IntegratedTime, 0).UTC()
+	}
+	if b.Payload.LogIndex > 0 {
+		rekorEntry = fmt.Sprintf("%s/?logIndex=%d", rekorSearchBaseURL, b.Payload.LogIndex)
+	}
+	// Bundle doesn't carry the OIDC subject; tier defaults to verified.
+	tier = TierVerified
+	return tier, "", rekorEntry, ts, true
 }
 
 // buildCosignNotFoundError returns a descriptive error with install instructions.

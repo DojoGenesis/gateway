@@ -190,6 +190,106 @@ func TestBuildCosignArgs(t *testing.T) {
 	}
 }
 
+// TestParseCosignOutput_WithBundle verifies that the RekorEntry URL and
+// Timestamp are populated from the embedded Bundle when present.
+func TestParseCosignOutput_WithBundle(t *testing.T) {
+	sampleJSON := `[
+  {
+    "critical": {
+      "identity": {"docker-reference": "ghcr.io/dojo-skills/researcher"},
+      "image": {"docker-manifest-digest": "sha256:cafebabe"},
+      "type": "cosign container image signature"
+    },
+    "optional": {
+      "subject": "https://github.com/trespies/dojo-skills/.github/workflows/publish.yml@refs/heads/main",
+      "Issuer": "https://token.actions.githubusercontent.com",
+      "Bundle": {
+        "SignedEntryTimestamp": "MEYCIQDdummy==",
+        "Payload": {
+          "body": "eyJkdW1teSI6dHJ1ZX0=",
+          "integratedTime": 1720000000,
+          "logIndex": 98765432,
+          "logID": "c0d23d6ad406973f"
+        }
+      }
+    }
+  }
+]`
+
+	result, err := parseCosignOutput([]byte(sampleJSON))
+	if err != nil {
+		t.Fatalf("parseCosignOutput: %v", err)
+	}
+	if !result.Verified {
+		t.Error("expected Verified=true")
+	}
+	if result.RekorEntry == "" {
+		t.Error("RekorEntry: expected non-empty URL")
+	}
+	if !containsAny(result.RekorEntry, "98765432") {
+		t.Errorf("RekorEntry: expected logIndex 98765432 in URL, got %q", result.RekorEntry)
+	}
+	wantTS := int64(1720000000)
+	if result.Timestamp.Unix() != wantTS {
+		t.Errorf("Timestamp: got %d, want %d", result.Timestamp.Unix(), wantTS)
+	}
+}
+
+// TestParseBundleJSON_Valid verifies rekor entry extraction from a bundle.
+func TestParseBundleJSON_Valid(t *testing.T) {
+	bundle := `{
+		"SignedEntryTimestamp": "MEY=",
+		"Payload": {
+			"body": "eyJkdW1teSI6dHJ1ZX0=",
+			"integratedTime": 1720050000,
+			"logIndex": 11111,
+			"logID": "abc"
+		}
+	}`
+
+	tier, identity, rekorEntry, ts, ok := parseBundleJSON([]byte(bundle))
+	if !ok {
+		t.Fatal("parseBundleJSON: ok=false")
+	}
+	if tier != TierVerified {
+		t.Errorf("tier: got %d, want %d", tier, TierVerified)
+	}
+	_ = identity // bundle doesn't carry OIDC subject
+	if rekorEntry == "" {
+		t.Error("rekorEntry: expected non-empty")
+	}
+	if !containsAny(rekorEntry, "11111") {
+		t.Errorf("rekorEntry: expected logIndex 11111, got %q", rekorEntry)
+	}
+	if ts.Unix() != 1720050000 {
+		t.Errorf("timestamp: got %d, want 1720050000", ts.Unix())
+	}
+}
+
+// TestParseBundleJSON_Invalid verifies graceful handling of bad JSON.
+func TestParseBundleJSON_Invalid(t *testing.T) {
+	_, _, _, _, ok := parseBundleJSON([]byte("not json"))
+	if ok {
+		t.Error("parseBundleJSON invalid JSON: expected ok=false")
+	}
+}
+
+// TestVerifyCASBlob_NoCosign verifies the no-cosign error path.
+func TestVerifyCASBlob_NoCosign(t *testing.T) {
+	_, err := exec.LookPath("cosign")
+	if err == nil {
+		t.Skip("cosign is installed; skipping NoCosign test")
+	}
+
+	_, verifyErr := VerifyCASBlob(context.Background(), []byte("data"), []byte("{}"))
+	if verifyErr == nil {
+		t.Fatal("expected error when cosign not installed")
+	}
+	if !containsAny(verifyErr.Error(), "cosign", "PATH", "Install") {
+		t.Errorf("expected install hint in error, got: %q", verifyErr.Error())
+	}
+}
+
 // --- helpers ---
 
 func containsAny(s string, substrings ...string) bool {
