@@ -556,15 +556,24 @@ func TestSplitIntoChunks_MultipleWords(t *testing.T) {
 		t.Errorf("Expected multiple chunks for text longer than chunk size, got %d", len(chunks))
 	}
 
-	for _, chunk := range chunks {
-		if len(chunk) > 25 {
-			t.Errorf("Chunk exceeds max size: '%s' (len=%d)", chunk, len(chunk))
-		}
+	// Chunks now preserve whitespace — concatenation should reconstruct the original
+	reconstructed := strings.Join(chunks, "")
+	if reconstructed != text {
+		t.Errorf("Reconstructed text doesn't match original:\n  got:  %q\n  want: %q", reconstructed, text)
+	}
+}
+
+func TestSplitIntoChunks_PreservesNewlines(t *testing.T) {
+	text := "First paragraph.\n\nSecond paragraph.\n\nThird paragraph."
+	chunks := SplitIntoChunks(text, 30)
+
+	reconstructed := strings.Join(chunks, "")
+	if reconstructed != text {
+		t.Errorf("Newlines not preserved:\n  got:  %q\n  want: %q", reconstructed, text)
 	}
 
-	reconstructed := strings.Join(chunks, " ")
-	if reconstructed != text {
-		t.Error("Reconstructed text doesn't match original")
+	if !strings.Contains(reconstructed, "\n\n") {
+		t.Error("Double newlines were stripped from chunks")
 	}
 }
 

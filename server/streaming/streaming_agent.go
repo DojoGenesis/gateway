@@ -416,8 +416,12 @@ func isRetryableError(err error) bool {
 		strings.Contains(msg, "unavailable")
 }
 
-// SplitIntoChunks splits text into word-boundary chunks of approximately
-// chunkSize characters. Exported for use by the gateway streaming handler.
+// SplitIntoChunks splits text into chunks of approximately chunkSize characters,
+// breaking at word boundaries while preserving all whitespace (newlines, tabs,
+// paragraph breaks). Exported for use by the gateway streaming handler.
+//
+// Previous implementation used strings.Fields which collapsed all whitespace
+// into single spaces, destroying newlines and formatting.
 func SplitIntoChunks(text string, chunkSize int) []string {
 	if text == "" {
 		return []string{}
@@ -427,28 +431,34 @@ func SplitIntoChunks(text string, chunkSize int) []string {
 		chunkSize = ChunkSize
 	}
 
-	words := strings.Fields(text)
-	if len(words) == 0 {
+	// For short text, return as single chunk
+	if len(text) <= chunkSize {
 		return []string{text}
 	}
 
 	var chunks []string
-	var currentChunk strings.Builder
+	remaining := text
 
-	for _, word := range words {
-		if currentChunk.Len() > 0 && currentChunk.Len()+len(word)+1 > chunkSize {
-			chunks = append(chunks, currentChunk.String())
-			currentChunk.Reset()
+	for len(remaining) > 0 {
+		if len(remaining) <= chunkSize {
+			chunks = append(chunks, remaining)
+			break
 		}
 
-		if currentChunk.Len() > 0 {
-			currentChunk.WriteString(" ")
-		}
-		currentChunk.WriteString(word)
-	}
+		// Find a break point at or before chunkSize
+		breakAt := chunkSize
 
-	if currentChunk.Len() > 0 {
-		chunks = append(chunks, currentChunk.String())
+		// Prefer breaking at a newline within the chunk
+		if idx := strings.LastIndex(remaining[:breakAt], "\n"); idx > 0 {
+			breakAt = idx + 1 // include the newline in the current chunk
+		} else if idx := strings.LastIndex(remaining[:breakAt], " "); idx > 0 {
+			// Otherwise break at the last space
+			breakAt = idx + 1 // include the space in the current chunk
+		}
+		// If no good break point found, break at chunkSize (mid-word)
+
+		chunks = append(chunks, remaining[:breakAt])
+		remaining = remaining[breakAt:]
 	}
 
 	return chunks
