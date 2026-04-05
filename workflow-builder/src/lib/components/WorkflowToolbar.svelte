@@ -8,6 +8,8 @@
 		getDefinition?: () => WorkflowDefinition;
 		onAutoLayout?: () => void;
 		onLoadWorkflow?: () => void;
+		onRunWorkflow?: () => void;
+		isRunning?: boolean;
 	}
 
 	let {
@@ -15,7 +17,9 @@
 		onWorkflowNameChange,
 		getDefinition,
 		onAutoLayout,
-		onLoadWorkflow
+		onLoadWorkflow,
+		onRunWorkflow,
+		isRunning = false
 	}: Props = $props();
 
 	type ValidationState = 'idle' | 'validating' | 'valid' | 'invalid';
@@ -76,8 +80,7 @@
 	}
 
 	function handleRun() {
-		// Phase 2 placeholder — execution via WebSocket bridge to NATS
-		alert('Workflow execution is a Phase 2 feature. Build the workflow and save it first.');
+		onRunWorkflow?.();
 	}
 </script>
 
@@ -158,13 +161,19 @@
 			{/if}
 		</button>
 
-		<!-- Run (placeholder) -->
+		<!-- Run -->
 		<button
 			class="toolbar__btn toolbar__btn--run"
+			class:toolbar__btn--running={isRunning}
 			onclick={handleRun}
-			title="Run workflow (Phase 2)"
+			disabled={isRunning || !workflowName}
+			title={isRunning ? 'Execution in progress…' : 'Execute workflow (saves first)'}
 		>
-			▶ Run
+			{#if isRunning}
+				<span class="spinner"></span> Running…
+			{:else}
+				▶ Run
+			{/if}
 		</button>
 	</div>
 
@@ -313,6 +322,12 @@
 	.toolbar__btn--run:hover:not(:disabled) {
 		background: #78350f;
 		border-color: #f59e0b;
+	}
+
+	.toolbar__btn--running {
+		background: #78350f !important;
+		border-color: #f59e0b !important;
+		color: #f59e0b !important;
 	}
 
 	.spinner {

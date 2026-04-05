@@ -74,3 +74,42 @@ export async function listSkills(query?: string): Promise<SkillInfo[]> {
 	const data = await apiFetch<{ skills: SkillInfo[] }>(`/api/skills${qs}`);
 	return data.skills ?? [];
 }
+
+// POST /api/workflows/{name}/execute
+// Returns a run_id used to subscribe to the SSE execution stream.
+export async function executeWorkflow(name: string): Promise<{ run_id: string; workflow: string }> {
+	return apiFetch(`/api/workflows/${encodeURIComponent(name)}/execute`, { method: 'POST' });
+}
+
+// Connect to the SSE execution stream for a given run_id.
+// Calls onStep for each step event, onDone when the run completes.
+// Returns a cleanup function that closes the EventSource.
+export function subscribeExecution(
+	runId: string,
+	onStep: (stepId: string, status: string) => void,
+	onDone: () => void
+): () => void {
+	const es = new EventSource(`${BASE}/api/workflows/${encodeURIComponent(runId)}/execution`);
+
+	es.onmessage = (e: MessageEvent) => {
+		let payload: { stepId?: string; status?: string; type?: string };
+		try {
+			payload = JSON.parse(e.data as string) as typeof payload;
+		} catch {
+			return;
+		}
+		if (payload.type === 'done') {
+			onDone();
+			es.close();
+		} else if (payload.stepId && payload.status) {
+			onStep(payload.stepId, payload.status);
+		}
+	};
+
+	es.onerror = () => {
+		onDone();
+		es.close();
+	};
+
+	return () => es.close();
+}

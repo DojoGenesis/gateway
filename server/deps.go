@@ -8,6 +8,7 @@ import (
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/maintenance"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
@@ -37,4 +38,8 @@ type ServerDeps struct {
 	MemoryStore         gateway.MemoryStore
 	AppManager          *apps.AppManager
 	AuthDB              *sql.DB
+
+	// WorkflowCAS is the CAS store used for workflow definition lookup and execution.
+	// If nil, the /api/workflows/* and execution endpoints are disabled.
+	WorkflowCAS cas.Store
 }

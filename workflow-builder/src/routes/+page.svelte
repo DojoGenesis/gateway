@@ -17,8 +17,9 @@
 	import SkillNode from '$lib/components/SkillNode.svelte';
 
 	import { applyDagreLayout } from '$lib/layout';
-	import { listWorkflows, getWorkflow, saveCanvas, getCanvas } from '$lib/api';
-	import type { WorkflowDefinition, SkillInfo, SkillNodeData, Step } from '$lib/types';
+	import { listWorkflows, getWorkflow, saveCanvas, getCanvas, executeWorkflow, subscribeExecution } from '$lib/api';
+	import type { WorkflowDefinition, SkillInfo, SkillNodeData, Step, StepStatus } from '$lib/types';
+	import { execution, startExecution, updateStep, finishExecution } from '$lib/stores/execution.svelte.js';
 
 	// -------------------------------------------------------------------------
 	// Node types registry for Svelte Flow
@@ -302,6 +303,51 @@
 	}
 
 	// -------------------------------------------------------------------------
+	// Execution: POST → run_id → SSE → node status updates
+	// -------------------------------------------------------------------------
+	let cleanupExecution = $state<(() => void) | null>(null);
+
+	async function handleRunWorkflow() {
+		if (!workflowName || execution.running) return;
+
+		// Save the workflow first so the executor finds the latest definition.
+		try {
+			const { createWorkflow } = await import('$lib/api');
+			await createWorkflow(buildDefinition());
+		} catch {
+			// Non-blocking — proceed even if save fails (workflow may already exist).
+		}
+
+		let result: { run_id: string; workflow: string };
+		try {
+			result = await executeWorkflow(workflowName);
+		} catch (e) {
+			console.error('Failed to start execution:', e);
+			return;
+		}
+
+		// Reset all node statuses to pending.
+		nodes = nodes.map((n) => ({ ...n, data: { ...n.data, status: 'pending' as StepStatus } }));
+		startExecution(result.run_id);
+
+		// Subscribe to the SSE stream.
+		if (cleanupExecution) cleanupExecution();
+		cleanupExecution = subscribeExecution(
+			result.run_id,
+			(stepId, status) => {
+				updateStep(stepId, status as StepStatus);
+				// Mirror status into the Svelte Flow nodes array so SkillNode re-renders.
+				nodes = nodes.map((n) =>
+					n.id === stepId ? { ...n, data: { ...n.data, status: status as StepStatus } } : n
+				);
+			},
+			() => {
+				finishExecution();
+			}
+		);
+	}
+
+	// -------------------------------------------------------------------------
 	// Initialize history on first load
 	// -------------------------------------------------------------------------
 	$effect(() => {
@@ -318,6 +364,8 @@
 		getDefinition={buildDefinition}
 		onAutoLayout={handleAutoLayout}
 		onLoadWorkflow={openLoadModal}
+		onRunWorkflow={handleRunWorkflow}
+		isRunning={execution.running}
 	/>
 
 	<div class="builder-body">

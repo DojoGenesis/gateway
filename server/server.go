@@ -24,6 +24,7 @@ import (
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/reflection"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/validation"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/maintenance"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/middleware"
@@ -104,6 +105,10 @@ type Server struct {
 
 	// Server start time for uptime tracking
 	startTime time.Time
+
+	// Workflow execution (Era 3)
+	workflowCAS cas.Store
+	execBus     *ExecutionBus
 }
 
 // New creates a new Server with all dependencies injected.
@@ -153,6 +158,8 @@ func New(deps ServerDeps) *Server {
 		authDB:                deps.AuthDB,
 		orchestrations:        NewOrchestrationStore(),
 		agents:                make(map[string]*AgentRuntime),
+		workflowCAS:           deps.WorkflowCAS,
+		execBus:               newExecutionBus(),
 	}
 
 	s.setupMiddleware()

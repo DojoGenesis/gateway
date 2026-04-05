@@ -1,7 +1,12 @@
 package server
 
 import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/handlers"
+	wfapi "github.com/TresPies-source/AgenticGatewayByDojoGenesis/workflow/api"
 )
 
 // setupRoutes registers all HTTP routes on the Gin engine.
@@ -114,6 +119,24 @@ func (s *Server) setupRoutes() {
 		settings.POST("/providers", s.handleSetProviderKey)
 		settings.GET("/providers", s.handleGetProviderSettings)
 	}
+
+	// ─── Workflow API (Era 3) ────────────────────────────────────────
+	// CRUD: POST/GET /api/workflows, PUT/GET /api/workflows/:name/canvas,
+	// POST /api/workflows/:name/validate, GET /api/skills.
+	// Requires WorkflowCAS dep; omitted when nil.
+	if s.workflowCAS != nil {
+		wfHandler := wfapi.NewWorkflowHandler(s.workflowCAS)
+		mux := http.NewServeMux()
+		wfHandler.RegisterRoutes(mux)
+		ginMux := gin.WrapH(mux)
+		s.router.Any("/api/workflows", ginMux)
+		s.router.Any("/api/workflows/*path", ginMux)
+		s.router.GET("/api/skills", ginMux)
+	}
+
+	// Execution endpoints (always registered; handler returns 501 when CAS absent).
+	s.router.POST("/api/workflows/:name/execute", s.handleWorkflowExecute)
+	s.router.GET("/api/workflows/:run_id/execution", s.handleWorkflowExecutionStream)
 
 	// ─── Workflow Builder SPA (Era 3) ────────────────────────────────
 	// Served from embedded dist/ compiled by `make build-spa`.
