@@ -7,10 +7,19 @@ use (
 	./events
 	./mcp
 	./memory
+	./observation/audit
 	./orchestration
+	./pkg/skill
+	./protocol/mcp-server
+	./protocol/transport
 	./provider
+	./runtime/actor
+	./runtime/cas
+	./runtime/event
+	./runtime/wasm
 	./server
 	./shared
 	./skill
 	./tools
+	./wasm-modules/dip-scorer
 )
