@@ -12,7 +12,7 @@ func TestVerifyAllTools(t *testing.T) {
 
 func TestGetToolCount(t *testing.T) {
 	count := GetToolCount()
-	expectedCount := 32
+	expectedCount := 33
 	if count != expectedCount {
 		t.Errorf("Expected %d tools, got %d", expectedCount, count)
 	}
@@ -22,7 +22,7 @@ func TestListAllTools(t *testing.T) {
 	categories := ListAllTools()
 
 	expectedCounts := map[string]int{
-		"file_operations": 4,
+		"file_operations": 5,
 		"web_operations":  3,
 		"web_advanced":    5,
 		"computation":     2,

@@ -13,10 +13,16 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/apps"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/collaboration"
+	pkgerrors "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/errors"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/intelligence"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/reflection"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/validation"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/maintenance"
@@ -31,6 +37,18 @@ const Version = "1.1.0"
 // *mcp.MCPHostManager satisfies this interface.
 type MCPStatusProvider interface {
 	Status() map[string]mcp.ServerStatus
+}
+
+// AgentRuntime holds per-agent disposition config and instantiated consumer modules.
+// Created when an agent is initialized via POST /v1/gateway/agents.
+type AgentRuntime struct {
+	Config        *gateway.AgentConfig
+	Disposition   *disposition.DispositionConfig
+	ErrorHandler  *pkgerrors.Handler
+	CollabManager *collaboration.Manager
+	Validator     *validation.Validator
+	Reflection    *reflection.Engine
+	Proactive     *intelligence.ProactiveEngine
 }
 
 // ServerConfig holds server-specific configuration.
@@ -81,7 +99,7 @@ type Server struct {
 	orchestrations *OrchestrationStore
 
 	// Agent state (in-memory for v1.0.0)
-	agents  map[string]*gateway.AgentConfig
+	agents  map[string]*AgentRuntime
 	agentMu sync.RWMutex
 
 	// Server start time for uptime tracking
@@ -134,7 +152,7 @@ func New(deps ServerDeps) *Server {
 		appManager:            deps.AppManager,
 		authDB:                deps.AuthDB,
 		orchestrations:        NewOrchestrationStore(),
-		agents:                make(map[string]*gateway.AgentConfig),
+		agents:                make(map[string]*AgentRuntime),
 	}
 
 	s.setupMiddleware()

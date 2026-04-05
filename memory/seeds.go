@@ -349,6 +349,93 @@ func (sm *SeedManager) CreateUserSeed(ctx context.Context, projectID *string, co
 	return seed, nil
 }
 
+// CreateSystemSeed creates a new system-sourced memory seed.
+// System seeds are non-editable by users and have source='system'.
+// The createdBy parameter is optional — system seeds may not have a human creator.
+// If projectID is provided, validates that the project exists.
+func (sm *SeedManager) CreateSystemSeed(ctx context.Context, projectID *string, content, seedType string, createdBy *string) (*MemorySeed, error) {
+	if err := validateContent(content); err != nil {
+		slog.Error("invalid content for new system seed", "error", err)
+		return nil, err
+	}
+
+	if seedType == "" {
+		return nil, fmt.Errorf("seed_type is required")
+	}
+
+	if projectID != nil && *projectID != "" {
+		exists, err := sm.projectExists(ctx, *projectID)
+		if err != nil {
+			slog.Error("failed to validate project existence", "error", err)
+			return nil, err
+		}
+		if !exists {
+			slog.Warn("attempt to create system seed for non-existent project", "project_id", *projectID)
+			return nil, ErrProjectNotFound
+		}
+	}
+
+	now := time.Now()
+	seed := &MemorySeed{
+		ID:           uuid.New().String(),
+		ProjectID:    projectID,
+		Content:      content,
+		SeedType:     seedType,
+		Source:       SourceSystem,
+		UserEditable: false,
+		Confidence:   1.0,
+		UsageCount:   0,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		CreatedBy:    createdBy,
+		Version:      1,
+	}
+
+	query := `
+		INSERT INTO memory_seeds
+		(id, project_id, content, seed_type, source, user_editable, confidence,
+		 usage_count, created_at, updated_at, created_by, version)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	var projectIDVal interface{}
+	if projectID != nil {
+		projectIDVal = *projectID
+	} else {
+		projectIDVal = nil
+	}
+
+	var createdByVal interface{}
+	if createdBy != nil {
+		createdByVal = *createdBy
+	} else {
+		createdByVal = nil
+	}
+
+	_, err := sm.db.ExecContext(ctx, query,
+		seed.ID,
+		projectIDVal,
+		seed.Content,
+		seed.SeedType,
+		seed.Source,
+		seed.UserEditable,
+		seed.Confidence,
+		seed.UsageCount,
+		seed.CreatedAt,
+		seed.UpdatedAt,
+		createdByVal,
+		seed.Version,
+	)
+
+	if err != nil {
+		slog.Error("failed to create system seed", "error", err)
+		return nil, fmt.Errorf("failed to create system seed: %w", err)
+	}
+
+	slog.Info("created system seed", "seed_id", seed.ID, "project_id", projectID, "seed_type", seedType, "content_length", len(content))
+	return seed, nil
+}
+
 // DeleteSeed soft-deletes a memory seed by setting its deleted_at timestamp.
 // Only user-created seeds (source='user' AND user_editable=true) can be deleted.
 // If userID is provided, verifies that the user owns the seed.

@@ -519,3 +519,87 @@ func TestEngine_Execute_FatalError_NoReplan(t *testing.T) {
 	// Should NOT have attempted replanning for fatal errors
 	assert.Equal(t, int32(0), planner.regenerateCount.Load())
 }
+
+func TestEngine_SetEventEmitter_WiresEvents(t *testing.T) {
+	ctx := context.Background()
+
+	invoker := &mockToolInvoker{
+		invokeFunc: func(ctx context.Context, toolName string, params map[string]interface{}) (map[string]interface{}, error) {
+			return map[string]interface{}{"result": "ok"}, nil
+		},
+	}
+
+	config := DefaultEngineConfig()
+	planner := &mockPlanner{}
+	rapidDisp := &disposition.DispositionConfig{Pacing: "rapid"}
+
+	// Start with nil emitter
+	engine := NewEngine(config, planner, invoker, nil, nil, nil, WithDisposition(rapidDisp))
+
+	// Create a mock emitter and set it
+	emitter := &mockEventEmitter{}
+	engine.SetEventEmitter(emitter)
+
+	plan := &Plan{
+		ID:     "test-events-1",
+		TaskID: "task-1",
+		Nodes: []*PlanNode{
+			{ID: "n1", ToolName: "tool_a", Parameters: map[string]interface{}{}, Dependencies: []string{}, State: NodeStatePending},
+		},
+	}
+
+	task := NewTask("user1", "test events")
+	err := engine.Execute(ctx, plan, task, "user1")
+	assert.NoError(t, err)
+
+	// Verify events were emitted
+	assert.NotEmpty(t, emitter.events, "event emitter should have received events")
+
+	// Should have at least node.start + node.end
+	hasStart := false
+	hasEnd := false
+	for _, evt := range emitter.events {
+		if evt.Type == "orchestration.node.start" {
+			hasStart = true
+			assert.Equal(t, "n1", evt.Data["node_id"])
+			assert.Equal(t, "tool_a", evt.Data["tool_name"])
+		}
+		if evt.Type == "orchestration.node.end" {
+			hasEnd = true
+			assert.Equal(t, "n1", evt.Data["node_id"])
+			assert.Equal(t, string(NodeStateSuccess), evt.Data["state"])
+		}
+	}
+	assert.True(t, hasStart, "should have received orchestration.node.start")
+	assert.True(t, hasEnd, "should have received orchestration.node.end")
+}
+
+func TestEngine_SetEventEmitter_NilClearsEmitter(t *testing.T) {
+	ctx := context.Background()
+
+	invoker := &mockToolInvoker{}
+	config := DefaultEngineConfig()
+	planner := &mockPlanner{}
+	rapidDisp := &disposition.DispositionConfig{Pacing: "rapid"}
+
+	emitter := &mockEventEmitter{}
+	engine := NewEngine(config, planner, invoker, nil, emitter, nil, WithDisposition(rapidDisp))
+
+	// Clear emitter
+	engine.SetEventEmitter(nil)
+
+	plan := &Plan{
+		ID:     "test-nil-emitter",
+		TaskID: "task-1",
+		Nodes: []*PlanNode{
+			{ID: "n1", ToolName: "tool_a", Parameters: map[string]interface{}{}, Dependencies: []string{}, State: NodeStatePending},
+		},
+	}
+
+	task := NewTask("user1", "test nil emitter")
+	err := engine.Execute(ctx, plan, task, "user1")
+	assert.NoError(t, err)
+
+	// Original emitter should have NO events since we cleared it
+	assert.Empty(t, emitter.events, "cleared emitter should not receive events")
+}

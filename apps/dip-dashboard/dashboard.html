@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIP Scoring Dashboard</title>
+<style>
+/* ------------------------------------------------------------------ */
+/* Theme tokens - overridable by MCP App host via custom properties    */
+/* ------------------------------------------------------------------ */
+:root {
+    --bg: var(--mcp-bg, #ffffff);
+    --fg: var(--mcp-fg, #111111);
+    --accent: var(--mcp-accent, #2563eb);
+    --border: var(--mcp-border, #e5e7eb);
+    --surface: var(--mcp-surface, #f9fafb);
+    --green: #16a34a;
+    --yellow: #ca8a04;
+    --red: #dc2626;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-lg: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Header                                                              */
+/* ------------------------------------------------------------------ */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+.header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+.header .subtitle {
+    font-size: 13px;
+    color: #6b7280;
+    margin-top: 2px;
+}
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--fg);
+    font-size: 13px;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+.btn:hover { background: #f3f4f6; box-shadow: var(--shadow); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: #1d4ed8; }
+
+/* ------------------------------------------------------------------ */
+/* Layout grid                                                         */
+/* ------------------------------------------------------------------ */
+.grid { display: grid; gap: 20px; margin-bottom: 24px; }
+.grid-top { grid-template-columns: 280px 1fr; }
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+}
+.card-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    margin-bottom: 16px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Score Gauge                                                         */
+/* ------------------------------------------------------------------ */
+.gauge-container { display: flex; flex-direction: column; align-items: center; }
+.gauge-svg { width: 200px; height: 140px; }
+.gauge-label {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-top: -8px;
+}
+.gauge-state {
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 4px;
+    padding: 2px 10px;
+    border-radius: 12px;
+}
+.gauge-state.conforming  { background: #dcfce7; color: var(--green); }
+.gauge-state.guided      { background: #fef9c3; color: var(--yellow); }
+.gauge-state.deviation   { background: #fee2e2; color: var(--red); }
+
+/* ------------------------------------------------------------------ */
+/* Radar Chart                                                         */
+/* ------------------------------------------------------------------ */
+.radar-container { display: flex; align-items: center; justify-content: center; }
+.radar-svg { width: 100%; max-width: 420px; height: 320px; }
+
+/* ------------------------------------------------------------------ */
+/* Dimension Table                                                     */
+/* ------------------------------------------------------------------ */
+.table-wrapper { overflow-x: auto; }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+thead th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    padding: 8px 12px;
+    border-bottom: 2px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+thead th:hover { color: var(--fg); }
+thead th .sort-arrow { margin-left: 4px; font-size: 10px; opacity: 0.5; }
+thead th.sorted .sort-arrow { opacity: 1; }
+tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+tbody tr:hover { background: rgba(0,0,0,0.02); }
+
+.score-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 12px;
+    font-family: var(--mono);
+}
+.score-badge.high  { background: #dcfce7; color: var(--green); }
+.score-badge.mid   { background: #fef9c3; color: var(--yellow); }
+.score-badge.low   { background: #fee2e2; color: var(--red); }
+
+.weight-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.weight-bar-track {
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.weight-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+}
+
+.state-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+}
+.state-pill.conforming  { background: #dcfce7; color: var(--green); }
+.state-pill.intentional { background: #fee2e2; color: var(--red); }
+.state-pill.exploratory { background: #dbeafe; color: var(--accent); }
+
+/* ------------------------------------------------------------------ */
+/* Sparkline                                                           */
+/* ------------------------------------------------------------------ */
+.sparkline { width: 64px; height: 24px; vertical-align: middle; }
+
+/* ------------------------------------------------------------------ */
+/* Detail panel                                                        */
+/* ------------------------------------------------------------------ */
+.detail-panel {
+    display: none;
+    margin-top: 20px;
+}
+.detail-panel.visible { display: block; }
+.detail-panel .detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.detail-panel .detail-title { font-size: 16px; font-weight: 600; }
+.detail-chart { width: 100%; height: 160px; }
+
+/* ------------------------------------------------------------------ */
+/* Status bar                                                          */
+/* ------------------------------------------------------------------ */
+.status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #9ca3af;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+.status-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+.status-dot.connected { background: var(--green); }
+.status-dot.demo      { background: var(--yellow); }
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                          */
+/* ------------------------------------------------------------------ */
+@media (max-width: 720px) {
+    .grid-top { grid-template-columns: 1fr; }
+    body { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>DIP Scoring Dashboard</h1>
+        <div class="subtitle" id="componentName">Design Intelligence Platform</div>
+    </div>
+    <div class="header-actions">
+        <button class="btn" id="btnRefresh" onclick="handleRefresh()">Refresh</button>
+        <button class="btn btn-primary" id="btnExport" onclick="handleExport()">Export Report</button>
+    </div>
+</div>
+
+<div class="grid grid-top">
+    <div class="card">
+        <div class="card-title">Aggregate Score</div>
+        <div class="gauge-container" id="gaugeContainer"></div>
+    </div>
+    <div class="card">
+        <div class="card-title">Dimension Radar</div>
+        <div class="radar-container" id="radarContainer"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Dimensions</div>
+    <div class="table-wrapper">
+        <table id="dimensionTable">
+            <thead>
+                <tr>
+                    <th data-col="name" onclick="sortTable('name')">
+                        Dimension <span class="sort-arrow">&#9650;</span>
+                    </th>
+                    <th data-col="score" onclick="sortTable('score')">
+                        Score <span class="sort-arrow">&#9650;</span>
+                    </th>
+                    <th data-col="weight" onclick="sortTable('weight')">
+                        Weight <span class="sort-arrow">&#9650;</span>
+                    </th>
+                    <th data-col="state" onclick="sortTable('state')">
+                        State <span class="sort-arrow">&#9650;</span>
+                    </th>
+                    <th>Trend</th>
+                </tr>
+            </thead>
+            <tbody id="dimensionBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card detail-panel" id="detailPanel">
+    <div class="detail-header">
+        <div class="detail-title" id="detailTitle">Dimension Detail</div>
+        <button class="btn" onclick="closeDetail()">Close</button>
+    </div>
+    <svg class="detail-chart" id="detailChart"></svg>
+</div>
+
+<div class="status-bar">
+    <div>
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText"></span>
+    </div>
+    <div id="lastUpdated"></div>
+</div>
+
+<script>
+/* ================================================================== */
+/* MCP App Bridge integration                                          */
+/* ================================================================== */
+const bridge = window.MCPAppBridge ? new window.MCPAppBridge() : null;
+let currentComponentId = null;
+let currentData = null;
+let sortCol = 'name';
+let sortAsc = true;
+
+if (bridge) {
+    bridge.onInitialize((hostContext) => {
+        if (hostContext.theme) {
+            const root = document.documentElement.style;
+            if (hostContext.theme.background) root.setProperty('--mcp-bg', hostContext.theme.background);
+            if (hostContext.theme.foreground) root.setProperty('--mcp-fg', hostContext.theme.foreground);
+            if (hostContext.theme.accent)     root.setProperty('--mcp-accent', hostContext.theme.accent);
+            if (hostContext.theme.border)     root.setProperty('--mcp-border', hostContext.theme.border);
+            if (hostContext.theme.surface)    root.setProperty('--mcp-surface', hostContext.theme.surface);
+        }
+        setStatus(true);
+    });
+
+    bridge.onToolInput((toolName, args) => {
+        if (toolName === 'show_dip_dashboard' || toolName === 'refresh_scores') {
+            renderDashboard(args);
+        }
+    });
+} else {
+    loadDemoData();
+}
+
+/* ================================================================== */
+/* Demo data for standalone viewing                                    */
+/* ================================================================== */
+function loadDemoData() {
+    setStatus(false);
+    const demo = {
+        component_id: 'demo-component-001',
+        component_name: 'Button / Primary',
+        aggregate_score: 0.72,
+        deviation_state: 'conforming',
+        dimensions: [
+            { name: 'Color Alignment',    score:  0.85, weight: 1.0, state: 'conforming',  history: [0.60, 0.65, 0.70, 0.78, 0.82, 0.85] },
+            { name: 'Spacing Substance',  score:  0.68, weight: 0.8, state: 'conforming',  history: [0.50, 0.55, 0.60, 0.62, 0.65, 0.68] },
+            { name: 'Typography Fidelity',score:  0.91, weight: 1.0, state: 'conforming',  history: [0.70, 0.75, 0.80, 0.85, 0.88, 0.91] },
+            { name: 'Motion Language',    score:  0.42, weight: 0.6, state: 'exploratory', history: [0.30, 0.32, 0.35, 0.38, 0.40, 0.42] },
+            { name: 'Accessibility',      score:  0.77, weight: 1.0, state: 'conforming',  history: [0.55, 0.60, 0.65, 0.70, 0.74, 0.77] },
+            { name: 'Interaction Pattern', score: -0.15, weight: 0.7, state: 'intentional', history: [-0.40, -0.35, -0.28, -0.22, -0.18, -0.15] },
+            { name: 'Visual Hierarchy',   score:  0.63, weight: 0.9, state: 'conforming',  history: [0.45, 0.50, 0.55, 0.58, 0.60, 0.63] },
+            { name: 'Density',            score:  0.54, weight: 0.5, state: 'conforming',  history: [0.40, 0.42, 0.45, 0.48, 0.51, 0.54] },
+        ]
+    };
+    renderDashboard(demo);
+}
+
+/* ================================================================== */
+/* Main render                                                         */
+/* ================================================================== */
+function renderDashboard(data) {
+    currentData = data;
+    currentComponentId = data.component_id || null;
+
+    document.getElementById('componentName').textContent =
+        data.component_name || data.component_id || 'Unknown Component';
+
+    renderGauge(data.aggregate_score, data.deviation_state);
+    renderRadar(data.dimensions || []);
+    renderTable(data.dimensions || []);
+    updateTimestamp();
+}
+
+/* ================================================================== */
+/* Score Gauge (SVG arc)                                               */
+/* ================================================================== */
+function renderGauge(score, state) {
+    const container = document.getElementById('gaugeContainer');
+    const clamped = Math.max(-1, Math.min(1, score));
+    const pct = (clamped + 1) / 2;  // map [-1,1] to [0,1]
+    const color = scoreColor(clamped);
+    const stateLabel = stateFromScore(clamped);
+
+    const cx = 100, cy = 100, r = 80;
+    const startAngle = Math.PI;
+    const endAngle   = Math.PI + Math.PI * pct;
+    const bgEnd      = 2 * Math.PI;
+
+    function arc(angle) {
+        return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`;
+    }
+
+    const bgPath = `M ${arc(startAngle)} A ${r} ${r} 0 1 1 ${arc(bgEnd)}`;
+    const fgLargeArc = pct > 0.5 ? 1 : 0;
+    const fgPath = `M ${arc(startAngle)} A ${r} ${r} 0 ${fgLargeArc} 1 ${arc(endAngle)}`;
+
+    container.innerHTML = `
+        <svg class="gauge-svg" viewBox="0 0 200 140">
+            <path d="${bgPath}" fill="none" stroke="${'var(--border)'}" stroke-width="14" stroke-linecap="round"/>
+            <path d="${fgPath}" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"/>
+        </svg>
+        <div class="gauge-label" style="color:${color}">${clamped >= 0 ? '+' : ''}${clamped.toFixed(2)}</div>
+        <div class="gauge-state ${stateLabel}">${capitalize(state || stateLabel)}</div>
+    `;
+}
+
+/* ================================================================== */
+/* Radar Chart                                                         */
+/* ================================================================== */
+function renderRadar(dimensions) {
+    const container = document.getElementById('radarContainer');
+    if (!dimensions.length) {
+        container.innerHTML = '<p style="color:#9ca3af;font-size:13px">No dimension data</p>';
+        return;
+    }
+
+    const n = dimensions.length;
+    const cx = 210, cy = 160, maxR = 130;
+    const step = (2 * Math.PI) / n;
+    const offset = -Math.PI / 2;
+
+    function point(i, val) {
+        const angle = offset + step * i;
+        const r = maxR * ((val + 1) / 2);  // map [-1,1] to [0, maxR]
+        return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
+    }
+
+    // Concentric rings at -1, -0.5, 0, 0.5, 1
+    let rings = '';
+    [0.0, 0.25, 0.5, 0.75, 1.0].forEach(pct => {
+        const r = maxR * pct;
+        rings += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="${pct === 0.5 ? '4,3' : 'none'}"/>`;
+    });
+
+    // Spokes
+    let spokes = '';
+    for (let i = 0; i < n; i++) {
+        const [ex, ey] = point(i, 1);
+        spokes += `<line x1="${cx}" y1="${cy}" x2="${ex}" y2="${ey}" stroke="var(--border)" stroke-width="0.5"/>`;
+    }
+
+    // Labels
+    let labels = '';
+    for (let i = 0; i < n; i++) {
+        const angle = offset + step * i;
+        const lr = maxR + 20;
+        const lx = cx + lr * Math.cos(angle);
+        const ly = cy + lr * Math.sin(angle);
+        const anchor = Math.abs(angle - (-Math.PI/2)) < 0.01 || Math.abs(angle - (Math.PI * 3/2)) < 0.01
+            ? 'middle'
+            : Math.cos(angle) < -0.01 ? 'end' : 'start';
+        const shortName = dimensions[i].name.length > 16
+            ? dimensions[i].name.slice(0, 14) + '..'
+            : dimensions[i].name;
+        labels += `<text x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle"
+            font-size="10" fill="#6b7280" font-family="var(--font)">${shortName}</text>`;
+    }
+
+    // Data polygon
+    const pts = dimensions.map((d, i) => point(i, d.score).join(',')).join(' ');
+
+    container.innerHTML = `
+        <svg class="radar-svg" viewBox="0 0 420 320">
+            ${rings}
+            ${spokes}
+            <polygon points="${pts}" fill="${'var(--accent)'}" fill-opacity="0.15"
+                stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+            ${dimensions.map((d, i) => {
+                const [px, py] = point(i, d.score);
+                return `<circle cx="${px}" cy="${py}" r="4" fill="${scoreColor(d.score)}" stroke="#fff" stroke-width="1.5"/>`;
+            }).join('')}
+            ${labels}
+        </svg>
+    `;
+}
+
+/* ================================================================== */
+/* Dimension Table                                                     */
+/* ================================================================== */
+function renderTable(dimensions) {
+    const body = document.getElementById('dimensionBody');
+    const sorted = [...dimensions].sort((a, b) => {
+        let va = a[sortCol], vb = b[sortCol];
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+        if (va < vb) return sortAsc ? -1 : 1;
+        if (va > vb) return sortAsc ? 1 : -1;
+        return 0;
+    });
+
+    body.innerHTML = sorted.map(d => {
+        const cls = scoreBadgeClass(d.score);
+        const stateCls = d.state || stateFromScore(d.score);
+        const weightPct = Math.min(100, Math.round((d.weight || 1) * 100));
+        const spark = renderSparkline(d.history || []);
+        return `
+            <tr onclick="showDetail('${escapeJs(d.name)}')" style="cursor:pointer">
+                <td><strong>${escapeHtml(d.name)}</strong></td>
+                <td><span class="score-badge ${cls}">${d.score >= 0 ? '+' : ''}${d.score.toFixed(2)}</span></td>
+                <td>
+                    <div class="weight-bar">
+                        <div class="weight-bar-track"><div class="weight-bar-fill" style="width:${weightPct}%"></div></div>
+                        <span style="font-size:12px;color:#6b7280;font-family:var(--mono)">${(d.weight || 1).toFixed(1)}</span>
+                    </div>
+                </td>
+                <td><span class="state-pill ${stateCls}">${capitalize(stateCls)}</span></td>
+                <td>${spark}</td>
+            </tr>
+        `;
+    }).join('');
+
+    // Update sort indicators
+    document.querySelectorAll('#dimensionTable thead th').forEach(th => {
+        const col = th.dataset.col;
+        th.classList.toggle('sorted', col === sortCol);
+        const arrow = th.querySelector('.sort-arrow');
+        if (arrow) arrow.innerHTML = col === sortCol ? (sortAsc ? '&#9650;' : '&#9660;') : '&#9650;';
+    });
+}
+
+function sortTable(col) {
+    if (sortCol === col) { sortAsc = !sortAsc; }
+    else { sortCol = col; sortAsc = true; }
+    if (currentData && currentData.dimensions) renderTable(currentData.dimensions);
+}
+
+/* ================================================================== */
+/* Sparkline                                                           */
+/* ================================================================== */
+function renderSparkline(history) {
+    if (!history || history.length < 2) return '';
+    const w = 64, h = 24, pad = 2;
+    const n = history.length;
+    const minV = Math.min(...history, -1);
+    const maxV = Math.max(...history, 1);
+    const range = maxV - minV || 1;
+
+    const pts = history.map((v, i) => {
+        const x = pad + (i / (n - 1)) * (w - 2 * pad);
+        const y = h - pad - ((v - minV) / range) * (h - 2 * pad);
+        return `${x},${y}`;
+    });
+
+    const last = history[history.length - 1];
+    const color = scoreColor(last);
+
+    return `<svg class="sparkline" viewBox="0 0 ${w} ${h}">
+        <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="${pts[pts.length - 1].split(',')[0]}" cy="${pts[pts.length - 1].split(',')[1]}" r="2" fill="${color}"/>
+    </svg>`;
+}
+
+/* ================================================================== */
+/* Detail panel                                                        */
+/* ================================================================== */
+function showDetail(dimensionName) {
+    const panel = document.getElementById('detailPanel');
+    document.getElementById('detailTitle').textContent = dimensionName;
+    panel.classList.add('visible');
+
+    if (bridge && currentComponentId) {
+        bridge.callTool('fetch_dimension_detail', {
+            component_id: currentComponentId,
+            dimension: dimensionName
+        }).then(result => {
+            renderDetailChart(result.history || [], dimensionName);
+        }).catch(() => {
+            // Fall back to local data
+            const dim = (currentData.dimensions || []).find(d => d.name === dimensionName);
+            renderDetailChart(dim ? dim.history || [] : [], dimensionName);
+        });
+    } else {
+        const dim = (currentData.dimensions || []).find(d => d.name === dimensionName);
+        renderDetailChart(dim ? dim.history || [] : [], dimensionName);
+    }
+}
+
+function renderDetailChart(history, label) {
+    const svg = document.getElementById('detailChart');
+    if (!history || history.length < 2) {
+        svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="13">No historical data</text>';
+        return;
+    }
+
+    const w = svg.clientWidth || 600;
+    const h = 160;
+    const pad = { top: 16, right: 16, bottom: 28, left: 44 };
+    const plotW = w - pad.left - pad.right;
+    const plotH = h - pad.top - pad.bottom;
+
+    const minV = Math.min(...history, -1);
+    const maxV = Math.max(...history, 1);
+    const range = maxV - minV || 1;
+    const n = history.length;
+
+    function x(i) { return pad.left + (i / (n - 1)) * plotW; }
+    function y(v) { return pad.top + plotH - ((v - minV) / range) * plotH; }
+
+    const linePts = history.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+    const areaPts = `${x(0)},${y(history[0])} ${linePts} ${x(n-1)},${pad.top + plotH} ${x(0)},${pad.top + plotH}`;
+
+    // Y-axis ticks
+    let yTicks = '';
+    [-1, -0.5, 0, 0.5, 1].forEach(v => {
+        if (v >= minV && v <= maxV) {
+            yTicks += `<line x1="${pad.left}" y1="${y(v)}" x2="${w - pad.right}" y2="${y(v)}"
+                stroke="var(--border)" stroke-width="0.5" ${v === 0 ? 'stroke-dasharray="4,3"' : ''}/>`;
+            yTicks += `<text x="${pad.left - 6}" y="${y(v)}" text-anchor="end" dominant-baseline="middle"
+                font-size="10" fill="#9ca3af" font-family="var(--mono)">${v.toFixed(1)}</text>`;
+        }
+    });
+
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.innerHTML = `
+        ${yTicks}
+        <polygon points="${areaPts}" fill="var(--accent)" fill-opacity="0.08"/>
+        <polyline points="${linePts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+        ${history.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${scoreColor(v)}" stroke="#fff" stroke-width="1.5"/>`).join('')}
+    `;
+}
+
+function closeDetail() {
+    document.getElementById('detailPanel').classList.remove('visible');
+}
+
+/* ================================================================== */
+/* Actions                                                             */
+/* ================================================================== */
+function handleRefresh() {
+    if (bridge && currentComponentId) {
+        bridge.callTool('refresh_scores', { component_id: currentComponentId })
+            .then(result => renderDashboard(result))
+            .catch(err => console.error('refresh failed:', err));
+    } else {
+        loadDemoData();
+    }
+}
+
+function handleExport() {
+    if (bridge && currentComponentId) {
+        bridge.callTool('export_report', {
+            component_id: currentComponentId,
+            format: 'html'
+        }).then(result => {
+            if (result.html) {
+                const blob = new Blob([result.html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `dip-report-${currentComponentId}.html`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        }).catch(err => console.error('export failed:', err));
+    } else {
+        // Demo mode export: serialize current view
+        const html = document.documentElement.outerHTML;
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'dip-report-demo.html';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+}
+
+/* ================================================================== */
+/* Helpers                                                             */
+/* ================================================================== */
+function scoreColor(s) {
+    if (s >= 0.5)  return 'var(--green)';
+    if (s >= -0.3) return 'var(--yellow)';
+    return 'var(--red)';
+}
+
+function scoreBadgeClass(s) {
+    if (s >= 0.5)  return 'high';
+    if (s >= -0.3) return 'mid';
+    return 'low';
+}
+
+function stateFromScore(s) {
+    if (s >= 0.5)  return 'conforming';
+    if (s >= -0.3) return 'guided';
+    return 'deviation';
+}
+
+function capitalize(s) {
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+}
+
+function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+}
+
+function escapeJs(str) {
+    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+}
+
+function setStatus(connected) {
+    const dot  = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if (connected) {
+        dot.className  = 'status-dot connected';
+        text.textContent = 'Connected via MCP Bridge';
+    } else {
+        dot.className  = 'status-dot demo';
+        text.textContent = 'Demo Mode (no bridge)';
+    }
+}
+
+function updateTimestamp() {
+    const el = document.getElementById('lastUpdated');
+    const now = new Date();
+    el.textContent = 'Updated ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+</script>
+</body>
+</html>

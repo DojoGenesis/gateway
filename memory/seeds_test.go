@@ -627,6 +627,99 @@ func TestSearchSeeds(t *testing.T) {
 	})
 }
 
+func TestCreateSystemSeed(t *testing.T) {
+	db := setupSeedTestDB(t)
+	defer db.Close()
+
+	sm, err := NewSeedManager(db)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	t.Run("valid global system seed", func(t *testing.T) {
+		seed, err := sm.CreateSystemSeed(ctx, nil, "System prompt analysis: Cursor uses rapid pacing", "knowledge", nil)
+		assert.NoError(t, err)
+		assert.NotNil(t, seed)
+		assert.NotEmpty(t, seed.ID)
+		assert.Equal(t, "System prompt analysis: Cursor uses rapid pacing", seed.Content)
+		assert.Equal(t, "knowledge", seed.SeedType)
+		assert.Equal(t, SourceSystem, seed.Source)
+		assert.False(t, seed.UserEditable, "system seeds must not be user-editable")
+		assert.Equal(t, 1.0, seed.Confidence)
+		assert.Nil(t, seed.CreatedBy)
+	})
+
+	t.Run("system seed with createdBy", func(t *testing.T) {
+		creator := "ingest-system-prompt-skill"
+		seed, err := sm.CreateSystemSeed(ctx, nil, "Behavioral pattern from Windsurf", "pattern", &creator)
+		assert.NoError(t, err)
+		assert.NotNil(t, seed)
+		assert.Equal(t, SourceSystem, seed.Source)
+		assert.False(t, seed.UserEditable)
+		assert.NotNil(t, seed.CreatedBy)
+		assert.Equal(t, "ingest-system-prompt-skill", *seed.CreatedBy)
+	})
+
+	t.Run("system seed with project", func(t *testing.T) {
+		projectID := "project-1"
+		seed, err := sm.CreateSystemSeed(ctx, &projectID, "Project-scoped system knowledge", "constraint", nil)
+		assert.NoError(t, err)
+		assert.NotNil(t, seed)
+		assert.NotNil(t, seed.ProjectID)
+		assert.Equal(t, projectID, *seed.ProjectID)
+	})
+
+	t.Run("system seed is not deletable by user", func(t *testing.T) {
+		seed, err := sm.CreateSystemSeed(ctx, nil, "Protected system seed", "knowledge", nil)
+		require.NoError(t, err)
+
+		userID := "user-1"
+		err = sm.DeleteSeed(ctx, seed.ID, &userID)
+		assert.Error(t, err, "system seeds should not be deletable")
+	})
+
+	t.Run("system seed is not editable", func(t *testing.T) {
+		seed, err := sm.CreateSystemSeed(ctx, nil, "Immutable system content", "knowledge", nil)
+		require.NoError(t, err)
+
+		userID := "user-1"
+		_, err = sm.UpdateSeed(ctx, seed.ID, "attempted modification", &userID)
+		assert.Error(t, err, "system seeds should not be editable")
+	})
+
+	t.Run("missing content", func(t *testing.T) {
+		seed, err := sm.CreateSystemSeed(ctx, nil, "", "knowledge", nil)
+		assert.Error(t, err)
+		assert.Nil(t, seed)
+	})
+
+	t.Run("missing seed_type", func(t *testing.T) {
+		seed, err := sm.CreateSystemSeed(ctx, nil, "Some content", "", nil)
+		assert.Error(t, err)
+		assert.Nil(t, seed)
+		assert.Contains(t, err.Error(), "seed_type is required")
+	})
+
+	t.Run("non-existent project", func(t *testing.T) {
+		badProject := "non-existent"
+		seed, err := sm.CreateSystemSeed(ctx, &badProject, "Content", "knowledge", nil)
+		assert.Error(t, err)
+		assert.Nil(t, seed)
+	})
+
+	t.Run("system seed appears in GetSeeds with source filter", func(t *testing.T) {
+		_, err := sm.CreateSystemSeed(ctx, nil, "Filterable system seed", "knowledge", nil)
+		require.NoError(t, err)
+
+		seeds, err := sm.GetSeeds(ctx, nil, map[string]interface{}{"source": "system"})
+		assert.NoError(t, err)
+		assert.NotEmpty(t, seeds)
+		for _, s := range seeds {
+			assert.Equal(t, SourceSystem, s.Source)
+		}
+	})
+}
+
 func stringPtr(s string) *string {
 	return &s
 }

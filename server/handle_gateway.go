@@ -14,9 +14,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/collaboration"
+	pkgerrors "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/errors"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/intelligence"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/reflection"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/validation"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/streaming"
 )
@@ -136,6 +142,97 @@ func (s *Server) runAgentLoop(
 	return finalResp, nil
 }
 
+// runAgentLoopWithDisposition drives the LLM ↔ tool agentic loop with
+// disposition-aware error handling and collaboration check-ins.
+// Falls back to runAgentLoop when runtime is nil.
+func (s *Server) runAgentLoopWithDisposition(
+	ctx context.Context,
+	llmProvider provider.ModelProvider,
+	messages []provider.Message,
+	tools []provider.Tool,
+	runtime *AgentRuntime,
+) (*provider.CompletionResponse, error) {
+	if runtime == nil {
+		return s.runAgentLoop(ctx, llmProvider, messages, tools)
+	}
+
+	const maxIter = 8
+
+	for i := 0; i < maxIter; i++ {
+		req := &provider.CompletionRequest{
+			Messages: messages,
+			Tools:    tools,
+		}
+
+		resp, err := llmProvider.GenerateCompletion(ctx, req)
+		if err != nil {
+			// Use disposition-aware error handling
+			if runtime.ErrorHandler != nil {
+				decision := runtime.ErrorHandler.HandleError(ctx, err, i)
+				if decision.ShouldRetry() {
+					continue
+				}
+				if decision.ShouldContinue() {
+					// Return what we have so far
+					return &provider.CompletionResponse{
+						Content: fmt.Sprintf("Encountered an error but continuing: %s", decision.Message),
+					}, nil
+				}
+			}
+			return nil, err
+		}
+
+		// No tool calls → we have the final answer
+		if len(resp.ToolCalls) == 0 {
+			return resp, nil
+		}
+
+		// Append the assistant turn (with tool calls) to history
+		assistantMsg := provider.Message{
+			Role:      "assistant",
+			Content:   resp.Content,
+			ToolCalls: resp.ToolCalls,
+		}
+		messages = append(messages, assistantMsg)
+
+		// Execute each tool call and collect results
+		for _, tc := range resp.ToolCalls {
+			result := s.executeToolCall(ctx, tc)
+			toolMsg := provider.Message{
+				Role:       "tool",
+				Content:    result,
+				ToolCallID: tc.ID,
+			}
+			messages = append(messages, toolMsg)
+		}
+
+		// Check if collaboration manager says we should check in
+		if runtime.CollabManager != nil {
+			event := collaboration.CollabEvent{
+				Type:          "action",
+				IsSignificant: len(resp.ToolCalls) > 1,
+				Description:   fmt.Sprintf("Executed %d tool calls", len(resp.ToolCalls)),
+			}
+			if runtime.CollabManager.ShouldCheckIn(ctx, event) {
+				// Inject a check-in prompt into the conversation
+				messages = append(messages, provider.Message{
+					Role:    "system",
+					Content: "Pause and check in with the user about your progress before continuing.",
+				})
+			}
+		}
+	}
+
+	// maxIter reached — do one final completion without tools to get a response
+	finalResp, err := llmProvider.GenerateCompletion(ctx, &provider.CompletionRequest{
+		Messages: messages,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return finalResp, nil
+}
+
 // executeToolCall dispatches a single tool call through the gateway ToolRegistry.
 // Returns a JSON-encoded result string (or an error description) suitable for
 // inclusion in a tool-role message.
@@ -201,8 +298,9 @@ type agentChatRequest struct {
 // and optional document context. Used by both streaming and non-streaming paths.
 func (s *Server) buildAgentSystemPrompt(agentConfig *gateway.AgentConfig, documentID, documentContent string) string {
 	systemPrompt := fmt.Sprintf(
-		"You are a helpful scientific writing assistant. "+
-			"Pacing: %s. Depth: %s. "+
+		"You are a helpful scientific writing assistant.\n"+
+			"Disposition: Pacing=%s, Depth=%s, Tone=%s, Initiative=%s.\n"+
+			"Adopt a %s communication style. "+
 			"Respond concisely and helpfully to the user's message.\n\n"+
 			"When you want to propose a specific edit to the document, embed EXACTLY ONE patch_intent "+
 			"fenced code block in your response. The block MUST use this format (no extra keys, no markdown inside the JSON):\n\n"+
@@ -216,7 +314,8 @@ func (s *Server) buildAgentSystemPrompt(agentConfig *gateway.AgentConfig, docume
 			"{\"operation\":\"replace\",\"section_id\":\"intro-1\",\"content\":\"The experiment confirmed the hypothesis.\",\"description\":\"Fix typo: confrimed → confirmed\"}\n"+
 			"```\n\n"+
 			"Place the block at the end of your response. Do NOT wrap it in another code fence.",
-		agentConfig.Pacing, agentConfig.Depth,
+		agentConfig.Pacing, agentConfig.Depth, agentConfig.Tone, agentConfig.Initiative,
+		agentConfig.Tone,
 	)
 
 	if documentContent != "" {
@@ -448,21 +547,41 @@ func (s *Server) handleGatewayCreateAgent(c *gin.Context) {
 		return
 	}
 
+	// Load full ADA disposition for consumer modules
+	disp, dispErr := disposition.ResolveDisposition(req.WorkspaceRoot, req.ActiveMode)
+	if dispErr != nil {
+		disp = disposition.DefaultDisposition()
+	}
+
 	// Generate agent ID
 	agentID := uuid.New().String()
 
-	// Store agent (in-memory for now - production would use persistence)
-	s.agentMu.Lock()
-	s.agents[agentID] = agentConfig
-	s.agentMu.Unlock()
+	// Instantiate per-agent consumer modules with disposition
+	runtime := &AgentRuntime{
+		Config:        agentConfig,
+		Disposition:   disp,
+		ErrorHandler:  pkgerrors.NewHandler(pkgerrors.WithDisposition(disp)),
+		CollabManager: collaboration.NewManager(collaboration.WithDisposition(disp)),
+		Validator:     validation.NewValidator(validation.WithDisposition(disp)),
+		Reflection:    reflection.NewEngine(reflection.WithDisposition(disp)),
+		Proactive:     intelligence.NewProactiveEngine(intelligence.WithDisposition(disp)),
+	}
 
-	// Note: Disposition is now set during engine construction in main.go
-	// The standalone orchestration engine uses orchestrationpkg.WithDisposition option
-	// No runtime pacing updates needed here
+	// Store agent runtime (in-memory for now - production would use persistence)
+	s.agentMu.Lock()
+	s.agents[agentID] = runtime
+	s.agentMu.Unlock()
 
 	c.JSON(http.StatusCreated, gin.H{
 		"agent_id": agentID,
 		"config":   agentConfig,
+		"disposition": gin.H{
+			"pacing":     disp.Pacing,
+			"depth":      disp.Depth,
+			"tone":       disp.Tone,
+			"initiative": disp.Initiative,
+			"source":     disp.SourceFile,
+		},
 	})
 }
 
@@ -472,7 +591,7 @@ func (s *Server) handleGatewayGetAgent(c *gin.Context) {
 	agentID := c.Param("id")
 
 	s.agentMu.RLock()
-	agentConfig, exists := s.agents[agentID]
+	runtime, exists := s.agents[agentID]
 	s.agentMu.RUnlock()
 
 	if !exists {
@@ -480,11 +599,20 @@ func (s *Server) handleGatewayGetAgent(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"agent_id": agentID,
-		"config":   agentConfig,
+		"config":   runtime.Config,
 		"status":   "active",
-	})
+	}
+	if runtime.Disposition != nil {
+		resp["disposition"] = gin.H{
+			"pacing":     runtime.Disposition.Pacing,
+			"depth":      runtime.Disposition.Depth,
+			"tone":       runtime.Disposition.Tone,
+			"initiative": runtime.Disposition.Initiative,
+		}
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // handleGatewayAgentChat handles chat interactions with a specific agent.
@@ -506,13 +634,15 @@ func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 	}
 
 	s.agentMu.RLock()
-	agentConfig, exists := s.agents[agentID]
+	runtime, exists := s.agents[agentID]
 	s.agentMu.RUnlock()
 
 	if !exists {
 		s.errorResponse(c, http.StatusNotFound, "not_found", fmt.Sprintf("Agent not found: %s", agentID))
 		return
 	}
+
+	agentConfig := runtime.Config
 
 	if s.pluginManager == nil {
 		s.errorResponse(c, http.StatusServiceUnavailable, "service_unavailable", "Plugin manager not available")
@@ -525,7 +655,7 @@ func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 		return
 	}
 
-	// ── Non-streaming path (unchanged from v1.1) ────────────────────────────
+	// ── Non-streaming path ──────────────────────────────────────────────────
 
 	// Resolve the LLM provider (empty model = use first available/default)
 	llmProvider, err := s.resolveProvider("")
@@ -548,8 +678,8 @@ func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 		{Role: "user", Content: req.Message},
 	}
 
-	// Run the agentic loop (tool calling + final completion)
-	completionResp, err := s.runAgentLoop(llmCtx, llmProvider, messages, toolList)
+	// Run the agentic loop with disposition-aware error handling
+	completionResp, err := s.runAgentLoopWithDisposition(llmCtx, llmProvider, messages, toolList, runtime)
 	if err != nil {
 		s.errorResponseWithDetails(c, http.StatusInternalServerError, "llm_error",
 			fmt.Sprintf("LLM completion failed: %v", err),
@@ -583,8 +713,10 @@ func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 		"task_id":  taskID,
 		"message":  req.Message,
 		"disposition": map[string]interface{}{
-			"pacing": agentConfig.Pacing,
-			"depth":  agentConfig.Depth,
+			"pacing":     agentConfig.Pacing,
+			"depth":      agentConfig.Depth,
+			"tone":       agentConfig.Tone,
+			"initiative": agentConfig.Initiative,
 		},
 		"tool_calls": toolCallsSummary,
 	}

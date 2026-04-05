@@ -3,6 +3,12 @@ go 1.25.6
 use (
 	.
 	./apps
+	./channel
+	./channel/discord
+	./channel/email
+	./channel/slack
+	./channel/telegram
+	./cmd/dojo
 	./disposition
 	./events
 	./mcp
@@ -22,4 +28,5 @@ use (
 	./skill
 	./tools
 	./wasm-modules/dip-scorer
+	./workflow
 )

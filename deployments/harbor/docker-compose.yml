@@ -1,0 +1,72 @@
+# Harbor CE - Private OCI Registry for Dojo Platform
+#
+# Reference deployment for air-gapped and enterprise environments.
+# Supports OCI artifacts (skills, workflows, plugins) with Cosign signature verification.
+#
+# Usage:
+#   cd deployments/harbor
+#   docker compose up -d
+#
+# Then configure gateway-config.yaml:
+#   marketplace:
+#     registry: harbor.local:8443/dojo-skills
+#
+# Default credentials: admin / Harbor12345 (CHANGE IN PRODUCTION)
+#
+# Requires: Docker + Docker Compose v2
+
+services:
+  harbor-core:
+    image: goharbor/harbor-core:v2.11.0
+    container_name: dojo-harbor-core
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/etc/harbor/app.conf
+      - HARBOR_ADMIN_PASSWORD=${HARBOR_ADMIN_PASSWORD:-Harbor12345}
+    volumes:
+      - harbor-data:/data
+      - ./harbor.yml:/etc/harbor/harbor.yml:ro
+    ports:
+      - "8443:8443"
+    depends_on:
+      - harbor-db
+      - harbor-redis
+
+  harbor-db:
+    image: goharbor/harbor-db:v2.11.0
+    container_name: dojo-harbor-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_PASSWORD=${HARBOR_DB_PASSWORD:-dojo-harbor-db}
+    volumes:
+      - harbor-db:/var/lib/postgresql/data
+
+  harbor-redis:
+    image: goharbor/redis-photon:v2.11.0
+    container_name: dojo-harbor-redis
+    restart: unless-stopped
+    volumes:
+      - harbor-redis:/data
+
+  harbor-registry:
+    image: goharbor/registry-photon:v2.11.0
+    container_name: dojo-harbor-registry
+    restart: unless-stopped
+    volumes:
+      - harbor-registry:/storage
+    environment:
+      # Enable OCI artifact support and referrers API (required for Cosign)
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
+
+  harbor-portal:
+    image: goharbor/harbor-portal:v2.11.0
+    container_name: dojo-harbor-portal
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+
+volumes:
+  harbor-data:
+  harbor-db:
+  harbor-redis:
+  harbor-registry:

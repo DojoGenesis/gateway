@@ -93,6 +93,16 @@ func WithDisposition(disp *disposition.DispositionConfig) EngineOption {
 	}
 }
 
+// SetEventEmitter replaces the engine's event emitter at runtime.
+// This enables per-execution event routing by setting an emitter before
+// Execute() and clearing it after. Pass nil to disable event emission.
+// Thread-safe: uses the engine's write lock.
+func (e *Engine) SetEventEmitter(emitter EventEmitterInterface) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.eventEmitter = emitter
+}
+
 // NewEngine creates a new orchestration engine.
 // traceLogger, eventEmitter, and budgetTracker are optional (can be nil).
 func NewEngine(

@@ -74,16 +74,18 @@ func TestAgentLifecycle_CreateAndRetrieve(t *testing.T) {
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	// Manually register an agent (simulating what handleGatewayCreateAgent does)
 	agentConfig := &gateway.AgentConfig{
-		Pacing: "measured",
-		Depth:  "thorough",
+		Pacing:     "measured",
+		Depth:      "thorough",
+		Tone:       "professional",
+		Initiative: "responsive",
 	}
 	s.agentMu.Lock()
-	s.agents["test-agent-id"] = agentConfig
+	s.agents["test-agent-id"] = &AgentRuntime{Config: agentConfig}
 	s.agentMu.Unlock()
 
 	// Set up router and test retrieval
@@ -123,7 +125,7 @@ func TestDAGRetrieval_WithPlan(t *testing.T) {
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	// Store an orchestration with a plan that has nodes
@@ -203,7 +205,7 @@ func TestHealthEndpoint_BasicResponse(t *testing.T) {
 		},
 		startTime:      time.Now().Add(-10 * time.Second),
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	router := gin.New()
@@ -235,7 +237,7 @@ func TestModelsEndpoint_NoProviders(t *testing.T) {
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	router := gin.New()
@@ -264,7 +266,7 @@ func TestToolsEndpoint_ListTools(t *testing.T) {
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	router := gin.New()
@@ -294,7 +296,7 @@ func TestAdminHealth_BasicResponse(t *testing.T) {
 		},
 		startTime:      time.Now(),
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	router := gin.New()
@@ -324,7 +326,7 @@ func TestAdminConfig_BasicResponse(t *testing.T) {
 			ShutdownTimeout: 30 * time.Second,
 		},
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	router := gin.New()
@@ -355,7 +357,7 @@ func TestAdminMetrics_PrometheusFormat(t *testing.T) {
 		},
 		startTime:      time.Now(),
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	router := gin.New()
@@ -388,7 +390,7 @@ func TestMemoryStore_InvalidContextType(t *testing.T) {
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	router := gin.New()

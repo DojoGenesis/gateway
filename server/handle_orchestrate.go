@@ -14,6 +14,7 @@ import (
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+	serverorchestration "github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
 )
 
 // ─── Orchestration API Types ─────────────────────────────────────────────────
@@ -174,10 +175,26 @@ func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestra
 	state.mu.Unlock()
 	eventChan <- planEvent
 
-	// Create engine event channel that forwards to our event channel
-	engineEventChan := make(chan events.StreamEvent, 100)
+	// Create orchestration event channel and wire the EventEmitterAdapter
+	// so the engine emits events during DAG execution.
+	orchEventChan := make(chan orchestrationpkg.StreamEvent, 100)
+	emitter := serverorchestration.NewEventEmitterAdapter(orchEventChan)
+
+	// Forward orchestration events to the SSE event channel with type conversion
 	go func() {
-		for evt := range engineEventChan {
+		for orchEvt := range orchEventChan {
+			// Convert orchestrationpkg.StreamEvent → events.StreamEvent
+			// Type: string → events.EventType, Timestamp: interface{} → time.Time
+			ts, ok := orchEvt.Timestamp.(time.Time)
+			if !ok {
+				ts = time.Now()
+			}
+			evt := events.StreamEvent{
+				Type:      events.EventType(orchEvt.Type),
+				Data:      orchEvt.Data,
+				Timestamp: ts,
+			}
+
 			// Tag with orchestration ID
 			if evt.Data == nil {
 				evt.Data = make(map[string]interface{})
@@ -192,11 +209,15 @@ func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestra
 		}
 	}()
 
+	// Set the event emitter for this execution, clear after
+	s.orchestrationEngine.SetEventEmitter(emitter)
+
 	// Execute plan
 	execErr := s.orchestrationEngine.Execute(ctx, plan, task, task.UserID)
 
-	// Close engine event channel
-	close(engineEventChan)
+	// Clear emitter and close channel
+	s.orchestrationEngine.SetEventEmitter(nil)
+	close(orchEventChan)
 
 	if execErr != nil {
 		state.mu.Lock()

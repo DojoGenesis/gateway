@@ -1,0 +1,121 @@
+/* Global styles for Dojo Workflow Builder */
+
+/* Reset */
+*, *::before, *::after {
+	box-sizing: border-box;
+}
+
+html, body {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+	-webkit-font-smoothing: antialiased;
+	background: #0f172a;
+	color: #e2e8f0;
+}
+
+/* Svelte Flow canvas overrides */
+:global(.svelte-flow) {
+	background: #f1f5f9 !important;
+}
+
+:global(.svelte-flow__edge-path) {
+	stroke: #6366f1;
+	stroke-width: 2;
+}
+
+:global(.svelte-flow__edge.selected .svelte-flow__edge-path),
+:global(.svelte-flow__edge:hover .svelte-flow__edge-path) {
+	stroke: #818cf8;
+	stroke-width: 2.5;
+}
+
+:global(.svelte-flow__handle) {
+	width: 10px;
+	height: 10px;
+	background: #6366f1;
+	border: 2px solid #fff;
+	border-radius: 50%;
+	cursor: crosshair;
+}
+
+:global(.svelte-flow__handle:hover) {
+	background: #818cf8;
+	transform: scale(1.3);
+}
+
+:global(.svelte-flow__handle-left) {
+	left: -5px;
+}
+
+:global(.svelte-flow__handle-right) {
+	right: -5px;
+}
+
+:global(.svelte-flow__controls) {
+	bottom: 16px;
+	right: 16px;
+	left: auto;
+	background: #1e293b;
+	border: 1px solid #334155;
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+:global(.svelte-flow__controls button) {
+	background: #1e293b;
+	border: none;
+	border-bottom: 1px solid #334155;
+	color: #94a3b8;
+	padding: 8px;
+	cursor: pointer;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 14px;
+}
+
+:global(.svelte-flow__controls button:hover) {
+	background: #334155;
+	color: #e2e8f0;
+}
+
+:global(.svelte-flow__controls button:last-child) {
+	border-bottom: none;
+}
+
+:global(.svelte-flow__minimap) {
+	border: 1px solid #334155;
+	border-radius: 8px;
+	overflow: hidden;
+	bottom: 16px;
+	left: 16px;
+	right: auto;
+	background: #1e293b !important;
+}
+
+:global(.svelte-flow__background) {
+	background: #f1f5f9;
+}
+
+/* Scrollbar styling for dark sidebars */
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: #334155;
+	border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: #475569;
+}

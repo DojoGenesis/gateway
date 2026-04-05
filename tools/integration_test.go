@@ -14,8 +14,8 @@ func TestToolIntegration(t *testing.T) {
 		}
 
 		count := GetToolCount()
-		if count != 32 {
-			t.Errorf("Expected 32 tools, got %d", count)
+		if count != 33 {
+			t.Errorf("Expected 33 tools, got %d", count)
 		}
 	})
 
@@ -61,7 +61,7 @@ func TestToolIntegration(t *testing.T) {
 		categories := ListAllTools()
 
 		expectedCounts := map[string]int{
-			"file_operations": 4,
+			"file_operations": 5,
 			"web_operations":  3,
 			"web_advanced":    5,
 			"computation":     2,
@@ -90,6 +90,7 @@ func TestToolIntegration(t *testing.T) {
 			"write_file":            "file_operations",
 			"list_directory":        "file_operations",
 			"search_files":          "file_operations",
+			"get_document":          "file_operations",
 			"web_search":            "web_operations",
 			"fetch_url":             "web_operations",
 			"api_call":              "web_operations",

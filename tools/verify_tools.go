@@ -11,6 +11,7 @@ func VerifyAllTools() error {
 		"write_file",
 		"list_directory",
 		"search_files",
+		"get_document",
 		"web_search",
 		"fetch_url",
 		"api_call",

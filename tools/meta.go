@@ -94,6 +94,7 @@ func getCategoryForTool(toolName string) string {
 		"write_file":             "file_operations",
 		"list_directory":         "file_operations",
 		"search_files":           "file_operations",
+		"get_document":           "file_operations",
 		"web_search":             "web_operations",
 		"fetch_url":              "web_operations",
 		"api_call":               "web_operations",

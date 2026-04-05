@@ -34,12 +34,13 @@ func (s *GatewayMemoryStore) Store(ctx context.Context, entry *gateway.MemoryEnt
 
 	// Convert gateway.MemoryEntry to memory.Memory
 	memory := Memory{
-		ID:        entry.ID,
-		Type:      entry.EntryType,
-		Content:   entry.Content,
-		Metadata:  entry.Metadata,
-		CreatedAt: entry.CreatedAt,
-		UpdatedAt: entry.UpdatedAt,
+		ID:          entry.ID,
+		Type:        entry.EntryType,
+		Content:     entry.Content,
+		Metadata:    entry.Metadata,
+		ContextType: entry.ContextType,
+		CreatedAt:   entry.CreatedAt,
+		UpdatedAt:   entry.UpdatedAt,
 	}
 
 	// Generate ID if not provided
@@ -83,13 +84,19 @@ func (s *GatewayMemoryStore) Search(ctx context.Context, query *gateway.SearchQu
 			continue
 		}
 
+		// Filter by context type if specified
+		if query.ContextType != "" && result.Memory.ContextType != query.ContextType {
+			continue
+		}
+
 		entry := &gateway.MemoryEntry{
-			ID:        result.Memory.ID,
-			EntryType: result.Memory.Type,
-			Content:   result.Memory.Content,
-			Metadata:  result.Memory.Metadata,
-			CreatedAt: result.Memory.CreatedAt,
-			UpdatedAt: result.Memory.UpdatedAt,
+			ID:          result.Memory.ID,
+			EntryType:   result.Memory.Type,
+			Content:     result.Memory.Content,
+			Metadata:    result.Memory.Metadata,
+			ContextType: result.Memory.ContextType,
+			CreatedAt:   result.Memory.CreatedAt,
+			UpdatedAt:   result.Memory.UpdatedAt,
 		}
 		entries = append(entries, entry)
 	}
@@ -116,12 +123,13 @@ func (s *GatewayMemoryStore) Get(ctx context.Context, id string) (*gateway.Memor
 
 	// Convert to gateway.MemoryEntry
 	entry := &gateway.MemoryEntry{
-		ID:        memory.ID,
-		EntryType: memory.Type,
-		Content:   memory.Content,
-		Metadata:  memory.Metadata,
-		CreatedAt: memory.CreatedAt,
-		UpdatedAt: memory.UpdatedAt,
+		ID:          memory.ID,
+		EntryType:   memory.Type,
+		Content:     memory.Content,
+		Metadata:    memory.Metadata,
+		ContextType: memory.ContextType,
+		CreatedAt:   memory.CreatedAt,
+		UpdatedAt:   memory.UpdatedAt,
 	}
 
 	return entry, nil

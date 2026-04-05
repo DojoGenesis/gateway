@@ -103,6 +103,10 @@ type MemoryEntry struct {
 	// UpdatedAt is the timestamp when the entry was last modified.
 	UpdatedAt time.Time `json:"updated_at" yaml:"updated_at"`
 
+	// ContextType categorizes the memory context (e.g., "conversation", "system_prompt", "tool_result").
+	// If empty, defaults to "conversation" in the storage layer.
+	ContextType string `json:"context_type,omitempty" yaml:"context_type,omitempty"`
+
 	// Embedding is the vector representation of the content for similarity search.
 	// Omitted from JSON/YAML if empty.
 	Embedding []float64 `json:"embedding,omitempty" yaml:"embedding,omitempty"`
@@ -116,6 +120,10 @@ type SearchQuery struct {
 	// EntryType filters results by memory entry type (e.g., "conversation").
 	// If empty, all types are included.
 	EntryType string `json:"type,omitempty" yaml:"type,omitempty"`
+
+	// ContextType filters results by context type (e.g., "system_prompt").
+	// If empty, all context types are included.
+	ContextType string `json:"context_type,omitempty" yaml:"context_type,omitempty"`
 }
 
 // ExecutionPlan represents an orchestration plan as a Directed Acyclic Graph (DAG)

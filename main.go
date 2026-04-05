@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/apps"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp"
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
 	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
@@ -209,6 +210,20 @@ func main() {
 	agentInitializer := pkgdisposition.NewAgentInitializer(dispositionCacheTTL)
 	slog.Info("agent initializer created", "cache_ttl", dispositionCacheTTL)
 
+	// ─── Load Default Disposition (ADA) ──────────────────────────────
+	workspaceRoot := getEnv("AGENT_WORKSPACE_ROOT", ".")
+	defaultDisp, dispErr := disposition.ResolveDisposition(workspaceRoot, "")
+	if dispErr != nil {
+		slog.Warn("failed to load disposition from workspace, using defaults", "workspace", workspaceRoot, "error", dispErr)
+		defaultDisp = disposition.DefaultDisposition()
+	}
+	slog.Info("disposition loaded",
+		"source", defaultDisp.SourceFile,
+		"pacing", defaultDisp.Pacing,
+		"depth", defaultDisp.Depth,
+		"tone", defaultDisp.Tone,
+		"initiative", defaultDisp.Initiative)
+
 	// ─── Initialize Memory ───────────────────────────────────────────
 	dbPath := getEnv("MEMORY_DB_PATH", "dojo_memory.db")
 	memoryManager, err := memory.NewMemoryManager(dbPath)
@@ -270,7 +285,8 @@ func main() {
 	traceAdapter := orchestration.NewTraceLoggerAdapter(traceLogger)
 	budgetAdapter := orchestration.NewBudgetTrackerAdapter(budgetTracker)
 
-	// Event emitter is nil for now (handled by server)
+	// Event emitter starts nil — set per-execution in handle_orchestrate.go
+	// via engine.SetEventEmitter() with a per-request EventEmitterAdapter.
 	var eventEmitter orchestrationpkg.EventEmitterInterface = nil
 
 	// Create the standalone orchestration engine with all adapters
@@ -281,8 +297,9 @@ func main() {
 		traceAdapter,
 		eventEmitter,
 		budgetAdapter,
+		orchestrationpkg.WithDisposition(defaultDisp),
 	)
-	slog.Info("orchestration engine initialized", "provider", providerName)
+	slog.Info("orchestration engine initialized", "provider", providerName, "pacing", defaultDisp.Pacing)
 
 	// ─── Initialize Gateway Interface Implementations ────────────────
 	// Wrap existing components to implement gateway interfaces

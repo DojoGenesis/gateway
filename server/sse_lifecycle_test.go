@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +24,7 @@ func TestSSEStreamingLifecycle(t *testing.T) {
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	// Create an orchestration with pre-existing events (simulating a plan that already ran)
@@ -123,7 +122,7 @@ func TestSSEStreamingLifecycle_CompletedOrchestration(t *testing.T) {
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	now := time.Now()
@@ -179,7 +178,7 @@ func TestSSEStreamingLifecycle_NotFound(t *testing.T) {
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 
 	router := gin.New()

@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,7 +54,7 @@ func newTestServer() (*Server, *gin.Engine) {
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
-		agents:         make(map[string]*gateway.AgentConfig),
+		agents:         make(map[string]*AgentRuntime),
 	}
 	return s, router
 }
