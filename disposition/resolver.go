@@ -245,6 +245,118 @@ func mergeReflection(base *ReflectionConfig, override *ReflectionConfig) {
 	}
 }
 
+// presetConfig is the YAML structure for a preset file containing multiple named presets.
+type presetConfig struct {
+	Presets []presetEntry `yaml:"presets"`
+}
+
+type presetEntry struct {
+	Name        string              `yaml:"name"`
+	Description string              `yaml:"description"`
+	Fields      DispositionConfig   `yaml:"fields"`
+	UseWhen     []string            `yaml:"use_when,omitempty"`
+	AvoidWhen   []string            `yaml:"avoid_when,omitempty"`
+}
+
+// LoadPreset loads a named disposition preset from a presets directory.
+// It searches for YAML files in the presetsDir, parses them for preset entries,
+// and returns the matching DispositionConfig with defaults applied for any unset fields.
+func LoadPreset(presetsDir string, presetName string) (*DispositionConfig, error) {
+	if presetName == "" {
+		return nil, fmt.Errorf("preset name is required")
+	}
+
+	// Scan all YAML files in presetsDir
+	entries, err := os.ReadDir(presetsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read presets directory %s: %w", presetsDir, err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := filepath.Ext(entry.Name())
+		if ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(presetsDir, entry.Name()))
+		if err != nil {
+			continue // skip unreadable files
+		}
+
+		var pc presetConfig
+		if err := yaml.Unmarshal(data, &pc); err != nil {
+			continue // skip malformed files
+		}
+
+		for _, preset := range pc.Presets {
+			if preset.Name == presetName {
+				cfg := preset.Fields
+				// Apply defaults for any unset fields
+				defaults := DefaultDisposition()
+				if cfg.Pacing == "" { cfg.Pacing = defaults.Pacing }
+				if cfg.Depth == "" { cfg.Depth = defaults.Depth }
+				if cfg.Tone == "" { cfg.Tone = defaults.Tone }
+				if cfg.Initiative == "" { cfg.Initiative = defaults.Initiative }
+				if cfg.Validation.Strategy == "" { cfg.Validation.Strategy = defaults.Validation.Strategy }
+				if cfg.ErrorHandling.Strategy == "" { cfg.ErrorHandling.Strategy = defaults.ErrorHandling.Strategy }
+				if cfg.ErrorHandling.RetryCount == 0 { cfg.ErrorHandling.RetryCount = defaults.ErrorHandling.RetryCount }
+				if cfg.Collaboration.Style == "" { cfg.Collaboration.Style = defaults.Collaboration.Style }
+				if cfg.Collaboration.CheckInFrequency == "" { cfg.Collaboration.CheckInFrequency = defaults.Collaboration.CheckInFrequency }
+				if cfg.Reflection.Frequency == "" { cfg.Reflection.Frequency = defaults.Reflection.Frequency }
+				if cfg.Reflection.Format == "" { cfg.Reflection.Format = defaults.Reflection.Format }
+				if cfg.Reflection.Triggers == nil { cfg.Reflection.Triggers = defaults.Reflection.Triggers }
+				cfg.ActiveMode = presetName
+				cfg.SchemaVersion = "1.0.0"
+
+				// Validate
+				if err := Validate(&cfg); err != nil {
+					return nil, fmt.Errorf("preset %q has invalid configuration: %w", presetName, err)
+				}
+				return &cfg, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("preset %q not found in %s", presetName, presetsDir)
+}
+
+// ListPresets returns the names and descriptions of all available presets in a directory.
+func ListPresets(presetsDir string) ([]struct{ Name, Description string }, error) {
+	entries, err := os.ReadDir(presetsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read presets directory: %w", err)
+	}
+
+	var result []struct{ Name, Description string }
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := filepath.Ext(entry.Name())
+		if ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(presetsDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+
+		var pc presetConfig
+		if err := yaml.Unmarshal(data, &pc); err != nil {
+			continue
+		}
+
+		for _, preset := range pc.Presets {
+			result = append(result, struct{ Name, Description string }{preset.Name, preset.Description})
+		}
+	}
+	return result, nil
+}
+
 // validateSemver validates that a version string follows semantic versioning.
 // Per ADA contract, schema_version must be valid semver (e.g., "1.0.0", "2.1.3-beta").
 func validateSemver(version string) error {

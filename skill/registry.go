@@ -9,8 +9,15 @@ import (
 	"sync"
 	"time"
 
+	"archive/tar"
+	"bytes"
+	"io"
+	"log/slog"
+
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
+
+	pkgskill "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/skill"
 )
 
 // SkillRegistry manages skill registration, lookup, and metadata.
@@ -344,4 +351,133 @@ func extractFrontmatter(content string) (frontmatter string, body string, err er
 	}
 
 	return frontmatter, strings.TrimSpace(body), nil
+}
+
+// LoadFromCAS loads skills from a CAS-backed SkillStore into the registry.
+// It reads each packaged skill's content tar, extracts the SKILL.md body,
+// re-parses frontmatter for full field population, and registers the result.
+// Skills that fail to parse or validate are logged and skipped.
+func (r *InMemorySkillRegistry) LoadFromCAS(ctx context.Context, store *pkgskill.SkillStore) error {
+	manifests, err := store.List(ctx)
+	if err != nil {
+		return fmt.Errorf("LoadFromCAS: failed to list skills: %w", err)
+	}
+
+	loaded := 0
+	skipped := 0
+	for _, m := range manifests {
+		// Skip if already registered (directory-loaded skills take precedence)
+		r.mu.RLock()
+		_, exists := r.skills[m.Name]
+		r.mu.RUnlock()
+		if exists {
+			continue
+		}
+
+		// Fetch content tar and extract SKILL.md
+		contentTar, err := store.GetContent(ctx, m.Name, m.Version)
+		if err != nil {
+			slog.Warn("LoadFromCAS: skip skill, no content", "name", m.Name, "error", err)
+			skipped++
+			continue
+		}
+
+		skillMD, err := extractSkillMDFromTar(contentTar)
+		if err != nil {
+			slog.Warn("LoadFromCAS: skip skill, no SKILL.md in tar", "name", m.Name, "error", err)
+			skipped++
+			continue
+		}
+
+		// Parse the SKILL.md to get full frontmatter + body
+		fmStr, body, err := extractFrontmatter(skillMD)
+		if err != nil {
+			// Use manifest data as fallback
+			fmStr = ""
+			body = skillMD
+		}
+
+		// Build SkillDefinition by combining manifest + parsed frontmatter
+		def := &SkillDefinition{
+			Name:        m.Name,
+			Description: m.Description,
+			Content:     body,
+			Version:     m.Version,
+			ParsedAt:    time.Now(),
+			PluginName:  "cas",
+		}
+
+		// Parse frontmatter for rich fields (tier, agents, triggers, tool_deps)
+		if fmStr != "" {
+			var meta Metadata
+			if yamlErr := yaml.Unmarshal([]byte(fmStr), &meta); yamlErr == nil {
+				if len(meta.Triggers) > 0 {
+					def.Triggers = meta.Triggers
+				}
+				if meta.ToolDependencies != nil {
+					def.ToolDependencies = meta.ToolDependencies
+				}
+				if meta.Tier > 0 {
+					def.Tier = meta.Tier
+				}
+				if len(meta.Agents) > 0 {
+					def.Agents = meta.Agents
+				}
+				def.Portable = meta.Portable
+				def.Hidden = meta.Hidden
+			}
+		}
+
+		// Apply defaults for fields required by IsValid
+		if len(def.Triggers) == 0 && m.Triggers != nil {
+			def.Triggers = m.Triggers
+		}
+		if len(def.Triggers) == 0 {
+			// Generate trigger from description first sentence
+			parts := strings.SplitN(def.Description, ".", 2)
+			if len(parts) > 0 && len(parts[0]) > 5 {
+				def.Triggers = []string{strings.ToLower(strings.TrimSpace(parts[0]))}
+			} else {
+				def.Triggers = []string{def.Name}
+			}
+		}
+		if def.Tier == 0 {
+			def.Tier = 1
+		}
+		if len(def.Agents) == 0 {
+			def.Agents = []string{"primary"}
+		}
+
+		if err := r.RegisterSkill(ctx, def); err != nil {
+			slog.Debug("LoadFromCAS: skip skill", "name", m.Name, "error", err)
+			skipped++
+			continue
+		}
+		loaded++
+	}
+
+	slog.Info("LoadFromCAS complete", "loaded", loaded, "skipped", skipped, "total_manifests", len(manifests))
+	return nil
+}
+
+// extractSkillMDFromTar reads a tar archive and returns the content of the first SKILL.md file found.
+func extractSkillMDFromTar(tarBytes []byte) (string, error) {
+	tr := tar.NewReader(bytes.NewReader(tarBytes))
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", fmt.Errorf("tar read error: %w", err)
+		}
+		if filepath.Base(hdr.Name) == "SKILL.md" {
+			data, err := io.ReadAll(tr)
+			if err != nil {
+				return "", fmt.Errorf("read SKILL.md from tar: %w", err)
+			}
+			return string(data), nil
+		}
+	}
+	return "", fmt.Errorf("SKILL.md not found in tar archive")
 }

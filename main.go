@@ -201,6 +201,30 @@ func main() {
 			DefaultToolTimeout: 30 * time.Second,
 		}, toolRegistry)
 		slog.Info("MCP Apps manager initialized")
+
+		// Register built-in MCP App dashboards
+		builtinApps := []struct{ uri, path string }{
+			{"ui://dip/dashboard", "apps/dip-dashboard/dashboard.html"},
+			{"ui://observability/dashboard", "apps/observability-dashboard/dashboard.html"},
+		}
+		for _, ba := range builtinApps {
+			content, readErr := os.ReadFile(ba.path)
+			if readErr != nil {
+				slog.Warn("built-in app not found, skipping", "uri", ba.uri, "path", ba.path)
+				continue
+			}
+			regErr := appManager.RegisterResource(&apps.ResourceMeta{
+				URI:      ba.uri,
+				MimeType: "text/html",
+				Content:  content,
+				CacheKey: fmt.Sprintf("%s-%d", ba.uri, len(content)),
+			})
+			if regErr != nil {
+				slog.Warn("failed to register built-in app", "uri", ba.uri, "error", regErr)
+			} else {
+				slog.Info("registered built-in MCP app", "uri", ba.uri, "size", len(content))
+			}
+		}
 	} else {
 		slog.Info("MCP Apps disabled (set MCP_APPS_ENABLED=true to enable)")
 	}
