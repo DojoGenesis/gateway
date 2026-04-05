@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Observability Dashboard</title>
+<style>
+:root {
+    --bg: var(--mcp-bg, #0f172a);
+    --fg: var(--mcp-fg, #e2e8f0);
+    --accent: var(--mcp-accent, #3b82f6);
+    --border: var(--mcp-border, #1e293b);
+    --surface: var(--mcp-surface, #1e293b);
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --orange: #f97316;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --mono: "SF Mono", "Fira Code", Menlo, monospace;
+    --dim: #64748b;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--fg); line-height: 1.5; overflow: hidden; height: 100vh; }
+
+/* Layout: header + 3-panel grid */
+.app { display: grid; grid-template-rows: 48px 1fr 180px; grid-template-columns: 280px 1fr; height: 100vh; gap: 1px; background: var(--border); }
+.header { grid-column: 1 / -1; background: var(--surface); display: flex; align-items: center; padding: 0 16px; gap: 16px; }
+.header h1 { font-size: 14px; font-weight: 600; letter-spacing: 0.02em; }
+.header .status-pills { display: flex; gap: 8px; margin-left: auto; }
+.pill { background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 2px 12px; font-size: 12px; font-family: var(--mono); }
+.pill.live { border-color: var(--green); color: var(--green); }
+.pill.warn { border-color: var(--yellow); color: var(--yellow); }
+.pill.err { border-color: var(--red); color: var(--red); }
+
+/* Left panel */
+.left { grid-row: 2 / 4; background: var(--surface); padding: 16px; overflow-y: auto; }
+.section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--dim); margin-bottom: 8px; margin-top: 16px; }
+.section-label:first-child { margin-top: 0; }
+
+/* KPI cards */
+.kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kpi { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+.kpi .value { font-size: 20px; font-weight: 700; font-family: var(--mono); }
+.kpi .label { font-size: 10px; color: var(--dim); text-transform: uppercase; }
+
+/* Budget gauges */
+.gauge-row { display: flex; gap: 8px; margin-top: 8px; }
+.gauge { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; text-align: center; }
+.gauge .bar { height: 6px; background: var(--border); border-radius: 3px; margin: 6px 0 4px; overflow: hidden; }
+.gauge .bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+.gauge .pct { font-size: 16px; font-weight: 700; font-family: var(--mono); }
+.gauge .tier-label { font-size: 9px; color: var(--dim); text-transform: uppercase; }
+
+/* Tool list */
+.tool-list { margin-top: 8px; }
+.tool-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 12px; border-bottom: 1px solid var(--border); }
+.tool-item .name { font-family: var(--mono); color: var(--accent); }
+.tool-item .count { color: var(--dim); font-family: var(--mono); }
+
+/* Center panel — DAG viz */
+.center { background: var(--bg); padding: 16px; overflow: auto; position: relative; }
+.center .panel-title { font-size: 12px; color: var(--dim); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.center .panel-title .tab { cursor: pointer; padding: 4px 10px; border-radius: 12px; font-size: 11px; }
+.center .panel-title .tab.active { background: var(--accent); color: #fff; }
+.dag-canvas { width: 100%; min-height: 200px; }
+.dag-node { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 14px; font-size: 12px; font-family: var(--mono); margin: 4px; }
+.dag-node.pending { opacity: 0.5; }
+.dag-node.running { border-color: var(--accent); box-shadow: 0 0 8px rgba(59,130,246,0.3); animation: pulse 1.5s infinite; }
+.dag-node.success { border-color: var(--green); }
+.dag-node.failed { border-color: var(--red); }
+.dag-node .dot { width: 8px; height: 8px; border-radius: 50%; }
+.dag-node.pending .dot { background: var(--dim); }
+.dag-node.running .dot { background: var(--accent); }
+.dag-node.success .dot { background: var(--green); }
+.dag-node.failed .dot { background: var(--red); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+/* Token chart area */
+.chart-area { width: 100%; height: calc(100% - 40px); position: relative; }
+.chart-bar { position: absolute; bottom: 0; background: var(--accent); opacity: 0.7; border-radius: 2px 2px 0 0; min-width: 4px; transition: height 0.3s; }
+.chart-label { position: absolute; bottom: -16px; font-size: 9px; color: var(--dim); font-family: var(--mono); }
+
+/* Bottom panel — event feed */
+.feed { grid-column: 2; background: var(--surface); padding: 12px 16px; overflow-y: auto; font-family: var(--mono); font-size: 11px; }
+.feed-line { display: flex; gap: 12px; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.feed-line .time { color: var(--dim); min-width: 50px; }
+.feed-line .type { min-width: 180px; }
+.feed-line .type.tool { color: var(--green); }
+.feed-line .type.orch { color: var(--orange); }
+.feed-line .type.trace { color: var(--accent); }
+.feed-line .type.err { color: var(--red); }
+.feed-line .detail { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Connection banner */
+.disconnected { background: var(--red); color: #fff; text-align: center; padding: 4px; font-size: 11px; display: none; }
+.disconnected.show { display: block; }
+</style>
+</head>
+<body>
+<div class="disconnected" id="conn-banner">Disconnected — reconnecting...</div>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <h1>Agent Observability</h1>
+    <div class="status-pills">
+      <span class="pill live" id="pill-agents">Agents: 0</span>
+      <span class="pill" id="pill-dags">DAGs: 0</span>
+      <span class="pill" id="pill-budget">Budget: --%</span>
+    </div>
+  </div>
+
+  <!-- Left Panel: KPIs + Budget + Tools -->
+  <div class="left">
+    <div class="section-label">Session KPIs</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="value" id="kpi-calls">0</div><div class="label">Tool Calls</div></div>
+      <div class="kpi"><div class="value" id="kpi-tokens">0</div><div class="label">Tokens</div></div>
+      <div class="kpi"><div class="value" id="kpi-cost">$0.00</div><div class="label">Cost</div></div>
+      <div class="kpi"><div class="value" id="kpi-errors">0</div><div class="label">Errors</div></div>
+      <div class="kpi"><div class="value" id="kpi-latency">0ms</div><div class="label">Avg Latency</div></div>
+      <div class="kpi"><div class="value" id="kpi-success">100%</div><div class="label">Success Rate</div></div>
+    </div>
+
+    <div class="section-label">Budget</div>
+    <div class="gauge-row">
+      <div class="gauge">
+        <div class="pct" id="budget-query-pct">--</div>
+        <div class="bar"><div class="bar-fill" id="budget-query-bar" style="width:0%;background:var(--green)"></div></div>
+        <div class="tier-label">Query</div>
+      </div>
+      <div class="gauge">
+        <div class="pct" id="budget-session-pct">--</div>
+        <div class="bar"><div class="bar-fill" id="budget-session-bar" style="width:0%;background:var(--green)"></div></div>
+        <div class="tier-label">Session</div>
+      </div>
+      <div class="gauge">
+        <div class="pct" id="budget-monthly-pct">--</div>
+        <div class="bar"><div class="bar-fill" id="budget-monthly-bar" style="width:0%;background:var(--green)"></div></div>
+        <div class="tier-label">Monthly</div>
+      </div>
+    </div>
+
+    <div class="section-label">Top Tools</div>
+    <div class="tool-list" id="tool-list"></div>
+  </div>
+
+  <!-- Center Panel: DAG / Chart -->
+  <div class="center">
+    <div class="panel-title">
+      <span class="tab active" onclick="switchView('dag')">DAG</span>
+      <span class="tab" onclick="switchView('tokens')">Tokens</span>
+      <span class="tab" onclick="switchView('latency')">Latency</span>
+    </div>
+    <div id="view-dag" class="dag-canvas"></div>
+    <div id="view-tokens" class="chart-area" style="display:none"></div>
+    <div id="view-latency" class="chart-area" style="display:none"></div>
+  </div>
+
+  <!-- Bottom Panel: Event Feed -->
+  <div class="feed" id="event-feed"></div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────
+const state = {
+  events: [],
+  nodes: {},           // nodeId -> {toolName, state, durationMs, planId}
+  plans: {},           // planId -> {nodeCount, nodes:[]}
+  toolStats: {},       // toolName -> {calls, totalMs, errors}
+  totalCalls: 0,
+  totalTokens: 0,
+  totalCost: 0,
+  totalErrors: 0,
+  latencies: [],
+  tokenHistory: [],    // [{ts, tokens}]
+  activeView: 'dag',
+  connected: false,
+  maxFeedLines: 200,
+};
+
+// ─── SSE Connection ──────────────────────────────────────────────────
+let evtSource = null;
+let reconnectTimer = null;
+
+function connect() {
+  // Try the orchestration events endpoint, fall back to general events
+  const url = '/v1/events/stream';
+  evtSource = new EventSource(url);
+
+  evtSource.onopen = () => {
+    state.connected = true;
+    document.getElementById('conn-banner').classList.remove('show');
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  };
+
+  evtSource.onmessage = (e) => {
+    try {
+      const evt = JSON.parse(e.data);
+      handleEvent(evt);
+    } catch(err) { /* ignore parse errors */ }
+  };
+
+  evtSource.onerror = () => {
+    state.connected = false;
+    document.getElementById('conn-banner').classList.add('show');
+    evtSource.close();
+    // Exponential backoff reconnect
+    reconnectTimer = setTimeout(connect, 3000);
+  };
+}
+
+// ─── Event Router ────────────────────────────────────────────────────
+function handleEvent(evt) {
+  const type = evt.type || '';
+  const data = evt.data || {};
+
+  // Store event
+  state.events.push({type, data, ts: new Date()});
+  if (state.events.length > 1000) state.events.shift();
+
+  // Route by type
+  if (type === 'tool_invoked') onToolInvoked(data);
+  else if (type === 'tool_completed') onToolCompleted(data);
+  else if (type === 'orchestration_plan_created' || type === 'orchestration.plan.created') onPlanCreated(data);
+  else if (type === 'orchestration_node_start' || type === 'orchestration.node.start') onNodeStart(data);
+  else if (type === 'orchestration_node_end' || type === 'orchestration.node.end') onNodeEnd(data);
+  else if (type === 'orchestration_replanning' || type === 'orchestration.replanning') onReplanning(data);
+  else if (type === 'orchestration_complete' || type === 'orchestration.complete') onOrchComplete(data);
+  else if (type === 'orchestration_failed' || type === 'orchestration.failed') onOrchFailed(data);
+  else if (type === 'error') { state.totalErrors++; }
+
+  addFeedLine(type, data);
+  updateKPIs();
+  updateToolList();
+}
+
+// ─── Event Handlers ──────────────────────────────────────────────────
+function onToolInvoked(d) {
+  state.totalCalls++;
+  const name = d.tool || d.tool_name || 'unknown';
+  if (!state.toolStats[name]) state.toolStats[name] = {calls: 0, totalMs: 0, errors: 0};
+  state.toolStats[name].calls++;
+}
+
+function onToolCompleted(d) {
+  const name = d.tool || d.tool_name || 'unknown';
+  const ms = d.duration_ms || 0;
+  const tokens = (d.input_tokens || 0) + (d.output_tokens || 0);
+  const cost = d.estimated_cost || 0;
+
+  if (state.toolStats[name]) state.toolStats[name].totalMs += ms;
+  state.latencies.push(ms);
+  if (state.latencies.length > 500) state.latencies.shift();
+
+  state.totalTokens += tokens;
+  state.totalCost += cost;
+  state.tokenHistory.push({ts: Date.now(), tokens: state.totalTokens});
+  if (state.tokenHistory.length > 200) state.tokenHistory.shift();
+}
+
+function onPlanCreated(d) {
+  const planId = d.plan?.id || d.plan_id || 'unknown';
+  const nodes = d.plan?.nodes || [];
+  state.plans[planId] = {nodeCount: d.plan?.node_count || nodes.length, nodes};
+  nodes.forEach(n => {
+    state.nodes[n.ID || n.id] = {toolName: n.ToolName || n.tool_name, state: 'pending', planId};
+  });
+  renderDAG();
+}
+
+function onNodeStart(d) {
+  const id = d.node_id;
+  if (!state.nodes[id]) state.nodes[id] = {toolName: d.tool_name, planId: d.plan_id};
+  state.nodes[id].state = 'running';
+  renderDAG();
+}
+
+function onNodeEnd(d) {
+  const id = d.node_id;
+  if (!state.nodes[id]) state.nodes[id] = {toolName: d.tool_name, planId: d.plan_id};
+  state.nodes[id].state = d.state === 'failed' ? 'failed' : 'success';
+  state.nodes[id].durationMs = d.duration_ms;
+  if (d.state === 'failed') state.totalErrors++;
+  renderDAG();
+}
+
+function onReplanning(d) { /* visual indicator in feed */ }
+function onOrchComplete(d) { updatePillDags(); }
+function onOrchFailed(d) { state.totalErrors++; }
+
+// ─── Renderers ───────────────────────────────────────────────────────
+function renderDAG() {
+  if (state.activeView !== 'dag') return;
+  const container = document.getElementById('view-dag');
+  container.innerHTML = '';
+  Object.entries(state.nodes).forEach(([id, node]) => {
+    const el = document.createElement('div');
+    el.className = `dag-node ${node.state || 'pending'}`;
+    el.innerHTML = `<span class="dot"></span>${node.toolName || id}${node.durationMs ? ` <span style="color:var(--dim)">${node.durationMs}ms</span>` : ''}`;
+    el.title = `Node: ${id}\nState: ${node.state}\nPlan: ${node.planId || '-'}`;
+    container.appendChild(el);
+  });
+}
+
+function renderTokenChart() {
+  if (state.activeView !== 'tokens') return;
+  const container = document.getElementById('view-tokens');
+  const h = container.clientHeight || 200;
+  const w = container.clientWidth || 600;
+  const hist = state.tokenHistory;
+  if (hist.length < 2) { container.innerHTML = '<div style="color:var(--dim);padding:40px">Waiting for token data...</div>'; return; }
+
+  const maxT = Math.max(...hist.map(h => h.tokens), 1);
+  container.innerHTML = '';
+  const barW = Math.max(4, (w / hist.length) - 1);
+  hist.forEach((pt, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'chart-bar';
+    bar.style.left = `${i * (barW + 1)}px`;
+    bar.style.width = `${barW}px`;
+    bar.style.height = `${(pt.tokens / maxT) * (h - 20)}px`;
+    container.appendChild(bar);
+  });
+}
+
+function renderLatencyChart() {
+  if (state.activeView !== 'latency') return;
+  const container = document.getElementById('view-latency');
+  const h = container.clientHeight || 200;
+  const lats = state.latencies;
+  if (lats.length < 2) { container.innerHTML = '<div style="color:var(--dim);padding:40px">Waiting for latency data...</div>'; return; }
+
+  const maxL = Math.max(...lats, 1);
+  container.innerHTML = '';
+  const barW = Math.max(4, (container.clientWidth / lats.length) - 1);
+  lats.forEach((ms, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'chart-bar';
+    const color = ms < 500 ? 'var(--green)' : ms < 2000 ? 'var(--yellow)' : 'var(--red)';
+    bar.style.left = `${i * (barW + 1)}px`;
+    bar.style.width = `${barW}px`;
+    bar.style.height = `${(ms / maxL) * (h - 20)}px`;
+    bar.style.background = color;
+    container.appendChild(bar);
+  });
+}
+
+function switchView(view) {
+  state.activeView = view;
+  ['dag', 'tokens', 'latency'].forEach(v => {
+    document.getElementById(`view-${v}`).style.display = v === view ? '' : 'none';
+  });
+  document.querySelectorAll('.panel-title .tab').forEach(t => {
+    t.classList.toggle('active', t.textContent.toLowerCase() === view);
+  });
+  if (view === 'dag') renderDAG();
+  else if (view === 'tokens') renderTokenChart();
+  else if (view === 'latency') renderLatencyChart();
+}
+
+function addFeedLine(type, data) {
+  const feed = document.getElementById('event-feed');
+  const line = document.createElement('div');
+  line.className = 'feed-line';
+
+  const now = new Date();
+  const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+
+  let cls = '';
+  if (type.includes('tool')) cls = 'tool';
+  else if (type.includes('orchestration') || type.includes('orch')) cls = 'orch';
+  else if (type.includes('trace') || type.includes('span')) cls = 'trace';
+  else if (type === 'error') cls = 'err';
+
+  const detail = data.tool_name || data.tool || data.plan_id || data.error || data.node_id || '';
+  line.innerHTML = `<span class="time">${timeStr}</span><span class="type ${cls}">${type}</span><span class="detail">${detail}</span>`;
+
+  feed.appendChild(line);
+  if (feed.children.length > state.maxFeedLines) feed.removeChild(feed.firstChild);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function updateKPIs() {
+  document.getElementById('kpi-calls').textContent = state.totalCalls;
+  document.getElementById('kpi-tokens').textContent = state.totalTokens > 1000 ? `${(state.totalTokens/1000).toFixed(1)}K` : state.totalTokens;
+  document.getElementById('kpi-cost').textContent = `$${state.totalCost.toFixed(3)}`;
+  document.getElementById('kpi-errors').textContent = state.totalErrors;
+
+  const avgMs = state.latencies.length ? Math.round(state.latencies.reduce((a,b) => a+b, 0) / state.latencies.length) : 0;
+  document.getElementById('kpi-latency').textContent = `${avgMs}ms`;
+
+  const successRate = state.totalCalls > 0 ? Math.round(((state.totalCalls - state.totalErrors) / state.totalCalls) * 100) : 100;
+  document.getElementById('kpi-success').textContent = `${successRate}%`;
+}
+
+function updateToolList() {
+  const list = document.getElementById('tool-list');
+  const sorted = Object.entries(state.toolStats).sort((a,b) => b[1].calls - a[1].calls).slice(0, 8);
+  list.innerHTML = sorted.map(([name, s]) => {
+    const avg = s.calls > 0 ? Math.round(s.totalMs / s.calls) : 0;
+    return `<div class="tool-item"><span class="name">${name}</span><span class="count">${s.calls}x ${avg}ms</span></div>`;
+  }).join('');
+}
+
+function updateBudgetGauges(query, session, monthly) {
+  [['query', query], ['session', session], ['monthly', monthly]].forEach(([tier, pct]) => {
+    if (pct === undefined || pct === null) return;
+    const used = Math.round(pct);
+    document.getElementById(`budget-${tier}-pct`).textContent = `${100 - used}%`;
+    const bar = document.getElementById(`budget-${tier}-bar`);
+    bar.style.width = `${used}%`;
+    bar.style.background = used < 70 ? 'var(--green)' : used < 90 ? 'var(--yellow)' : 'var(--red)';
+  });
+  document.getElementById('pill-budget').textContent = `Budget: ${100 - Math.round(monthly || 0)}%`;
+}
+
+function updatePillDags() {
+  const active = Object.values(state.nodes).filter(n => n.state === 'running').length;
+  document.getElementById('pill-dags').textContent = `DAGs: ${Object.keys(state.plans).length}`;
+  document.getElementById('pill-dags').className = `pill ${active > 0 ? 'live' : ''}`;
+}
+
+// ─── Demo Mode (when no SSE endpoint available) ─────────────────────
+function runDemo() {
+  const tools = ['file_system', 'bash', 'web_search', 'mcp_by_dojo:search_wisdom', 'invoke_skill', 'code_execution'];
+  let step = 0;
+
+  // Simulate a plan creation
+  handleEvent({type: 'orchestration_plan_created', data: {plan: {id: 'demo-plan-1', node_count: 4, nodes: [
+    {ID: 'n1', ToolName: 'web_search', Dependencies: []},
+    {ID: 'n2', ToolName: 'file_system', Dependencies: ['n1']},
+    {ID: 'n3', ToolName: 'bash', Dependencies: ['n1']},
+    {ID: 'n4', ToolName: 'invoke_skill', Dependencies: ['n2', 'n3']},
+  ]}}});
+
+  const steps = [
+    () => handleEvent({type: 'orchestration.node.start', data: {node_id: 'n1', tool_name: 'web_search', plan_id: 'demo-plan-1'}}),
+    () => handleEvent({type: 'tool_invoked', data: {tool: 'web_search', arguments: {query: 'MCP servers'}}}),
+    () => { handleEvent({type: 'tool_completed', data: {tool: 'web_search', duration_ms: 340, input_tokens: 150, output_tokens: 800, estimated_cost: 0.003}}); handleEvent({type: 'orchestration.node.end', data: {node_id: 'n1', tool_name: 'web_search', plan_id: 'demo-plan-1', state: 'success', duration_ms: 340}}); },
+    () => { handleEvent({type: 'orchestration.node.start', data: {node_id: 'n2', tool_name: 'file_system', plan_id: 'demo-plan-1'}}); handleEvent({type: 'orchestration.node.start', data: {node_id: 'n3', tool_name: 'bash', plan_id: 'demo-plan-1'}}); },
+    () => { handleEvent({type: 'tool_invoked', data: {tool: 'file_system'}}); handleEvent({type: 'tool_invoked', data: {tool: 'bash'}}); },
+    () => { handleEvent({type: 'tool_completed', data: {tool: 'file_system', duration_ms: 12, input_tokens: 50, output_tokens: 200, estimated_cost: 0.0005}}); handleEvent({type: 'orchestration.node.end', data: {node_id: 'n2', tool_name: 'file_system', plan_id: 'demo-plan-1', state: 'success', duration_ms: 12}}); },
+    () => { handleEvent({type: 'tool_completed', data: {tool: 'bash', duration_ms: 1540, input_tokens: 80, output_tokens: 400, estimated_cost: 0.001}}); handleEvent({type: 'orchestration.node.end', data: {node_id: 'n3', tool_name: 'bash', plan_id: 'demo-plan-1', state: 'success', duration_ms: 1540}}); },
+    () => handleEvent({type: 'orchestration.node.start', data: {node_id: 'n4', tool_name: 'invoke_skill', plan_id: 'demo-plan-1'}}),
+    () => { handleEvent({type: 'tool_invoked', data: {tool: 'invoke_skill'}}); handleEvent({type: 'tool_completed', data: {tool: 'invoke_skill', duration_ms: 2100, input_tokens: 500, output_tokens: 1200, estimated_cost: 0.005}}); handleEvent({type: 'orchestration.node.end', data: {node_id: 'n4', tool_name: 'invoke_skill', plan_id: 'demo-plan-1', state: 'success', duration_ms: 2100}}); },
+    () => handleEvent({type: 'orchestration_complete', data: {plan_id: 'demo-plan-1', total_nodes: 4, success_nodes: 4, failed_nodes: 0, duration_ms: 4000}}),
+  ];
+
+  function nextStep() {
+    if (step < steps.length) {
+      steps[step]();
+      step++;
+      setTimeout(nextStep, 600 + Math.random() * 400);
+    } else {
+      // Update budget gauges at end
+      updateBudgetGauges(5, 12, 28);
+    }
+  }
+  nextStep();
+}
+
+// ─── Init ────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Try SSE, fall back to demo
+  try { connect(); } catch(e) { /* will auto-reconnect */ }
+  // Run demo after short delay if no events received
+  setTimeout(() => {
+    if (state.events.length === 0) runDemo();
+  }, 2000);
+});
+</script>
+</body>
+</html>
