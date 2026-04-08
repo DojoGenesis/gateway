@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/provider"
 )
 
 // ─── OpenAI-Compatible Request/Response Types ────────────────────────────────
@@ -82,7 +82,8 @@ func (s *Server) handleChatCompletions(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
+	// Default 5 minutes for local LLM inference (large models on consumer GPUs)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 300*time.Second)
 	defer cancel()
 
 	if req.Stream {
@@ -145,7 +146,16 @@ func (s *Server) nonStreamChatCompletions(c *gin.Context, ctx context.Context, r
 		return
 	}
 
+	callStart := time.Now()
 	resp, err := prov.GenerateCompletion(ctx, completionReq)
+	latencyMs := time.Since(callStart).Milliseconds()
+
+	// Record latency for provider history tracking
+	if s.latencyTracker != nil {
+		provName := s.resolveProviderName(req.Model)
+		s.latencyTracker.Record(provName, latencyMs, err != nil)
+	}
+
 	if err != nil {
 		s.errorResponse(c, http.StatusInternalServerError, "provider_error", "Completion failed: "+err.Error())
 		return
@@ -332,6 +342,30 @@ func (s *Server) resolveProvider(model string) (provider.ModelProvider, error) {
 	}
 
 	return nil, fmt.Errorf("no provider available for model %q", model)
+}
+
+// resolveProviderName returns the provider name for a given model string,
+// used for latency tracking attribution. Falls back to "unknown" if the model
+// cannot be matched to a specific provider.
+func (s *Server) resolveProviderName(model string) string {
+	if s.pluginManager == nil {
+		return "unknown"
+	}
+	providers := s.pluginManager.GetProviders()
+	for name, prov := range providers {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		models, err := prov.ListModels(ctx)
+		cancel()
+		if err != nil {
+			continue
+		}
+		for _, m := range models {
+			if m.ID == model || m.Name == model {
+				return name
+			}
+		}
+	}
+	return "unknown"
 }
 
 // errorResponse sends a consistent error response.

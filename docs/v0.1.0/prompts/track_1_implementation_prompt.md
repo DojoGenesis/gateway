@@ -22,9 +22,9 @@
 - `go_backend/events/events.go`: StreamEvent types and constructors
 
 **Module Paths:**
-- `github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider`
-- `github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools`
-- `github.com/TresPies-source/AgenticGatewayByDojoGenesis/events`
+- `github.com/DojoGenesis/gateway/provider`
+- `github.com/DojoGenesis/gateway/tools`
+- `github.com/DojoGenesis/gateway/events`
 
 ---
 

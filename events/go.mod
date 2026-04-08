@@ -1,4 +1,4 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/events
+module github.com/DojoGenesis/gateway/events
 
 go 1.25.6
 

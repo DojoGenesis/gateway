@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/artifacts"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/server/artifacts"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 var artifactManager *artifacts.ArtifactManager

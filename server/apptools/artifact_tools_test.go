@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/artifacts"
+	"github.com/DojoGenesis/gateway/server/artifacts"
 	_ "modernc.org/sqlite"
 )
 

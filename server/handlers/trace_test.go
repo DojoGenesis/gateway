@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
+	"github.com/DojoGenesis/gateway/server/trace"
 	"github.com/gin-gonic/gin"
 	_ "modernc.org/sqlite"
 )

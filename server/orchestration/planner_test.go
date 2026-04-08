@@ -1,6 +1,6 @@
 package orchestration
 
-import orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+import orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 type mockProvider struct {

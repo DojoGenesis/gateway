@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
+	"github.com/DojoGenesis/gateway/runtime/cas"
 )
 
 // CASStorage adapts the CAS Store to an OCI-compatible content storage interface.

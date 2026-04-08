@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/projects"
+	"github.com/DojoGenesis/gateway/server/projects"
 	_ "modernc.org/sqlite"
 )
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/observation/audit"
+	"github.com/DojoGenesis/gateway/observation/audit"
 )
 
 func newTestLog(t *testing.T) audit.AuditLog {

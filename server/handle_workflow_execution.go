@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/workflow"
+	"github.com/DojoGenesis/gateway/workflow"
 )
 
 // ---------------------------------------------------------------------------

@@ -24,7 +24,7 @@
 
 **Target Module Path Convention:**
 ```
-github.com/TresPies-source/AgenticGatewayByDojoGenesis/{module}
+github.com/DojoGenesis/gateway/{module}
 ```
 
 ---
@@ -47,13 +47,13 @@ github.com/TresPies-source/AgenticGatewayByDojoGenesis/{module}
    )
    ```
 
-3. **Create `shared/` module** (`github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared`):
+3. **Create `shared/` module** (`github.com/DojoGenesis/gateway/shared`):
    - `shared/go.mod` with `go 1.24`
    - `shared/types.go` — Cross-cutting currency types: `Message`, `ToolCall`, `ToolResult`, `Usage`, `TaskStatus`, `NodeState` (see spec section 5.3)
    - `shared/errors.go` — Standard error types
    - No external dependencies (stdlib only)
 
-4. **Create `events/` module** (`github.com/TresPies-source/AgenticGatewayByDojoGenesis/events`):
+4. **Create `events/` module** (`github.com/DojoGenesis/gateway/events`):
    - `events/go.mod` with `go 1.24`, depends on `shared`
    - `events/events.go` — `StreamEvent` type and event constructors for provider, tool, and orchestration events
    - Extract from `go_backend/events/` in the monolith
@@ -73,7 +73,7 @@ github.com/TresPies-source/AgenticGatewayByDojoGenesis/{module}
 
 7. **Update all import paths** across all copied files:
    - FROM: `github.com/TresPies-source/dojo-genesis/go_backend/...`
-   - TO: `github.com/TresPies-source/AgenticGatewayByDojoGenesis/...`
+   - TO: `github.com/DojoGenesis/gateway/...`
 
 8. **Strip Dojo-specific packages** — Remove ALL code referencing:
    - `calibration/`, `compassion/`, `proactive/`, `telegram/`, `judgment/`, `goals/`, `context/` (the engine), `entities/`, `workspaces/`
@@ -127,7 +127,7 @@ github.com/TresPies-source/AgenticGatewayByDojoGenesis/{module}
 ## 4. Success Criteria
 
 - [ ] `go.work` file exists at workspace root with all 7 modules listed
-- [ ] Each module's `go.mod` uses `github.com/TresPies-source/AgenticGatewayByDojoGenesis/{module}` path with `go 1.24`
+- [ ] Each module's `go.mod` uses `github.com/DojoGenesis/gateway/{module}` path with `go 1.24`
 - [ ] `go build ./...` from workspace root succeeds without errors
 - [ ] `go test ./...` from workspace root runs all tests successfully
 - [ ] `go vet ./...` passes without warnings

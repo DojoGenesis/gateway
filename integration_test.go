@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/disposition"
+	"github.com/DojoGenesis/gateway/memory"
+	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 // TestDispositionToOrchestrationPacing verifies that agent disposition

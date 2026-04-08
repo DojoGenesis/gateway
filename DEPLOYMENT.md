@@ -10,7 +10,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/TresPies-source/AgenticGatewayByDojoGenesis.git
+git clone https://github.com/DojoGenesis/gateway.git
 cd AgenticGatewayByDojoGenesis
 
 # 2. Set environment variables (optional)

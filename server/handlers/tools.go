@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/tools"
 	"github.com/gin-gonic/gin"
 )
 

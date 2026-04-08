@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 func TestCreateToolDefinition(t *testing.T) {

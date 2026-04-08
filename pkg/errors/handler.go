@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
+	"github.com/DojoGenesis/gateway/disposition"
 )
 
 // ErrorAction represents the action to take in response to an error.

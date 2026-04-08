@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	providerpkg "github.com/DojoGenesis/gateway/provider"
 )
 
 type mockCalculationProvider struct{}

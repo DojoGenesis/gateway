@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
+	"github.com/DojoGenesis/gateway/runtime/cas"
 )
 
 // ─── CAS API Types ──────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/d1client"
+	"github.com/DojoGenesis/gateway/runtime/d1client"
 )
 
 // D1Config holds connection parameters for the D1-backed CAS store.

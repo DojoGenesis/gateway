@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
+	"github.com/DojoGenesis/gateway/disposition"
 )
 
 // ErrorType classifies errors for retry/replan/abort decisions.

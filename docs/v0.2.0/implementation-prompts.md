@@ -244,7 +244,7 @@ Phase 3 (Sequential)
 
 ### 6. Grounding
 
-- **Module path:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis`
+- **Module path:** `github.com/DojoGenesis/gateway`
 - **Existing ToolFunc signature:** `func(context.Context, map[string]interface{}) (map[string]interface{}, error)` in tools/types.go
 - **Existing ToolDefinition shape:** See tools/types.go (has Name, Description, Parameters, Function, Timeout fields)
 - **Time package:** `import "time"` for time.Time in MemoryEntry
@@ -287,7 +287,7 @@ Phase 3 (Sequential)
 
 1. **Create `mcp/` as a new workspace module:**
    - Create `mcp/` directory at repository root
-   - Create `mcp/go.mod` with module path `github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp`
+   - Create `mcp/go.mod` with module path `github.com/DojoGenesis/gateway/mcp`
    - Create `mcp/go.sum` (will populate as you add dependencies)
    - This is a separate module, NOT a package within the main module
 
@@ -406,7 +406,7 @@ Phase 3 (Sequential)
 - **MCP Go library:** `github.com/mark3labs/mcp-go` (version 0.8.0+)
 - **YAML:** `gopkg.in/yaml.v3`
 - **OTEL:** `go.opentelemetry.io/otel` and `go.opentelemetry.io/otel/trace`
-- **Module path:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp`
+- **Module path:** `github.com/DojoGenesis/gateway/mcp`
 - **Workspace:** `go.work` already exists; add `use ./mcp`
 
 ---
@@ -551,8 +551,8 @@ Phase 3 (Sequential)
 - **Time:** `import "time"` for cache TTL
 - **Context:** `import "context"`
 - **Contract:** `contracts/gateway-ada.md` is canonical source for all type definitions
-- **Module path:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition`
-- **Gateway interfaces:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway`
+- **Module path:** `github.com/DojoGenesis/gateway/pkg/disposition`
+- **Gateway interfaces:** `github.com/DojoGenesis/gateway/pkg/gateway`
 
 ---
 

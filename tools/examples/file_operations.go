@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 // RegisterFileTools registers read_file and write_file reference tools.

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
+	"github.com/DojoGenesis/gateway/runtime/cas"
 )
 
 func newTestStore(t *testing.T) cas.Store {

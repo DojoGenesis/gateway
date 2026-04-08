@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/secure_storage"
+	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/database"
+	"github.com/DojoGenesis/gateway/server/secure_storage"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )

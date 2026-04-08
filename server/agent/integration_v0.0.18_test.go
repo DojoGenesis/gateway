@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/apptools"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/artifacts"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/projects"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	providerpkg "github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/apptools"
+	"github.com/DojoGenesis/gateway/server/artifacts"
+	"github.com/DojoGenesis/gateway/server/projects"
+	"github.com/DojoGenesis/gateway/tools"
 	_ "modernc.org/sqlite"
 )
 

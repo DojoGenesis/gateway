@@ -221,7 +221,7 @@ mcp:
 
 ### 3.3 mcp/ Module Design
 
-**Module Path:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp`
+**Module Path:** `github.com/DojoGenesis/gateway/mcp`
 
 **Primary Interfaces & Types:**
 
@@ -705,7 +705,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -859,7 +859,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
 	"go.opentelemetry.io/otel"
 )
 
@@ -1788,9 +1788,9 @@ Week 3:
 - **JSON Schema:** https://json-schema.org/
 
 ### Related Code Locations
-- **Gateway Module:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway`
-- **Orchestration Engine:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway/orchestration`
-- **Tool Registry:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway/tool_registry.go`
+- **Gateway Module:** `github.com/DojoGenesis/gateway/pkg/gateway`
+- **Orchestration Engine:** `github.com/DojoGenesis/gateway/pkg/gateway/orchestration`
+- **Tool Registry:** `github.com/DojoGenesis/gateway/pkg/gateway/tool_registry.go`
 - **MCPByDojoGenesis:** `github.com/TresPies-source/MCPByDojoGenesis` (reference MCP server)
 
 ### Configuration Examples

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	mcpserver "github.com/TresPies-source/AgenticGatewayByDojoGenesis/protocol/mcpserver"
+	mcpserver "github.com/DojoGenesis/gateway/protocol/mcpserver"
 )
 
 type jsonRPCRequest struct {

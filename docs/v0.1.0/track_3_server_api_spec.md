@@ -1092,11 +1092,11 @@ import (
 
     "github.com/gin-contrib/cors"
     "github.com/gin-gonic/gin"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/streaming"
+    "github.com/DojoGenesis/gateway/orchestration"
+    "github.com/DojoGenesis/gateway/provider"
+    "github.com/DojoGenesis/gateway/memory"
+    "github.com/DojoGenesis/gateway/tools"
+    "github.com/DojoGenesis/gateway/streaming"
 )
 
 type ServerConfig struct {
@@ -1437,13 +1437,13 @@ import (
     "os/signal"
     "syscall"
 
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/config"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/streaming"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/server"
+    "github.com/DojoGenesis/gateway/server/config"
+    "github.com/DojoGenesis/gateway/orchestration"
+    "github.com/DojoGenesis/gateway/provider"
+    "github.com/DojoGenesis/gateway/memory"
+    "github.com/DojoGenesis/gateway/tools"
+    "github.com/DojoGenesis/gateway/streaming"
+    "github.com/DojoGenesis/gateway/server"
 )
 
 func main() {
@@ -1873,7 +1873,7 @@ echo "All tests passed!"
 ### 2. Technical Readiness
 
 - [x] **Architecture is Sound:** Server with dependency injection, middleware stack, route groups, SSE broadcaster pattern all well-defined.
-- [x] **Code is Production-Ready:** Complete server.go implementation, route setup, middleware chain. Uses `github.com/TresPies-source/AgenticGatewayByDojoGenesis/*` paths.
+- [x] **Code is Production-Ready:** Complete server.go implementation, route setup, middleware chain. Uses `github.com/DojoGenesis/gateway/*` paths.
 - [x] **APIs are Specified:** All 15+ endpoints fully specified (Method, Path, Request JSON, Response JSON, Status Codes, Auth requirements).
 - [x] N/A **Database Schema is Final:** Server module doesn't own database; delegates to memory module.
 - [x] **Dependencies are Met:** Depends on all other modules (provider, tools, orchestration, memory, events). Gin framework, CORS middleware.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
+	"github.com/DojoGenesis/gateway/disposition"
 )
 
 // Artifact represents code or content to be validated.

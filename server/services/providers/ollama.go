@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/provider"
 )
 
 type OllamaProvider struct {

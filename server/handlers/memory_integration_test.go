@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/middleware"
+	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/server/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )

@@ -10,8 +10,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/middleware"
+	"github.com/DojoGenesis/gateway/server/database"
+	"github.com/DojoGenesis/gateway/server/middleware"
 )
 
 // ─── Request / Response types ───────────────────────────────────────────────
@@ -82,13 +82,13 @@ func (s *Server) handleAuthRegister(c *gin.Context) {
 	}
 
 	// Issue tokens
-	accessToken, err := issueToken(userID, "user", 24*time.Hour)
+	accessToken, err := issueToken(userID, "user", s.cfg.AccessTokenTTL)
 	if err != nil {
 		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to issue access token")
 		return
 	}
 
-	refreshToken, err := issueToken(userID, "refresh", 7*24*time.Hour)
+	refreshToken, err := issueToken(userID, "refresh", s.cfg.RefreshTokenTTL)
 	if err != nil {
 		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to issue refresh token")
 		return
@@ -99,7 +99,7 @@ func (s *Server) handleAuthRegister(c *gin.Context) {
 		DisplayName:  req.DisplayName,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		ExpiresIn:    86400,
+		ExpiresIn:    int(s.cfg.AccessTokenTTL.Seconds()),
 	})
 }
 
@@ -136,13 +136,13 @@ func (s *Server) handleAuthLogin(c *gin.Context) {
 	}
 
 	// Issue tokens
-	accessToken, err := issueToken(userID, "user", 24*time.Hour)
+	accessToken, err := issueToken(userID, "user", s.cfg.AccessTokenTTL)
 	if err != nil {
 		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to issue access token")
 		return
 	}
 
-	refreshToken, err := issueToken(userID, "refresh", 7*24*time.Hour)
+	refreshToken, err := issueToken(userID, "refresh", s.cfg.RefreshTokenTTL)
 	if err != nil {
 		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to issue refresh token")
 		return
@@ -153,7 +153,7 @@ func (s *Server) handleAuthLogin(c *gin.Context) {
 		DisplayName:  displayName,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		ExpiresIn:    86400,
+		ExpiresIn:    int(s.cfg.AccessTokenTTL.Seconds()),
 	})
 }
 
@@ -185,7 +185,7 @@ func (s *Server) handleAuthRefresh(c *gin.Context) {
 	}
 
 	// Issue new access token only
-	accessToken, err := issueToken(userID, "user", 24*time.Hour)
+	accessToken, err := issueToken(userID, "user", s.cfg.AccessTokenTTL)
 	if err != nil {
 		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to issue access token")
 		return

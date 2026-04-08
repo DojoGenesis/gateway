@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider/pb"
+	"github.com/DojoGenesis/gateway/provider/pb"
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 )

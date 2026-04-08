@@ -1,8 +1,8 @@
 package maintenance
 
 import (
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/provider"
 )
 
 // ProviderPluginManager is the interface that provider.PluginManager satisfies.

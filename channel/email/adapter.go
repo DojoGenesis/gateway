@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/channel"
+	"github.com/DojoGenesis/gateway/channel"
 	"github.com/google/uuid"
 )
 

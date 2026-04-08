@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/provider"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

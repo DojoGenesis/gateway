@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 var startTime = time.Now()

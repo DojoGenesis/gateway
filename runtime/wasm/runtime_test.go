@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/wasm"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/wasm/testdata"
+	"github.com/DojoGenesis/gateway/runtime/wasm"
+	"github.com/DojoGenesis/gateway/runtime/wasm/testdata"
 )
 
 func newTestRuntime(t *testing.T) wasm.WASMRuntime {

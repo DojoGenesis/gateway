@@ -469,7 +469,7 @@ All requirements from `specs/phase-3-protocol/mcp-wiring.md` have been implement
 
 ```bash
 $ go test ./mcp
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp	0.401s
+ok  	github.com/DojoGenesis/gateway/mcp	0.401s
 
 $ go vet ./mcp/...
 (no output - clean)

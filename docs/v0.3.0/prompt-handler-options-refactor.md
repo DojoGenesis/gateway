@@ -23,14 +23,14 @@ Replace the 18-parameter `New()` and `NewFromConfig()` constructors with a singl
 package server
 
 import (
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/maintenance"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
+	"github.com/DojoGenesis/gateway/memory"
+	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
+	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/agent"
+	"github.com/DojoGenesis/gateway/server/maintenance"
+	"github.com/DojoGenesis/gateway/server/services"
+	"github.com/DojoGenesis/gateway/server/trace"
 )
 
 // ServerDeps holds all injectable dependencies for the Server.
@@ -226,7 +226,7 @@ s := server.New(server.ServerDeps{})
 
 After removing `NewFromConfig()`, the `config` import may become unused:
 ```go
-"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/config"
+"github.com/DojoGenesis/gateway/server/config"
 ```
 
 Check if `config.Config` is still used anywhere in `server.go`. If `NewFromConfig()` was the only user, remove the import.

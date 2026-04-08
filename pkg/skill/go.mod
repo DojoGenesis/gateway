@@ -1,8 +1,8 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/skill
+module github.com/DojoGenesis/gateway/pkg/skill
 
 go 1.25.6
 
-require github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas v0.0.0
+require github.com/DojoGenesis/gateway/runtime/cas v0.0.0
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -17,4 +17,4 @@ require (
 	modernc.org/sqlite v1.48.1 // indirect
 )
 
-replace github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas => ../../runtime/cas
+replace github.com/DojoGenesis/gateway/runtime/cas => ../../runtime/cas

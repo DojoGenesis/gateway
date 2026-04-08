@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
 )
 
 // ShouldCompress returns true if the number of memories exceeds the threshold.

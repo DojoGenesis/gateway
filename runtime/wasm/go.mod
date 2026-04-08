@@ -1,4 +1,4 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/wasm
+module github.com/DojoGenesis/gateway/runtime/wasm
 
 go 1.25.6
 

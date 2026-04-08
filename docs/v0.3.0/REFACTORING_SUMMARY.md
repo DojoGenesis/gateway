@@ -7,7 +7,7 @@ Decouple the `orchestration/` module from transitive dependencies on `tools/` (w
 
 ### 1. New `disposition/` Module
 **Created:** `disposition/go.mod`
-- Module path: `github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition`
+- Module path: `github.com/DojoGenesis/gateway/disposition`
 - Dependencies: `gopkg.in/yaml.v3 v3.0.1`
 
 **Files moved from `pkg/disposition/` to `disposition/`:**
@@ -31,7 +31,7 @@ Decouple the `orchestration/` module from transitive dependencies on `tools/` (w
 
 ### 2. New `skill/` Module
 **Created:** `skill/go.mod`
-- Module path: `github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill`
+- Module path: `github.com/DojoGenesis/gateway/skill`
 - Dependencies: `google/uuid`, `stretchr/testify`, `gopkg.in/yaml.v3`
 
 **Files moved from `pkg/skill/` to `skill/`:**
@@ -55,24 +55,24 @@ Decouple the `orchestration/` module from transitive dependencies on `tools/` (w
 **Before:**
 ```go
 require (
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis v0.0.0
+    github.com/DojoGenesis/gateway v0.0.0
     ...
 )
-replace github.com/TresPies-source/AgenticGatewayByDojoGenesis => ../
+replace github.com/DojoGenesis/gateway => ../
 ```
 
 **After:**
 ```go
 require (
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition v0.0.0
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill v0.0.0
+    github.com/DojoGenesis/gateway/disposition v0.0.0
+    github.com/DojoGenesis/gateway/skill v0.0.0
     github.com/google/uuid v1.6.0
     github.com/stretchr/testify v1.11.1
 )
 
 replace (
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition => ../disposition
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill => ../skill
+    github.com/DojoGenesis/gateway/disposition => ../disposition
+    github.com/DojoGenesis/gateway/skill => ../skill
 )
 ```
 
@@ -126,11 +126,11 @@ Total workspace modules: 11
 Added dependency and replace directive:
 ```go
 require (
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition v0.0.0
+    github.com/DojoGenesis/gateway/disposition v0.0.0
     ...
 )
 
-replace github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition => ../disposition
+replace github.com/DojoGenesis/gateway/disposition => ../disposition
 ```
 
 ## Verification Results

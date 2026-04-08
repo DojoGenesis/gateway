@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/workflow"
+	"github.com/DojoGenesis/gateway/runtime/cas"
+	"github.com/DojoGenesis/gateway/workflow"
 )
 
 // WorkflowHandler provides HTTP handlers for workflow CRUD operations.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
+	"github.com/DojoGenesis/gateway/server/agent"
 )
 
 const (

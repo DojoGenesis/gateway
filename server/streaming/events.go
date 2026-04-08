@@ -1,7 +1,7 @@
 package streaming
 
 import (
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
+	"github.com/DojoGenesis/gateway/events"
 )
 
 type EventType = events.EventType

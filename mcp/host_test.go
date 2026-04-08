@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 // mockToolRegistry is a simple in-memory implementation of gateway.ToolRegistry for testing.

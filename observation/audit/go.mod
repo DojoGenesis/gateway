@@ -1,4 +1,4 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/observation/audit
+module github.com/DojoGenesis/gateway/observation/audit
 
 go 1.25.6
 

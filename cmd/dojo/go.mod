@@ -1,10 +1,10 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/cmd/dojo
+module github.com/DojoGenesis/gateway/cmd/dojo
 
 go 1.25.6
 
 require (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/skill v0.0.0
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas v0.0.0
+	github.com/DojoGenesis/gateway/pkg/skill v0.0.0
+	github.com/DojoGenesis/gateway/runtime/cas v0.0.0
 )
 
 require (
@@ -21,6 +21,6 @@ require (
 )
 
 replace (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/skill => ../../pkg/skill
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas => ../../runtime/cas
+	github.com/DojoGenesis/gateway/pkg/skill => ../../pkg/skill
+	github.com/DojoGenesis/gateway/runtime/cas => ../../runtime/cas
 )

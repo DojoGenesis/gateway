@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/apps"
+	"github.com/DojoGenesis/gateway/apps"
 )
 
 // handleGetResource serves a UI resource by URI with security headers.

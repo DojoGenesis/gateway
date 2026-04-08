@@ -1,9 +1,9 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/channel/slack
+module github.com/DojoGenesis/gateway/channel/slack
 
 go 1.25.6
 
 require (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/channel v0.0.0
+	github.com/DojoGenesis/gateway/channel v0.0.0
 	github.com/google/uuid v1.6.0
 	github.com/slack-go/slack v0.15.0
 )
@@ -14,4 +14,4 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 )
 
-replace github.com/TresPies-source/AgenticGatewayByDojoGenesis/channel => ../
+replace github.com/DojoGenesis/gateway/channel => ../

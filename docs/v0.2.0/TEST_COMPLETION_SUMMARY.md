@@ -19,10 +19,10 @@ Successfully completed the full test suite update for the ADA (Agent Disposition
 ```bash
 $ go test ./pkg/disposition/... -v
 PASS
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition	0.608s
+ok  	github.com/DojoGenesis/gateway/pkg/disposition	0.608s
 
 $ go test ./pkg/disposition/... -cover
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition	0.617s	coverage: 88.5% of statements
+ok  	github.com/DojoGenesis/gateway/pkg/disposition	0.617s	coverage: 88.5% of statements
 ```
 
 **✅ All tests passing**

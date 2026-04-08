@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/maintenance"
+	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/server/maintenance"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )

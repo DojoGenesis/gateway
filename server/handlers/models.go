@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/provider"
 	"github.com/gin-gonic/gin"
 )
 

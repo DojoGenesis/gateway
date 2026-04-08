@@ -1,3 +1,3 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/wasm-modules/dip-scorer
+module github.com/DojoGenesis/gateway/wasm-modules/dip-scorer
 
 go 1.25.6

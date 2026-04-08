@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
+	"github.com/DojoGenesis/gateway/server/services"
 	"github.com/gin-gonic/gin"
 )
 

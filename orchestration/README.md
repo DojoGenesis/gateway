@@ -76,7 +76,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+    "github.com/DojoGenesis/gateway/orchestration"
 )
 
 func main() {
@@ -125,7 +125,7 @@ func main() {
 ### With Disposition-Aware Pacing
 
 ```go
-import "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+import "github.com/DojoGenesis/gateway/pkg/disposition"
 
 // Create disposition config
 dispConfig := &disposition.DispositionConfig{

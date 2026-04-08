@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 // RegisterWebSearchTool registers a web search tool.

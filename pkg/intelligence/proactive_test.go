@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
+	"github.com/DojoGenesis/gateway/disposition"
 )
 
 func TestShouldSuggest_Reactive(t *testing.T) {

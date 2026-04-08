@@ -12,9 +12,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
-	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	serverorchestration "github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
+	"github.com/DojoGenesis/gateway/events"
+	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
+	serverorchestration "github.com/DojoGenesis/gateway/server/orchestration"
 )
 
 // ─── Orchestration API Types ─────────────────────────────────────────────────

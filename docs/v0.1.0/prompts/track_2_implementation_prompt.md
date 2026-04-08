@@ -21,8 +21,8 @@
 - `go_backend/memory/garden_manager.go`: Garden compression and seed extraction
 
 **Module Paths:**
-- `github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration`
-- `github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory`
+- `github.com/DojoGenesis/gateway/orchestration`
+- `github.com/DojoGenesis/gateway/memory`
 
 ---
 

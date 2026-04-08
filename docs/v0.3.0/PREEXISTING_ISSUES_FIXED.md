@@ -135,7 +135,7 @@ return s.manager.Delete(ctx, id)
 
 ```bash
 $ go test ./memory
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory	1.841s
+ok  	github.com/DojoGenesis/gateway/memory	1.841s
 ```
 
 All memory tests now pass, including:
@@ -202,7 +202,7 @@ Added import:
 ```go
 import (
     // ... existing imports
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+    "github.com/DojoGenesis/gateway/pkg/disposition"
 )
 ```
 
@@ -214,7 +214,7 @@ $ go test ./orchestration -run "TestEngine_Execute_ThreeNodeDAGWithParallelPair"
     engine_test.go:159: 3-node DAG with parallel pair completed in 100.979792ms
 --- PASS: TestEngine_Execute_ThreeNodeDAGWithParallelPair (0.10s)
 PASS
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration	0.526s
+ok  	github.com/DojoGenesis/gateway/orchestration	0.526s
 ```
 
 **Result:** Test now completes in ~101ms as expected ✅
@@ -222,7 +222,7 @@ ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration	0.526s
 All orchestration tests pass:
 ```bash
 $ go test ./orchestration
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration	17.466s
+ok  	github.com/DojoGenesis/gateway/orchestration	17.466s
 ```
 
 ---
@@ -234,13 +234,13 @@ ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration	17.466
 ```bash
 $ go test ./orchestration ./memory ./pkg/intelligence ./pkg/errors ./pkg/collaboration ./pkg/validation ./pkg/reflection
 
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration     17.466s
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory            1.841s
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/intelligence  0.284s
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/errors        0.556s
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/collaboration 1.349s
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/validation    0.815s
-ok  	github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/reflection    1.046s
+ok  	github.com/DojoGenesis/gateway/orchestration     17.466s
+ok  	github.com/DojoGenesis/gateway/memory            1.841s
+ok  	github.com/DojoGenesis/gateway/pkg/intelligence  0.284s
+ok  	github.com/DojoGenesis/gateway/pkg/errors        0.556s
+ok  	github.com/DojoGenesis/gateway/pkg/collaboration 1.349s
+ok  	github.com/DojoGenesis/gateway/pkg/validation    0.815s
+ok  	github.com/DojoGenesis/gateway/pkg/reflection    1.046s
 ```
 
 **Total:** 100% passing ✅

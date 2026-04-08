@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/handlers"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/middleware"
-	wfapi "github.com/TresPies-source/AgenticGatewayByDojoGenesis/workflow/api"
+	"github.com/DojoGenesis/gateway/server/handlers"
+	"github.com/DojoGenesis/gateway/server/middleware"
+	wfapi "github.com/DojoGenesis/gateway/workflow/api"
 )
 
 // setupRoutes registers all HTTP routes on the Gin engine.

@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
+	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
+	providerpkg "github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/services"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )

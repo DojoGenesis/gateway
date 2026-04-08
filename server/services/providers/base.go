@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/provider"
 )
 
 // APIKeyResolver dynamically resolves API keys at request time.

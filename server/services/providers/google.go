@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/provider"
 )
 
 // GoogleProvider implements the Google Gemini API adapter.

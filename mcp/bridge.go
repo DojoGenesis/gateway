@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 // AdaptMCPTool creates a Gateway ToolFunc that bridges to an MCP tool on a remote server.

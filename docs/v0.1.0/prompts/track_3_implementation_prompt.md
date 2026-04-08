@@ -21,7 +21,7 @@
 - `go_backend/middleware/`: Auth, logging, CORS middleware patterns
 
 **Module Path:**
-- `github.com/TresPies-source/AgenticGatewayByDojoGenesis/server`
+- `github.com/DojoGenesis/gateway/server`
 
 **HTTP Framework:** Gin (`github.com/gin-gonic/gin`)
 
@@ -176,11 +176,11 @@
 **Import Paths (all must use):**
 ```go
 import (
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
+    "github.com/DojoGenesis/gateway/shared"
+    "github.com/DojoGenesis/gateway/events"
+    "github.com/DojoGenesis/gateway/provider"
+    "github.com/DojoGenesis/gateway/tools"
+    "github.com/DojoGenesis/gateway/orchestration"
+    "github.com/DojoGenesis/gateway/memory"
 )
 ```

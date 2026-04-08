@@ -3,7 +3,7 @@ package gateway
 import (
 	"context"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 // ToolRegistry is the interface for managing tool registration and lookup.

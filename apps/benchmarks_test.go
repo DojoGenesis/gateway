@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 func BenchmarkResourceRegistry_Get(b *testing.B) {

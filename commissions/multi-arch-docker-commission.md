@@ -76,7 +76,7 @@
      "org.opencontainers.image.title": "{{.ProjectName}}"
      "org.opencontainers.image.revision": "{{.FullCommit}}"
      "org.opencontainers.image.version": "{{.Version}}"
-     "org.opencontainers.image.source": "https://github.com/TresPies-source/AgenticGatewayByDojoGenesis"
+     "org.opencontainers.image.source": "https://github.com/DojoGenesis/gateway"
    ```
 
 ### Phase 2: Create Goreleaser-Specific Dockerfile (Steps 4-5)

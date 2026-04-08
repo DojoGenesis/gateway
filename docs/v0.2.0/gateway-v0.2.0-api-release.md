@@ -708,7 +708,7 @@ package orchestration
 import (
     "context"
     "go.opentelemetry.io/otel"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
+    "github.com/DojoGenesis/gateway/server/trace"
 )
 
 func (e *Executor) Execute(ctx context.Context, agent *Agent, sessionID string) (*ExecutionStep, error) {
@@ -1016,7 +1016,7 @@ BINARY_NAME := agentic-gateway
 VERSION := v0.2.0
 BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-MODULE_PATH := github.com/TresPies-source/AgenticGatewayByDojoGenesis
+MODULE_PATH := github.com/DojoGenesis/gateway
 
 help:
 	@echo "AgenticGateway v0.2.0 Build Targets"
@@ -1095,9 +1095,9 @@ builds:
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -X github.com/TresPies-source/AgenticGatewayByDojoGenesis/server.Version={{.Version}}
-      - -X github.com/TresPies-source/AgenticGatewayByDojoGenesis/server.BuildTime={{.Date}}
-      - -X github.com/TresPies-source/AgenticGatewayByDojoGenesis/server.Commit={{.Commit}}
+      - -X github.com/DojoGenesis/gateway/server.Version={{.Version}}
+      - -X github.com/DojoGenesis/gateway/server.BuildTime={{.Date}}
+      - -X github.com/DojoGenesis/gateway/server.Commit={{.Commit}}
     goos:
       - linux
       - darwin
@@ -1154,7 +1154,7 @@ make clean test lint vet
 make release
 
 # 4. Publish binaries and checksums to GitHub Releases (manual).
-# URL: github.com/TresPies-source/AgenticGatewayByDojoGenesis/releases
+# URL: github.com/DojoGenesis/gateway/releases
 # Assets: bin/agentic-gateway-* + checksums.txt
 
 # 5. Publish Docker image to GHCR (manual).
@@ -1231,7 +1231,7 @@ We are committed to providing a welcoming and inclusive environment.
 ### Local Build
 
 ```bash
-git clone https://github.com/TresPies-source/AgenticGatewayByDojoGenesis
+git clone https://github.com/DojoGenesis/gateway
 cd AgenticGatewayByDojoGenesis
 make build
 ./bin/agentic-gateway
@@ -1255,7 +1255,7 @@ package custom
 
 import (
     "context"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+    "github.com/DojoGenesis/gateway/pkg/gateway"
 )
 
 func MyToolFunc(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) {
@@ -1565,7 +1565,7 @@ git revert HEAD --no-edit
 - **ADR-001:** Hybrid API Surface (pkg/gateway/ interfaces, three-layer HTTP)
 - **ADR-005:** OTEL Span Export (server/trace/ integration)
 - **ADR-006:** No Public Git Tag Until Orchestration Extraction
-- **Module Path:** github.com/TresPies-source/AgenticGatewayByDojoGenesis
+- **Module Path:** github.com/DojoGenesis/gateway
 - **Go Version:** 1.24+
 - **OTEL Specs:** opentelemetry.io/docs
 - **Langfuse Docs:** langfuse.com/docs
@@ -1579,7 +1579,7 @@ package websearch
 import (
     "context"
     "fmt"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+    "github.com/DojoGenesis/gateway/pkg/gateway"
 )
 
 // WebSearchFunc implements a simple web search tool.
@@ -1631,7 +1631,7 @@ func Definition() *gateway.ToolDefinition {
 
 ```go
 import (
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools/web_search"
+    "github.com/DojoGenesis/gateway/tools/web_search"
 )
 
 // In DI container setup:
@@ -1649,7 +1649,7 @@ import (
     "database/sql"
     "github.com/pgvector/pgvector-go"
     _ "github.com/lib/pq"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+    "github.com/DojoGenesis/gateway/pkg/gateway"
 )
 
 // PostgresStore implements gateway.MemoryStore backed by PostgreSQL + pgvector.

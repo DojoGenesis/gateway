@@ -3,16 +3,16 @@ package server
 import (
 	"database/sql"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/apps"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/maintenance"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
+	"github.com/DojoGenesis/gateway/apps"
+	"github.com/DojoGenesis/gateway/memory"
+	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
+	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/runtime/cas"
+	"github.com/DojoGenesis/gateway/server/agent"
+	"github.com/DojoGenesis/gateway/server/maintenance"
+	"github.com/DojoGenesis/gateway/server/services"
+	"github.com/DojoGenesis/gateway/server/trace"
 )
 
 // ServerDeps holds all injectable dependencies for the Server.

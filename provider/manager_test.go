@@ -87,7 +87,7 @@ import (
 	"context"
 	"fmt"
 	
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/provider"
 	goplugin "github.com/hashicorp/go-plugin"
 )
 
@@ -479,7 +479,7 @@ import (
 	"context"
 	"fmt"
 	
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/provider"
 	goplugin "github.com/hashicorp/go-plugin"
 )
 

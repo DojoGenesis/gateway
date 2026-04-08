@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
+	"github.com/DojoGenesis/gateway/events"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"

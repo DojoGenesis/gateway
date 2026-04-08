@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
+	"github.com/DojoGenesis/gateway/server/database"
 	"github.com/gin-gonic/gin"
 )
 

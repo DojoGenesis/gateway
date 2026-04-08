@@ -13,7 +13,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
+	"github.com/DojoGenesis/gateway/server/database"
 	_ "modernc.org/sqlite"
 )
 

@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/memory"
+	providerpkg "github.com/DojoGenesis/gateway/provider"
 )
 
 const (

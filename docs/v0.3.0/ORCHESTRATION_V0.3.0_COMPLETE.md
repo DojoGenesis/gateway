@@ -294,7 +294,7 @@ Total: 6 tests PASS
 
 ```bash
 # Verify no server imports in orchestration/
-grep -r "github.com/TresPies-source/AgenticGatewayByDojoGenesis/server" orchestration/
+grep -r "github.com/DojoGenesis/gateway/server" orchestration/
 # Result: (no output - clean!)
 
 # Build verification
@@ -323,13 +323,13 @@ These should be addressed in separate work.
 
 ```go
 // Old
-import "github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/orchestration"
+import "github.com/DojoGenesis/gateway/server/orchestration"
 
 engine := orchestration.NewEngine(...)
 task := orchestration.NewTask(...)
 
 // New
-import orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+import orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 
 engine := orchestrationpkg.NewEngine(...)
 task := orchestrationpkg.NewTask(...)

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/DojoGenesis/gateway/disposition"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
 )
 
 // AgentInitializerImpl implements the gateway.AgentInitializer interface.

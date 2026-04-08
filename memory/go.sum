@@ -1,9 +1,9 @@
 github.com/Knetic/govaluate v3.0.0+incompatible h1:7o6+MAPhYTCF0+fdvoz1xDedhRb4f6s9Tn1Tt7/WTEg=
 github.com/Knetic/govaluate v3.0.0+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
-github.com/TresPies-source/AgenticGatewayByDojoGenesis v0.0.0-20260214031115-661180cba890 h1:zcoinM+ltNO8VK3428zIeRN/qWY5tgA2fqxX/Or0iTo=
-github.com/TresPies-source/AgenticGatewayByDojoGenesis v0.0.0-20260214031115-661180cba890/go.mod h1:WIzA6eOQgUtyTjcVsUEGMrwFRwMSeKpVssQvcHcSxlc=
-github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools v0.0.0-20260214031115-661180cba890 h1:4kbHhrEoC1XFrTbcAlbVaabxKZra/WD/DO8Rbyn642Y=
-github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools v0.0.0-20260214031115-661180cba890/go.mod h1:w19atR8SxiI7PhpbNzfSAoRi0jFg+tKzpXWXBaB9S08=
+github.com/DojoGenesis/gateway v0.0.0-20260214031115-661180cba890 h1:zcoinM+ltNO8VK3428zIeRN/qWY5tgA2fqxX/Or0iTo=
+github.com/DojoGenesis/gateway v0.0.0-20260214031115-661180cba890/go.mod h1:WIzA6eOQgUtyTjcVsUEGMrwFRwMSeKpVssQvcHcSxlc=
+github.com/DojoGenesis/gateway/tools v0.0.0-20260214031115-661180cba890 h1:4kbHhrEoC1XFrTbcAlbVaabxKZra/WD/DO8Rbyn642Y=
+github.com/DojoGenesis/gateway/tools v0.0.0-20260214031115-661180cba890/go.mod h1:w19atR8SxiI7PhpbNzfSAoRi0jFg+tKzpXWXBaB9S08=
 github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327 h1:UQ4AU+BGti3Sy/aLU8KVseYKNALcX9UXY6DfpwQ6J8E=
 github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327/go.mod h1:NItd7aLkcfOA/dcMXvl8p1u+lQqioRMq/SqDp71Pb/k=
 github.com/chromedp/chromedp v0.14.2 h1:r3b/WtwM50RsBZHMUm9fsNhhzRStTHrKdr2zmwbZSzM=

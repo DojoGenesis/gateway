@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 func setupMemoryToolsTest(t *testing.T) (*memory.MemoryManager, func()) {

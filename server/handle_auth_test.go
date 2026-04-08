@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/middleware"
+	"github.com/DojoGenesis/gateway/server/middleware"
 
 	_ "modernc.org/sqlite"
 )

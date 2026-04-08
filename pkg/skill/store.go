@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
+	"github.com/DojoGenesis/gateway/runtime/cas"
 )
 
 // validateTar checks that data is a valid tar archive by reading the first header.

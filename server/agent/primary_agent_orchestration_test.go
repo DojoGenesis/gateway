@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/memory"
+	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
+	providerpkg "github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/services"
+	"github.com/DojoGenesis/gateway/server/trace"
+	"github.com/DojoGenesis/gateway/tools"
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )

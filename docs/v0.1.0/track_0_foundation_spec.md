@@ -45,17 +45,17 @@ This makes it hard to:
 Extract and modularize the core agentic infrastructure into **five independent Go modules**, each with its own `go.mod`, `go.sum`, and version lifecycle:
 
 ```
-github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider    → Plugin system, model routing, gRPC
-github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools       → Tool registry, definitions, execution
-github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration → DAG planning, task execution
-github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory      → Conversation memory, compression, seeds
-github.com/TresPies-source/AgenticGatewayByDojoGenesis/server      → HTTP server, OpenAI API, SSE streaming
+github.com/DojoGenesis/gateway/provider    → Plugin system, model routing, gRPC
+github.com/DojoGenesis/gateway/tools       → Tool registry, definitions, execution
+github.com/DojoGenesis/gateway/orchestration → DAG planning, task execution
+github.com/DojoGenesis/gateway/memory      → Conversation memory, compression, seeds
+github.com/DojoGenesis/gateway/server      → HTTP server, OpenAI API, SSE streaming
 ```
 
 Plus a shared module for cross-cutting interfaces:
 
 ```
-github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared     → Types, interfaces, constants
+github.com/DojoGenesis/gateway/shared     → Types, interfaces, constants
 ```
 
 All modules live in a single Go workspace (`go.work`) that ensures:
@@ -84,7 +84,7 @@ This positions Dojo Genesis as:
 | G3 | Define shared types + events packages | `shared/types.go` with currency types (Message, ToolResult, etc.); `events/events.go` with StreamEvent types; each module owns its primary interface | Architecture |
 | G4 | Each module compiles independently | `go build ./provider`, `go build ./tools`, etc. all succeed | CI/CD |
 | G5 | Module dependency DAG is clean | No circular imports; dependency graph matches design | Code Review |
-| G6 | Rename module paths | All imports updated from `github.com/TresPies-source/dojo-genesis/go_backend/...` to `github.com/TresPies-source/AgenticGatewayByDojoGenesis/...` | DevOps |
+| G6 | Rename module paths | All imports updated from `github.com/TresPies-source/dojo-genesis/go_backend/...` to `github.com/DojoGenesis/gateway/...` | DevOps |
 | G7 | Set up CI/CD skeleton | GitHub Actions workflow for test + build on push | CI/CD |
 | G8 | Create placeholder README | Project vision, architecture diagram, quickstart stub | Docs |
 
@@ -402,7 +402,7 @@ This structure ensures:
 |-----|------|-------|----------|---|
 | Mon | 1. Clone dojo-genesis repo to new GitHub org (if not done). Create branch `foundation/track-0` | DevOps | 2h | None |
 | Mon | 2. Create `go.work` file; list all 5 modules (initially empty directories) | DevOps | 1h | (1) |
-| Mon | 3. Create `shared/go.mod` with module path `github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared` | DevOps | 30m | (2) |
+| Mon | 3. Create `shared/go.mod` with module path `github.com/DojoGenesis/gateway/shared` | DevOps | 30m | (2) |
 | Tue | 4. Write `shared/types.go` with core interfaces (ModelProvider, Tool, Task, Message, Event) | Lead Dev | 3h | (3) |
 | Tue | 5. Create `shared/error.go` with standard error types | Lead Dev | 1h | (3) |
 | Wed | 6. Create stub `go.mod` files for provider/, tools/, orchestration/, memory/, server/ | DevOps | 1h | (2) |
@@ -432,7 +432,7 @@ This structure ensures:
 | Tue | 14. Copy `orchestration/` → `orchestration/`; update imports | Lead Dev | 2h | (13) |
 | Wed | 15. Copy `memory/` → `memory/`; update imports | Lead Dev | 3h | (14) |
 | Wed | 16. Stub out `server/` with HTTP skeleton; copy `handlers/`, `streaming/`, `events/` | DevOps | 3h | (15) |
-| Thu | 17. Update all imports across modules: old `github.com/TresPies-source/dojo-genesis/go_backend/...` → new `github.com/TresPies-source/AgenticGatewayByDojoGenesis/...` | Build Engineer | 6h | (16) |
+| Thu | 17. Update all imports across modules: old `github.com/TresPies-source/dojo-genesis/go_backend/...` → new `github.com/DojoGenesis/gateway/...` | Build Engineer | 6h | (16) |
 | Thu | 18. Run `go mod tidy` for each module; check for missing transitive dependencies | DevOps | 2h | (17) |
 | Fri | 19. Verify `go build ./...` succeeds for all modules | DevOps | 2h | (18) |
 | Fri | 20. Run `go mod verify` for each module | DevOps | 1h | (19) |
@@ -742,7 +742,7 @@ func (e *StandardEvent) Data() interface{}   { return e.EventData }
 
 ### 8.1 `shared` Module
 
-**Module Path:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared`
+**Module Path:** `github.com/DojoGenesis/gateway/shared`
 
 **Responsibility:** Core types, interfaces, and constants used by all other modules.
 
@@ -762,7 +762,7 @@ func (e *StandardEvent) Data() interface{}   { return e.EventData }
 
 ### 8.2 `provider` Module
 
-**Module Path:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider`
+**Module Path:** `github.com/DojoGenesis/gateway/provider`
 
 **Responsibility:** Plugin system, model provider management, gRPC transport, and routing.
 
@@ -792,7 +792,7 @@ func (e *StandardEvent) Data() interface{}   { return e.EventData }
 
 ### 8.3 `tools` Module
 
-**Module Path:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools`
+**Module Path:** `github.com/DojoGenesis/gateway/tools`
 
 **Responsibility:** Tool registry, definitions, and execution.
 
@@ -817,7 +817,7 @@ func (e *StandardEvent) Data() interface{}   { return e.EventData }
 
 ### 8.4 `orchestration` Module
 
-**Module Path:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration`
+**Module Path:** `github.com/DojoGenesis/gateway/orchestration`
 
 **Responsibility:** DAG-based task planning and execution.
 
@@ -842,7 +842,7 @@ func (e *StandardEvent) Data() interface{}   { return e.EventData }
 
 ### 8.5 `memory` Module
 
-**Module Path:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory`
+**Module Path:** `github.com/DojoGenesis/gateway/memory`
 
 **Responsibility:** Conversation memory management, compression, and seed extraction.
 
@@ -868,7 +868,7 @@ func (e *StandardEvent) Data() interface{}   { return e.EventData }
 
 ### 8.6 `server` Module
 
-**Module Path:** `github.com/TresPies-source/AgenticGatewayByDojoGenesis/server`
+**Module Path:** `github.com/DojoGenesis/gateway/server`
 
 **Responsibility:** HTTP server, API endpoints, middleware, configuration, and database management.
 
@@ -928,7 +928,7 @@ use (
 #### shared/go.mod
 
 ```
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared
+module github.com/DojoGenesis/gateway/shared
 
 go 1.24
 ```
@@ -938,12 +938,12 @@ go 1.24
 #### provider/go.mod
 
 ```
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider
+module github.com/DojoGenesis/gateway/provider
 
 go 1.24
 
 require (
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared v0.1.0
+    github.com/DojoGenesis/gateway/shared v0.1.0
     github.com/hashicorp/go-plugin v1.7.0
     google.golang.org/grpc v1.78.0
     google.golang.org/protobuf v1.36.11
@@ -957,12 +957,12 @@ require (
 #### tools/go.mod
 
 ```
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools
+module github.com/DojoGenesis/gateway/tools
 
 go 1.24
 
 require (
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared v0.1.0
+    github.com/DojoGenesis/gateway/shared v0.1.0
 )
 
 require (
@@ -973,13 +973,13 @@ require (
 #### orchestration/go.mod
 
 ```
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration
+module github.com/DojoGenesis/gateway/orchestration
 
 go 1.24
 
 require (
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared v0.1.0
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools v0.1.0
+    github.com/DojoGenesis/gateway/shared v0.1.0
+    github.com/DojoGenesis/gateway/tools v0.1.0
 )
 
 require (
@@ -990,12 +990,12 @@ require (
 #### memory/go.mod
 
 ```
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory
+module github.com/DojoGenesis/gateway/memory
 
 go 1.24
 
 require (
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared v0.1.0
+    github.com/DojoGenesis/gateway/shared v0.1.0
     github.com/mattn/go-sqlite3 v1.14.33  // if needed
 )
 
@@ -1007,16 +1007,16 @@ require (
 #### server/go.mod
 
 ```
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/server
+module github.com/DojoGenesis/gateway/server
 
 go 1.24
 
 require (
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared v0.1.0
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider v0.1.0
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools v0.1.0
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration v0.1.0
-    github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory v0.1.0
+    github.com/DojoGenesis/gateway/shared v0.1.0
+    github.com/DojoGenesis/gateway/provider v0.1.0
+    github.com/DojoGenesis/gateway/tools v0.1.0
+    github.com/DojoGenesis/gateway/orchestration v0.1.0
+    github.com/DojoGenesis/gateway/memory v0.1.0
     github.com/gin-gonic/gin v1.11.0
     github.com/gin-contrib/cors v1.7.6
     github.com/mattn/go-sqlite3 v1.14.33
@@ -1191,7 +1191,7 @@ Before signing off on Track 0, verify every item:
 - [ ] `go build ./...` succeeds from workspace root without warnings or errors
 - [ ] `go test ./...` passes from workspace root (all tests pass)
 - [ ] No imports of `calibration/`, `compassion/`, `proactive/`, `telegram/`, `judgment/`, `goals/`, `context/` (engine), `entities/`, or `workspaces/` anywhere in codebase
-- [ ] All internal imports updated to use `github.com/TresPies-source/AgenticGatewayByDojoGenesis/...` paths
+- [ ] All internal imports updated to use `github.com/DojoGenesis/gateway/...` paths
 - [ ] `go mod graph` shows clean, acyclic dependency structure
 - [ ] Each module compiles independently:
   - `go build ./provider` ✓
@@ -1238,8 +1238,8 @@ package main
 
 import (
     "context"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared"
+    "github.com/DojoGenesis/gateway/provider"
+    "github.com/DojoGenesis/gateway/shared"
 )
 
 func main() {
@@ -1351,7 +1351,7 @@ A: For v0.1.0, all modules ship at the same version. Independent versioning is f
 - [x] **Codebase Verified:** Source monolith (52K lines, 162 source files, 178 test files) was read during context ingestion.
 - [x] **Types Verified:** All referenced packages (plugin/, tools/, orchestration/, memory/, streaming/, events/, handlers/) exist in the monolith.
 - [x] N/A **APIs Verified:** Track 0 does not define external APIs.
-- [x] **File Structure Verified:** Module paths use `github.com/TresPies-source/AgenticGatewayByDojoGenesis/*` convention consistently.
+- [x] **File Structure Verified:** Module paths use `github.com/DojoGenesis/gateway/*` convention consistently.
 - [x] **Remediation Complete:** Cross-spec alignment fixes applied per pre_flight_report.md (shared types updated, events module added, module count updated to 7).
 
 **Q: Is main.go completely rewritten?**

@@ -1,4 +1,4 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/actor
+module github.com/DojoGenesis/gateway/runtime/actor
 
 go 1.25.6
 

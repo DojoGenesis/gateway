@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
+	"github.com/DojoGenesis/gateway/disposition"
 )
 
 var errTest = errors.New("test error")

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
 )
 
 // ServerStatus represents the health and status of an MCP server connection.

@@ -544,7 +544,7 @@ package handlers
 
 import (
 	"net/http"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
+	"github.com/DojoGenesis/gateway/server/agent"
 	"github.com/gin-gonic/gin"
 )
 
@@ -581,7 +581,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
+	"github.com/DojoGenesis/gateway/server/agent"
 	"github.com/gin-gonic/gin"
 )
 

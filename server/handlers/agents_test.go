@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
+	"github.com/DojoGenesis/gateway/server/agent"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	_ "modernc.org/sqlite"

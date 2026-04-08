@@ -12,7 +12,7 @@ Agentic Gateway is the fourth option: a production-ready Go framework for self-h
 
 ```bash
 # Download and run (macOS Apple Silicon)
-curl -L https://github.com/TresPies-source/AgenticGatewayByDojoGenesis/releases/latest/download/agentic-gateway_darwin_arm64.tar.gz | tar xz
+curl -L https://github.com/DojoGenesis/gateway/releases/latest/download/agentic-gateway_darwin_arm64.tar.gz | tar xz
 ./agentic-gateway
 
 # Or with Docker
@@ -144,8 +144,8 @@ import (
     "context"
     "fmt"
 
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+    "github.com/DojoGenesis/gateway/provider"
+    "github.com/DojoGenesis/gateway/tools"
 )
 
 func main() {

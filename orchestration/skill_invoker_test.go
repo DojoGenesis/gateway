@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill"
+	"github.com/DojoGenesis/gateway/skill"
 )
 
 // Mock implementations for testing

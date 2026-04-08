@@ -1,4 +1,4 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas
+module github.com/DojoGenesis/gateway/runtime/cas
 
 go 1.25.6
 

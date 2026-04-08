@@ -16,7 +16,7 @@ info:
 
   contact:
     name: Dojo Genesis
-    url: https://github.com/TresPies-source/AgenticGatewayByDojoGenesis
+    url: https://github.com/DojoGenesis/gateway
 
 servers:
   - url: http://localhost:8081

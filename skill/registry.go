@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 
-	pkgskill "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/skill"
+	pkgskill "github.com/DojoGenesis/gateway/pkg/skill"
 )
 
 // SkillRegistry manages skill registration, lookup, and metadata.

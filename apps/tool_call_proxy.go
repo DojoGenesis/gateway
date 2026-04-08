@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
 )
 
 // ToolCallRequest represents a tool call from an app.

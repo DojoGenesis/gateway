@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/artifacts"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/projects"
+	"github.com/DojoGenesis/gateway/server/artifacts"
+	"github.com/DojoGenesis/gateway/server/projects"
 	"github.com/gin-gonic/gin"
 	_ "modernc.org/sqlite"
 )

@@ -1,9 +1,9 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/channel/discord
+module github.com/DojoGenesis/gateway/channel/discord
 
 go 1.25.6
 
 require (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/channel v0.0.0
+	github.com/DojoGenesis/gateway/channel v0.0.0
 	github.com/bwmarrin/discordgo v0.28.1
 )
 
@@ -14,4 +14,4 @@ require (
 	golang.org/x/sys v0.42.0 // indirect
 )
 
-replace github.com/TresPies-source/AgenticGatewayByDojoGenesis/channel => ../
+replace github.com/DojoGenesis/gateway/channel => ../

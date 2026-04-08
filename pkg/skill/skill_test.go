@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
+	"github.com/DojoGenesis/gateway/runtime/cas"
 )
 
 // newTestStore creates a temporary SQLite-backed CAS store for testing.

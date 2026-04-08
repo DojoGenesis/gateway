@@ -1,4 +1,4 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition
+module github.com/DojoGenesis/gateway/disposition
 
 go 1.25.6
 

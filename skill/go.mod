@@ -1,4 +1,4 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill
+module github.com/DojoGenesis/gateway/skill
 
 go 1.25.6
 

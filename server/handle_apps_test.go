@@ -11,8 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/apps"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/apps"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 func init() {

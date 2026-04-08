@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
+	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/agent"
 )
 
 type MockPluginManager struct{}

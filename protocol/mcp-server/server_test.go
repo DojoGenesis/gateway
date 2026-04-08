@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	mcpserver "github.com/TresPies-source/AgenticGatewayByDojoGenesis/protocol/mcpserver"
+	mcpserver "github.com/DojoGenesis/gateway/protocol/mcpserver"
 )
 
 func newTestServer(t *testing.T) mcpserver.Server {

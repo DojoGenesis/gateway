@@ -471,7 +471,7 @@ curl http://localhost:8080/admin/metrics/prometheus
 
 ## References
 
-- **Repository:** [AgenticGatewayByDojoGenesis](https://github.com/TresPies-source/AgenticGatewayByDojoGenesis)
+- **Repository:** [AgenticGatewayByDojoGenesis](https://github.com/DojoGenesis/gateway)
 - **ADA Repository:** AgentIdentitiesByDojoGenesis
 - **ADA Contract:** Gateway-ADA Contract v1.0.0
 - **MCP Contract:** Gateway-MCP Contract (docs/v0.2.0)

@@ -254,6 +254,46 @@ func TestValidate(t *testing.T) {
 			errMsg:    "plugin_dir cannot be empty",
 		},
 		{
+			name: "origin missing scheme",
+			config: &Config{
+				Port:           "8080",
+				PluginDir:      "plugins",
+				AllowedOrigins: []string{"localhost:3000"},
+			},
+			expectErr: true,
+			errMsg:    `invalid allowed_origin "localhost:3000"`,
+		},
+		{
+			name: "wildcard origin is valid",
+			config: &Config{
+				Port:           "8080",
+				PluginDir:      "plugins",
+				AllowedOrigins: []string{"*"},
+			},
+			expectErr: false,
+		},
+		{
+			name: "https origin is valid",
+			config: &Config{
+				Port:           "8080",
+				PluginDir:      "plugins",
+				AllowedOrigins: []string{"https://example.com"},
+			},
+			expectErr: false,
+		},
+		{
+			name: "mcp_apps origin missing scheme",
+			config: &Config{
+				Port:      "8080",
+				PluginDir: "plugins",
+				MCPApps: MCPAppsConfig{
+					AllowedOrigins: []string{"example.com"},
+				},
+			},
+			expectErr: true,
+			errMsg:    `invalid mcp_apps.allowed_origin "example.com"`,
+		},
+		{
 			name: "duplicate provider names",
 			config: &Config{
 				Port:      "8080",

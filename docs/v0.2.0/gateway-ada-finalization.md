@@ -5,7 +5,7 @@
 **Created:** 2026-02-13
 **Grounded In:** contracts/gateway-ada.md v1.0.0, ADR-001, ARCHITECTURE.md
 **Target Repository:** AgenticGatewayByDojoGenesis
-**Target Module Path:** github.com/TresPies-source/AgenticGatewayByDojoGenesis
+**Target Module Path:** github.com/DojoGenesis/gateway
 
 ---
 
@@ -610,7 +610,7 @@ package gateway
 
 import (
     "context"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+    "github.com/DojoGenesis/gateway/pkg/disposition"
 )
 
 // AgentInitializer is the extension point where ADA plugs in.
@@ -646,7 +646,7 @@ import (
     "context"
     "fmt"
     "log/slog"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+    "github.com/DojoGenesis/gateway/pkg/disposition"
 )
 
 // DefaultAgentInitializer implements AgentInitializer
@@ -752,10 +752,10 @@ import (
     "log/slog"
     "os"
 
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/memory"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/orchestration"
+    "github.com/DojoGenesis/gateway/pkg/disposition"
+    "github.com/DojoGenesis/gateway/pkg/gateway"
+    "github.com/DojoGenesis/gateway/pkg/memory"
+    "github.com/DojoGenesis/gateway/pkg/orchestration"
 )
 
 func main() {
@@ -1163,7 +1163,7 @@ package orchestration
 import (
     "log/slog"
     "time"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+    "github.com/DojoGenesis/gateway/pkg/disposition"
 )
 
 type Engine struct {
@@ -1232,7 +1232,7 @@ package memory
 
 import (
     "log/slog"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
+    "github.com/DojoGenesis/gateway/pkg/disposition"
 )
 
 type CompressionStore struct {

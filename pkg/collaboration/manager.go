@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
+	"github.com/DojoGenesis/gateway/disposition"
 )
 
 // CollabEvent represents an event that might trigger a check-in.

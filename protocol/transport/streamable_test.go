@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/protocol/transport"
+	"github.com/DojoGenesis/gateway/protocol/transport"
 )
 
 func TestNewStreamableHTTP(t *testing.T) {

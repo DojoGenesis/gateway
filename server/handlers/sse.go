@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/models"
+	"github.com/DojoGenesis/gateway/server/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,6 +26,12 @@ func HandleSSE(c *gin.Context) {
 	clientID := c.Query("client_id")
 	if clientID == "" {
 		respondBadRequest(c, "client_id query parameter is required")
+		return
+	}
+
+	// Validate client_id format (UUID or reasonable identifier)
+	if len(clientID) > 128 {
+		respondBadRequest(c, "client_id must be 128 characters or fewer")
 		return
 	}
 

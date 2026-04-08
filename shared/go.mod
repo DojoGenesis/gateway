@@ -1,3 +1,3 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/shared
+module github.com/DojoGenesis/gateway/shared
 
 go 1.25.6

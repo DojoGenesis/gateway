@@ -15,17 +15,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
-	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/collaboration"
-	pkgerrors "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/errors"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/intelligence"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/reflection"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/validation"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/streaming"
+	"github.com/DojoGenesis/gateway/disposition"
+	"github.com/DojoGenesis/gateway/events"
+	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
+	"github.com/DojoGenesis/gateway/pkg/collaboration"
+	pkgerrors "github.com/DojoGenesis/gateway/pkg/errors"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
+	"github.com/DojoGenesis/gateway/pkg/intelligence"
+	"github.com/DojoGenesis/gateway/pkg/reflection"
+	"github.com/DojoGenesis/gateway/pkg/validation"
+	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/streaming"
 )
 
 // ─── Agent chat types ────────────────────────────────────────────────────────

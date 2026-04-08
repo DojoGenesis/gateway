@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/projects"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/server/projects"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 var projectManager *projects.ProjectManager

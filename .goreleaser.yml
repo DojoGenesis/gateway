@@ -83,7 +83,7 @@ dockers:
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://github.com/TresPies-source/AgenticGatewayByDojoGenesis"
+      - "--label=org.opencontainers.image.source=https://github.com/DojoGenesis/gateway"
     extra_files: []
   - id: agentic-gateway-arm64
     ids: ["agentic-gateway"]
@@ -98,7 +98,7 @@ dockers:
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://github.com/TresPies-source/AgenticGatewayByDojoGenesis"
+      - "--label=org.opencontainers.image.source=https://github.com/DojoGenesis/gateway"
     extra_files: []
 
 docker_manifests:
@@ -123,7 +123,7 @@ release:
 
     See [CHANGELOG.md](CHANGELOG.md) for full release notes.
   footer: |
-    **Full Changelog**: https://github.com/TresPies-source/AgenticGatewayByDojoGenesis/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/DojoGenesis/gateway/compare/{{ .PreviousTag }}...{{ .Tag }}
 
     ---
     **Docker:** `docker pull ghcr.io/trespies-source/agentic-gateway:{{ .Version }}`

@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/config"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
+	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/config"
+	"github.com/DojoGenesis/gateway/server/services"
 )
 
 // mockProviderForAdmin implements provider.ModelProvider for testing.

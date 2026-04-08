@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	providerpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	providerpkg "github.com/DojoGenesis/gateway/provider"
 )
 
 // ConversationContext stores the state of a multi-turn conversation

@@ -20,7 +20,7 @@ mkdir -p disposition
 
 Create `disposition/go.mod`:
 ```
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition
+module github.com/DojoGenesis/gateway/disposition
 
 go 1.24.0
 
@@ -87,7 +87,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
 )
 ```
 
@@ -99,8 +99,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	"github.com/DojoGenesis/gateway/disposition"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
 )
 ```
 
@@ -166,7 +166,7 @@ rm pkg/disposition/disposition_bench_test.go
 
 ### Step 1.7: Update all files importing pkg/disposition
 
-Every file that imports `"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"` must change to `"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"`.
+Every file that imports `"github.com/DojoGenesis/gateway/pkg/disposition"` must change to `"github.com/DojoGenesis/gateway/disposition"`.
 
 **Complete file list (19 files, excluding the ones we already handled):**
 
@@ -194,8 +194,8 @@ Every file that imports `"github.com/TresPies-source/AgenticGatewayByDojoGenesis
 
 **In each file, the change is a simple string replacement:**
 ```
-OLD: "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/disposition"
-NEW: "github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
+OLD: "github.com/DojoGenesis/gateway/pkg/disposition"
+NEW: "github.com/DojoGenesis/gateway/disposition"
 ```
 
 No code changes needed — the package name is still `disposition`, so all usage like `disposition.DispositionConfig` remains the same.
@@ -233,7 +233,7 @@ mkdir -p skill
 
 Create `skill/go.mod`:
 ```
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill
+module github.com/DojoGenesis/gateway/skill
 
 go 1.24.0
 
@@ -318,8 +318,8 @@ use (
 
 **In each file:**
 ```
-OLD: "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/skill"
-NEW: "github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill"
+OLD: "github.com/DojoGenesis/gateway/pkg/skill"
+NEW: "github.com/DojoGenesis/gateway/skill"
 ```
 
 ### Step 2.6: Run go mod tidy in affected modules
@@ -345,35 +345,35 @@ go vet ./...
 
 **BEFORE:**
 ```go
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration
+module github.com/DojoGenesis/gateway/orchestration
 
 go 1.24.0
 
 require (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis v0.0.0
+	github.com/DojoGenesis/gateway v0.0.0
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.11.1
 )
 
-replace github.com/TresPies-source/AgenticGatewayByDojoGenesis => ../
+replace github.com/DojoGenesis/gateway => ../
 ```
 
 **AFTER:**
 ```go
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration
+module github.com/DojoGenesis/gateway/orchestration
 
 go 1.24.0
 
 require (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition v0.0.0
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill v0.0.0
+	github.com/DojoGenesis/gateway/disposition v0.0.0
+	github.com/DojoGenesis/gateway/skill v0.0.0
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.11.1
 )
 
 replace (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition => ../disposition
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill => ../skill
+	github.com/DojoGenesis/gateway/disposition => ../disposition
+	github.com/DojoGenesis/gateway/skill => ../skill
 )
 ```
 

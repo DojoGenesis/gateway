@@ -2,9 +2,10 @@ package server
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/tools"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,8 +21,11 @@ type ToolResponse struct {
 
 // ToolListResponse is the response for GET /v1/tools.
 type ToolListResponse struct {
-	Tools []ToolResponse `json:"tools"`
-	Count int            `json:"count"`
+	Tools  []ToolResponse `json:"tools"`
+	Count  int            `json:"count"`
+	Total  int            `json:"total"`
+	Limit  int            `json:"limit"`
+	Offset int            `json:"offset"`
 }
 
 // ToolInvokeRequest is the request body for POST /v1/tools/:name/invoke.
@@ -41,6 +45,11 @@ type ToolInvokeResponse struct {
 }
 
 // handleListTools handles GET /v1/tools.
+// Supports optional pagination via ?limit=N&offset=N query parameters.
+// When limit is 0 or omitted, all tools are returned (backward compatible).
+//
+// Response always includes `total` reflecting the full unfiltered count,
+// enabling clients to compute page count. (Gap 6)
 func (s *Server) handleListTools(c *gin.Context) {
 	allTools := tools.GetAllTools()
 
@@ -53,9 +62,51 @@ func (s *Server) handleListTools(c *gin.Context) {
 		})
 	}
 
+	total := len(toolList)
+
+	// Parse pagination params
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "0"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	// Clamp negative values
+	if limit < 0 {
+		limit = 0
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	// Clamp offset to total
+	if offset > total {
+		offset = total
+	}
+
+	// Apply pagination when limit > 0
+	if limit > 0 {
+		// Cap limit at a reasonable maximum
+		if limit > 500 {
+			limit = 500
+		}
+		end := offset + limit
+		if end > total {
+			end = total
+		}
+		toolList = toolList[offset:end]
+	} else {
+		// No pagination — return everything from offset onward
+		if offset > 0 {
+			toolList = toolList[offset:]
+		}
+		// limit=0 means "all remaining"
+		limit = total - offset
+	}
+
 	c.JSON(http.StatusOK, ToolListResponse{
-		Tools: toolList,
-		Count: len(toolList),
+		Tools:  toolList,
+		Count:  len(toolList),
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
 	})
 }
 

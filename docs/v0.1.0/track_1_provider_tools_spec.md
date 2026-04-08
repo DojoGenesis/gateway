@@ -28,9 +28,9 @@
 
 **Track 1** extracts and cleanly publishes two foundational, independent Go modules that form the bedrock of the Agentic Gateway framework:
 
-1. **Provider Module** (`github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider`) — A pluggable model provider system supporting in-process and out-of-process (gRPC-based) LLM providers, with lifecycle management, discovery, and dynamic configuration.
+1. **Provider Module** (`github.com/DojoGenesis/gateway/provider`) — A pluggable model provider system supporting in-process and out-of-process (gRPC-based) LLM providers, with lifecycle management, discovery, and dynamic configuration.
 
-2. **Tools Module** (`github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools`) — A thread-safe, context-aware tool registry and execution framework with parameter validation, per-tool timeout control, and a clean interface for registering arbitrary tool implementations.
+2. **Tools Module** (`github.com/DojoGenesis/gateway/tools`) — A thread-safe, context-aware tool registry and execution framework with parameter validation, per-tool timeout control, and a clean interface for registering arbitrary tool implementations.
 
 These are **leaf modules** with no external Dojo dependencies. They form the stable, public API foundation for all higher-level orchestration (Track 2) and HTTP serving (Track 3).
 
@@ -1072,7 +1072,7 @@ providers:
 ```go
 package main
 
-import "github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+import "github.com/DojoGenesis/gateway/tools"
 
 func init() {
 	tools.RegisterTool(&tools.ToolDefinition{
@@ -1126,15 +1126,15 @@ export SEARCH_API_ENDPOINT=https://api.example.com
    - Publish as separate packages
 
 2. **Phase 2:** Update go_backend to import provider/ and tools/
-   - go get github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider v1.0.0
-   - go get github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools v1.0.0
+   - go get github.com/DojoGenesis/gateway/provider v1.0.0
+   - go get github.com/DojoGenesis/gateway/tools v1.0.0
    - Remove local plugin/, tools/, events/ packages
    - Point imports to new modules
 
 3. **Phase 3:** Update consumer applications
-   - Replace import "github.com/dojo-genesis/go_backend/plugin" with "github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-   - Replace import "github.com/dojo-genesis/go_backend/tools" with "github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
-   - Replace import "github.com/dojo-genesis/go_backend/events" with "github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
+   - Replace import "github.com/dojo-genesis/go_backend/plugin" with "github.com/DojoGenesis/gateway/provider"
+   - Replace import "github.com/dojo-genesis/go_backend/tools" with "github.com/DojoGenesis/gateway/tools"
+   - Replace import "github.com/dojo-genesis/go_backend/events" with "github.com/DojoGenesis/gateway/events"
 
 ### Backward Compatibility
 
@@ -1165,7 +1165,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/provider"
 )
 
 func main() {
@@ -1247,7 +1247,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 func main() {
@@ -1343,7 +1343,7 @@ import (
 	"os"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/provider"
 )
 
 // OpenAIProvider implements ModelProvider
@@ -1458,7 +1458,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
+	"github.com/DojoGenesis/gateway/events"
 )
 
 func main() {
@@ -1516,7 +1516,7 @@ func main() {
 
 ```
 provider/
-├── go.mod                          (module github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider v1.0.0)
+├── go.mod                          (module github.com/DojoGenesis/gateway/provider v1.0.0)
 ├── go.sum
 ├── README.md                       (setup, usage, examples)
 ├── LICENSE                         (Apache 2.0)
@@ -1552,7 +1552,7 @@ provider/
 
 ```
 tools/
-├── go.mod                          (module github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools v1.0.0)
+├── go.mod                          (module github.com/DojoGenesis/gateway/tools v1.0.0)
 ├── go.sum
 ├── README.md                       (setup, usage, examples)
 ├── LICENSE                         (Apache 2.0)
@@ -1577,7 +1577,7 @@ tools/
 
 ```
 events/
-├── go.mod                          (module github.com/TresPies-source/AgenticGatewayByDojoGenesis/events v1.0.0)
+├── go.mod                          (module github.com/DojoGenesis/gateway/events v1.0.0)
 ├── go.sum
 ├── README.md                       (setup, usage, examples)
 ├── LICENSE                         (Apache 2.0)
@@ -1631,7 +1631,7 @@ All three modules are **independent**, **well-tested**, **documented**, and **re
 ### 2. Technical Readiness
 
 - [x] **Architecture is Sound:** Module layout, dependency graph, and design principles are well-defined.
-- [x] **Code is Production-Ready:** Complete Go interface definitions, type definitions, and constructor signatures. All code uses `github.com/TresPies-source/AgenticGatewayByDojoGenesis/*` paths.
+- [x] **Code is Production-Ready:** Complete Go interface definitions, type definitions, and constructor signatures. All code uses `github.com/DojoGenesis/gateway/*` paths.
 - [x] **APIs are Specified:** ModelProvider (6 methods), PluginManager, ToolDefinition, Registry, Executor all fully specified.
 - [x] N/A **Database Schema is Final:** No database in provider/tools modules.
 - [x] **Dependencies are Met:** External deps identified (hashicorp/go-plugin, grpc, protobuf). Events module as standalone leaf.
@@ -1659,5 +1659,5 @@ All three modules are **independent**, **well-tested**, **documented**, and **re
 - [x] **Codebase Verified:** plugin/manager.go (PluginManager), tools/ (registry, executor) confirmed in monolith during ingestion.
 - [x] **Types Verified:** ModelProvider interface matches codebase's 6-method pattern. ToolDefinition struct matches registry pattern.
 - [x] **APIs Verified:** All interface methods match existing codebase signatures (verified during context ingestion).
-- [x] **File Structure Verified:** Module paths updated to `github.com/TresPies-source/AgenticGatewayByDojoGenesis/*`. Dockerfile updated to golang:1.24.
+- [x] **File Structure Verified:** Module paths updated to `github.com/DojoGenesis/gateway/*`. Dockerfile updated to golang:1.24.
 - [x] **Remediation Complete:** Date fixed (2026), version claim fixed (0.1.0 pre-release), module paths standardized, Go version corrected.

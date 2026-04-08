@@ -1,10 +1,10 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory
+module github.com/DojoGenesis/gateway/memory
 
 go 1.25.6
 
 require (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis v0.0.0-20260214031115-661180cba890
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition v0.0.0
+	github.com/DojoGenesis/gateway v0.0.0-20260214031115-661180cba890
+	github.com/DojoGenesis/gateway/disposition v0.0.0
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.11.1
 	modernc.org/sqlite v1.48.1
@@ -12,7 +12,7 @@ require (
 
 require (
 	github.com/Knetic/govaluate v3.0.0+incompatible // indirect
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools v0.0.0-20260214031115-661180cba890 // indirect
+	github.com/DojoGenesis/gateway/tools v0.0.0-20260214031115-661180cba890 // indirect
 	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327 // indirect
 	github.com/chromedp/chromedp v0.14.2 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
@@ -38,4 +38,4 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-replace github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition => ../disposition
+replace github.com/DojoGenesis/gateway/disposition => ../disposition

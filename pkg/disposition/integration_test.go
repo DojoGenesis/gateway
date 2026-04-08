@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/collaboration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/errors"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/intelligence"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/reflection"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/validation"
+	"github.com/DojoGenesis/gateway/disposition"
+	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/orchestration"
+	"github.com/DojoGenesis/gateway/pkg/collaboration"
+	"github.com/DojoGenesis/gateway/pkg/errors"
+	"github.com/DojoGenesis/gateway/pkg/intelligence"
+	"github.com/DojoGenesis/gateway/pkg/reflection"
+	"github.com/DojoGenesis/gateway/pkg/validation"
 )
 
 // TestFullIntegration_AllModulesReceiveDisposition verifies that when a

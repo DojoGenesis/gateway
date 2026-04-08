@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/workflow"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/workflow/api"
+	"github.com/DojoGenesis/gateway/runtime/cas"
+	"github.com/DojoGenesis/gateway/workflow"
+	"github.com/DojoGenesis/gateway/workflow/api"
 )
 
 // ---------------------------------------------------------------------------

@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/agent"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/database"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/streaming"
+	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/agent"
+	"github.com/DojoGenesis/gateway/server/database"
+	"github.com/DojoGenesis/gateway/server/streaming"
 	"github.com/stretchr/testify/assert"
 )
 

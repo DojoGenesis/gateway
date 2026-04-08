@@ -23,12 +23,12 @@ The specs disagree on the canonical module path convention.
 
 | Spec | Convention | Example |
 |------|-----------|---------|
-| Track 0 | `agentic-gateway/` prefix | `github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider` |
+| Track 0 | `agentic-gateway/` prefix | `github.com/DojoGenesis/gateway/provider` |
 | Track 1 | No prefix | `github.com/dojo-genesis/provider` |
 | Track 2 | No prefix | `github.com/dojo-genesis/orchestration` |
 | Track 3 | Old monolith paths | `github.com/TresPies-source/dojo-genesis/go_backend/...` |
 
-**Resolution:** Track 0 is the foundation spec and defines the canonical convention. All tracks must use `github.com/TresPies-source/AgenticGatewayByDojoGenesis/*`. This also matches the Go workspace layout (`go.work` with subdirectory modules). Tracks 1, 2, and 3 must be updated.
+**Resolution:** Track 0 is the foundation spec and defines the canonical convention. All tracks must use `github.com/DojoGenesis/gateway/*`. This also matches the Go workspace layout (`go.work` with subdirectory modules). Tracks 1, 2, and 3 must be updated.
 
 #### 2. ModelProvider Interface Conflict
 
@@ -98,7 +98,7 @@ github.com/TresPies-source/dojo-genesis/go_backend/...
 
 These must be updated to:
 ```
-github.com/TresPies-source/AgenticGatewayByDojoGenesis/...
+github.com/DojoGenesis/gateway/...
 ```
 
 ---
@@ -136,7 +136,7 @@ Track 1 header says `API Version: 1.0` and `Stability: Stable`. The overall proj
 
 | # | Issue | Fix | Tracks Affected |
 |---|-------|-----|-----------------|
-| 1 | Module paths | Standardize to `github.com/TresPies-source/AgenticGatewayByDojoGenesis/*` | 1, 2, 3 |
+| 1 | Module paths | Standardize to `github.com/DojoGenesis/gateway/*` | 1, 2, 3 |
 | 2 | ModelProvider | Remove from shared/; provider/ owns the interface | 0, 1 |
 | 3 | Tool type | Remove from shared/; tools/ owns ToolDefinition | 0, 1 |
 | 4 | Events module | Standalone module, not part of server/ | 0, 1 |

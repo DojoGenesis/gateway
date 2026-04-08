@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/event"
+	"github.com/DojoGenesis/gateway/runtime/event"
 )
 
 func newTestBus(t *testing.T) event.Bus {

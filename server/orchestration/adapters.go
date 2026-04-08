@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/services"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/trace"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools"
+	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
+	"github.com/DojoGenesis/gateway/server/services"
+	"github.com/DojoGenesis/gateway/server/trace"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 // ToolInvokerAdapter adapts the tools registry to implement orchestration.ToolInvokerInterface.

@@ -1,7 +1,7 @@
 package providers
 
 import (
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
+	"github.com/DojoGenesis/gateway/provider"
 )
 
 // DeepSeekProvider implements the DeepSeek API using the shared OpenAI-compatible base.

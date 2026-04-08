@@ -1,10 +1,10 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration
+module github.com/DojoGenesis/gateway/orchestration
 
 go 1.25.6
 
 require (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition v0.0.0
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill v0.0.0
+	github.com/DojoGenesis/gateway/disposition v0.0.0
+	github.com/DojoGenesis/gateway/skill v0.0.0
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.11.1
 )
@@ -17,6 +17,6 @@ require (
 )
 
 replace (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition => ../disposition
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/skill => ../skill
+	github.com/DojoGenesis/gateway/disposition => ../disposition
+	github.com/DojoGenesis/gateway/skill => ../skill
 )

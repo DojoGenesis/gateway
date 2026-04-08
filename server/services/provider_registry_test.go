@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/provider"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/config"
+	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/config"
 )
 
 func TestRegisterProviders_NoKeys(t *testing.T) {

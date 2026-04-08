@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/events"
+	"github.com/DojoGenesis/gateway/events"
 	_ "modernc.org/sqlite"
 )
 

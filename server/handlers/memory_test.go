@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
+	"github.com/DojoGenesis/gateway/memory"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )

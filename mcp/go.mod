@@ -1,10 +1,10 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/mcp
+module github.com/DojoGenesis/gateway/mcp
 
 go 1.25.6
 
 require (
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis v0.0.0
-	github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools v0.0.0
+	github.com/DojoGenesis/gateway v0.0.0
+	github.com/DojoGenesis/gateway/tools v0.0.0
 	github.com/mark3labs/mcp-go v0.44.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.40.0
@@ -42,6 +42,6 @@ require (
 	golang.org/x/sys v0.42.0 // indirect
 )
 
-replace github.com/TresPies-source/AgenticGatewayByDojoGenesis => ../
+replace github.com/DojoGenesis/gateway => ../
 
-replace github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools => ../tools
+replace github.com/DojoGenesis/gateway/tools => ../tools

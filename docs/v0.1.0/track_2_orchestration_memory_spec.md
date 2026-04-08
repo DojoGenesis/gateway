@@ -517,7 +517,7 @@ import (
     "context"
     "fmt"
     "strings"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+    "github.com/DojoGenesis/gateway/orchestration"
 )
 
 // SimpleRuleBasedPlanner demonstrates a non-LLM planner implementation
@@ -594,7 +594,7 @@ import (
     "context"
     "fmt"
     "time"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+    "github.com/DojoGenesis/gateway/orchestration"
     "github.com/your-org/planner"
 )
 
@@ -672,7 +672,7 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+    "github.com/DojoGenesis/gateway/orchestration"
 )
 
 // DemoParallelDAG creates a 3-node DAG with parallel execution:
@@ -778,7 +778,7 @@ import (
     "context"
     "fmt"
     "time"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/memory"
+    "github.com/DojoGenesis/gateway/memory"
 )
 
 func main() {
@@ -960,7 +960,7 @@ Explicitly out of scope for Track 2:
 **Phase 1: Extract**
 1. Copy orchestration/ and memory/ from go_backend
 2. Create separate go.mod for each (remove internal dependencies)
-3. Update imports: `github.com/TresPies-source/dojo-genesis/go_backend/...` → `github.com/TresPies-source/AgenticGatewayByDojoGenesis/...`
+3. Update imports: `github.com/TresPies-source/dojo-genesis/go_backend/...` → `github.com/DojoGenesis/gateway/...`
 4. Remove Dojo-specific features (compassion, dojo events)
 
 **Phase 2: Test & Verify**
@@ -1211,7 +1211,7 @@ import (
     "context"
     "testing"
     "time"
-    "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
+    "github.com/DojoGenesis/gateway/orchestration"
 )
 
 // TestThreeNodeDAGWithParallel verifies 3-node DAG execution
@@ -1300,7 +1300,7 @@ Approval: Pre-Implementation Checklist Complete
 ### 2. Technical Readiness
 
 - [x] **Architecture is Sound:** Module structure, dependency graph, and 5 core interfaces (PlannerInterface, StorageBackendInterface, CompressionServiceInterface, TraceLoggerInterface, EventEmitterInterface) well-defined.
-- [x] **Code is Production-Ready:** Complete Go type definitions for Task, Plan, PlanNode, Memory, MemorySeed, and all interfaces. Uses `github.com/TresPies-source/AgenticGatewayByDojoGenesis/*` paths.
+- [x] **Code is Production-Ready:** Complete Go type definitions for Task, Plan, PlanNode, Memory, MemorySeed, and all interfaces. Uses `github.com/DojoGenesis/gateway/*` paths.
 - [x] N/A **APIs are Specified:** Track 2 defines internal Go interfaces, not HTTP APIs (that's Track 3).
 - [x] **Database Schema is Final:** StorageBackendInterface is an abstraction; no hardcoded schema. Memory and Seed types defined.
 - [x] **Dependencies are Met:** Depends on shared/ for currency types, tools/ for ToolDefinition, events/ for event emission.
@@ -1328,5 +1328,5 @@ Approval: Pre-Implementation Checklist Complete
 - [x] **Codebase Verified:** orchestration/ (engine, planner, task types) and memory/ (manager, garden, seeds, context builder) confirmed in monolith.
 - [x] **Types Verified:** PlannerInterface, Task, Plan, PlanNode, Memory, MemorySeed match existing codebase patterns.
 - [x] **APIs Verified:** StorageBackendInterface (9 methods) matches existing database layer patterns.
-- [x] **File Structure Verified:** Module paths updated to `github.com/TresPies-source/AgenticGatewayByDojoGenesis/*`. Go version corrected to 1.24.
+- [x] **File Structure Verified:** Module paths updated to `github.com/DojoGenesis/gateway/*`. Go version corrected to 1.24.
 - [x] **Remediation Complete:** Module paths standardized, Go version fixed (was 1.19-1.22, now 1.24), migration instructions updated to show correct target paths.

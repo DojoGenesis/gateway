@@ -241,6 +241,18 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// Validate allowed origins have scheme required by gin-contrib/cors
+	for _, origin := range c.AllowedOrigins {
+		if origin != "*" && !strings.HasPrefix(origin, "http://") && !strings.HasPrefix(origin, "https://") {
+			return fmt.Errorf("invalid allowed_origin %q: must be \"*\" or start with http:// or https://", origin)
+		}
+	}
+	for _, origin := range c.MCPApps.AllowedOrigins {
+		if origin != "*" && !strings.HasPrefix(origin, "http://") && !strings.HasPrefix(origin, "https://") {
+			return fmt.Errorf("invalid mcp_apps.allowed_origin %q: must be \"*\" or start with http:// or https://", origin)
+		}
+	}
+
 	// Validate budget limits are positive
 	if c.Budget.QueryLimit < 0 {
 		return fmt.Errorf("query_limit must be positive, got %d", c.Budget.QueryLimit)

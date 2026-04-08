@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/disposition"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/collaboration"
-	pkgerrors "github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/errors"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/intelligence"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/reflection"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/validation"
+	"github.com/DojoGenesis/gateway/disposition"
+	"github.com/DojoGenesis/gateway/pkg/collaboration"
+	pkgerrors "github.com/DojoGenesis/gateway/pkg/errors"
+	"github.com/DojoGenesis/gateway/pkg/intelligence"
+	"github.com/DojoGenesis/gateway/pkg/reflection"
+	"github.com/DojoGenesis/gateway/pkg/validation"
 )
 
 // TestPhase2Integration verifies Phase 2 ADA Full Integration implementation.

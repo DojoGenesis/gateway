@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/artifacts"
+	"github.com/DojoGenesis/gateway/server/artifacts"
 	"github.com/gin-gonic/gin"
 )
 

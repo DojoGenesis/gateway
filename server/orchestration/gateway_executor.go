@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	orchestrationpkg "github.com/TresPies-source/AgenticGatewayByDojoGenesis/orchestration"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/gateway"
+	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
+	"github.com/DojoGenesis/gateway/pkg/gateway"
 	"github.com/google/uuid"
 )
 

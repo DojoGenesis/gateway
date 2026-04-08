@@ -21,8 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/pkg/skill"
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
+	"github.com/DojoGenesis/gateway/pkg/skill"
+	"github.com/DojoGenesis/gateway/runtime/cas"
 )
 
 const defaultCASPath = "dojo-skills.db"

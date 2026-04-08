@@ -1,3 +1,3 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/protocol/transport
+module github.com/DojoGenesis/gateway/protocol/transport
 
 go 1.25.6

@@ -1,4 +1,4 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/protocol/mcpserver
+module github.com/DojoGenesis/gateway/protocol/mcpserver
 
 go 1.25.6
 

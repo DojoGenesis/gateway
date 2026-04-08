@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/workflowui"
+	"github.com/DojoGenesis/gateway/server/workflowui"
 )
 
 // workflowBuilderHandler returns a Gin handler that serves the Workflow Builder

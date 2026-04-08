@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/channel"
+	"github.com/DojoGenesis/gateway/channel"
 	"github.com/bwmarrin/discordgo"
 )
 

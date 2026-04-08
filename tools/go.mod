@@ -1,4 +1,4 @@
-module github.com/TresPies-source/AgenticGatewayByDojoGenesis/tools
+module github.com/DojoGenesis/gateway/tools
 
 go 1.25.6
 
