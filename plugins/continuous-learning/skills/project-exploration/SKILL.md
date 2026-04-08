@@ -1,17 +1,12 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: project-exploration
-description: Systematically explore unfamiliar codebases to build understanding
+description: Guides exploration of new, large-scale projects to assess collaboration potential. Explore philosophy and patterns before diving into implementation. Use when encountering a new codebase, repository, or project.
 triggers:
-  - "explore new codebase"
-  - "understand unfamiliar project"
-  - "map project structure"
+  - "explore this new project before diving in"
+  - "assess this codebase for collaboration potential"
+  - "map the philosophy and patterns of this repo"
 metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
+  version: "1.1"
   tool_dependencies:
     - file_system
     - bash
@@ -23,19 +18,17 @@ metadata:
 
 # Project Exploration Skill
 
-**Version:** 1.0
+**Version:** 1.1
 **Author:** Tres Pies Design
 **Purpose:** Structured process for respectfully exploring a new project to determine collaboration readiness and fit before committing.
 
 ---
 
-## Philosophy: Exploration Before Commitment
+## I. Philosophy: Exploration Before Commitment
 
 When encountering a large project or codebase, explore its philosophy and patterns before diving into implementation. The goal is not just to understand the code, but to understand the project's relationship to your goals, values, and existing knowledge.
 
----
-
-## Core Principles
+**Core Principles:**
 
 - **Progressive Disclosure:** Do not attempt to read everything at once. Start with a high-level overview and drill down as needed.
 - **Incremental Synthesis:** Save findings as you go. Externalize understanding to prevent information loss.
@@ -45,7 +38,7 @@ When encountering a large project or codebase, explore its philosophy and patter
 
 ---
 
-## When to Use This Skill
+## II. When to Use This Skill
 
 - Invited to collaborate on a project with a large existing codebase
 - Evaluating whether to adopt a library, framework, or tool
@@ -54,7 +47,7 @@ When encountering a large project or codebase, explore its philosophy and patter
 
 ---
 
-## The 5-Phase Exploration Process
+## III. The 5-Phase Exploration Workflow
 
 ### Phase 1: First Impressions — Map the Terrain
 
@@ -102,11 +95,94 @@ Where would a new collaborator start?
 
 ### Phase 5: Synthesis — The Exploration Brief
 
-Produce a comprehensive assessment.
+Produce a comprehensive assessment using the Fit Classification and Output Format below.
 
 ---
 
-## Fit Classification
+## IV. Best Practices
+
+1. **Start with README, not code** — The README reveals intent and philosophy. Code reveals implementation. Start with intent.
+2. **Map resonances explicitly** — Don't just assess compatibility. Name the connections between the project's principles and your existing knowledge. Resonances accelerate collaboration.
+3. **Time-box each phase** — Spend no more than 15-20 minutes per phase. Exploration should produce a decision, not an encyclopedia.
+4. **Document as you go** — Don't wait until Phase 5. Capture findings at each phase to prevent information loss.
+5. **Respect the project's norms** — Before contributing, understand the project's conventions (commit style, PR process, coding standards). Adopting norms shows good faith.
+
+---
+
+## V. Quality Checklist
+
+- [ ] First impressions phase completed before architecture deep-dive
+- [ ] Fit assessment uses GREEN/YELLOW/RED classification
+- [ ] Resonance map connects project to existing knowledge
+- [ ] Entry points ranked by approachability and impact
+- [ ] Risks identified with mitigation strategies
+- [ ] Time-boxed (< 90 minutes total for the full exploration)
+
+---
+
+## VI. Example: Dojo Supply Chain Repo Exploration (April 2026)
+
+**The Problem:** Needed to evaluate 13 community GitHub repos for skill supply chain integration — determining which repos had compatible architectures, useful skills, and healthy codebases worth investing in.
+
+**The Process:**
+
+1. **First Impressions:** Scanned READMEs, commit histories, and star counts for all 13 repos. 4 repos eliminated immediately (dormant >6 months, no clear purpose).
+2. **Architecture Mapping:** Mapped behavioral capabilities of 9 remaining repos using semantic-clusters. Found 3 distinct patterns: hooks-based, prompt-library, and full-agent-framework.
+3. **Fit Assessment:** Assessed each against Dojo Gateway integration requirements. Classified: 5 GREEN (strong fit), 3 YELLOW (partial), 1 RED (incompatible architecture).
+4. **Entry Points:** Identified specific skills and patterns to extract from each GREEN repo.
+5. **Synthesis:** Produced exploration briefs that fed directly into the supply chain pipeline.
+
+**The Outcome:** 495 discoverable community skills cataloged. 15 repos security-audited. 47 reusable seeds extracted. The exploration briefs prevented investing time in the 4 repos that would have been dead ends.
+
+**Key Insight:** The resonance mapping in Phase 3 was the most valuable step — it revealed that 2 repos we almost skipped (low star count) had the highest philosophical alignment with Dojo's skill-first approach.
+
+---
+
+## VII. Common Pitfalls
+
+### Pitfall 1: Diving Into Code Before Philosophy
+
+**Problem:** Reading source code before understanding the project's intent leads to misinterpretation of design decisions.
+
+**Solution:** Always complete Phase 1 (README, structure, activity) before Phase 2 (code). The README tells you *why*; the code tells you *how*.
+
+### Pitfall 2: Skipping the Resonance Map
+
+**Problem:** Without explicit resonance mapping, you assess projects as "good" or "bad" rather than "compatible" or "incompatible."
+
+**Solution:** Always fill out the resonance table in Phase 3. Name specific connections between the project's principles and your existing patterns.
+
+### Pitfall 3: Exploring Without a Time Box
+
+**Problem:** Interesting projects can consume hours of exploration without producing a decision.
+
+**Solution:** Set a 90-minute maximum for the full 5-phase process. If you can't assess fit in 90 minutes, the project is likely too complex for casual collaboration.
+
+### Pitfall 4: Confusing Stars with Quality
+
+**Problem:** High GitHub stars indicate popularity, not architectural compatibility or codebase health.
+
+**Solution:** Phase 3 health assessment (test coverage, docs quality, consistency) is more predictive of collaboration success than star count.
+
+### Pitfall 5: Producing Exploration Without Action
+
+**Problem:** A beautiful exploration brief that doesn't lead to a clear GREEN/YELLOW/RED decision is wasted effort.
+
+**Solution:** Every exploration must end with a classification and recommended next step. Exploration without decision is procrastination.
+
+---
+
+## VIII. Related Skills
+
+- **`semantic-clusters`** — Used in Phase 2 to map behavioral capabilities of the project
+- **`health-audit`** — Provides the 5-dimension assessment used in Phase 3 health checks
+- **`research-modes`** — Deep research mode for investigating specific aspects that emerge during exploration
+- **`handoff-protocol`** — When exploration leads to collaboration, use this to hand off findings to implementation agents
+- **`seed-extraction`** — Extract reusable patterns discovered during exploration into seeds
+
+---
+
+## IX. Fit Classification Reference
 
 | Rating | Meaning | Guidance |
 |--------|---------|----------|
@@ -116,7 +192,7 @@ Produce a comprehensive assessment.
 
 ---
 
-## Output Format: Exploration Brief
+## X. Output Format: Exploration Brief
 
 ```markdown
 ## Exploration Brief: [Project Name]
@@ -161,10 +237,5 @@ Produce a comprehensive assessment.
 
 ---
 
-## Quality Criteria
-
-- [ ] First impressions phase completed before architecture deep-dive
-- [ ] Fit assessment uses GREEN/YELLOW/RED classification
-- [ ] Resonance map connects project to existing knowledge
-- [ ] Entry points ranked by approachability and impact
-- [ ] Risks identified with mitigation strategies
+**Last Updated:** 2026-04-06
+**Status:** Active

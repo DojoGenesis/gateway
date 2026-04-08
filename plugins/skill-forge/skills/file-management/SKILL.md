@@ -1,17 +1,12 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: file-management
-description: Organize, relocate, and maintain skill files across plugin directories
+description: A flexible guide for organizing files and directories in a way that is adaptable to different project environments, promoting clarity and good practice without being overly rigid.
 triggers:
-  - "organize skill files"
-  - "move skills between plugins"
-  - "maintain skill directory structure"
+  - "organize these files and directories"
+  - "clean up this project structure"
+  - "suggest a file layout for this project"
 metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
+  version: "1.1"
   tool_dependencies:
     - file_system
     - bash
@@ -23,8 +18,9 @@ metadata:
 
 # File Management & Organization Skill
 
-**Version:** 1.0  
-**Created:** 2026-02-04  
+**Version:** 1.1
+**Created:** 2026-02-04
+**Last Updated:** 2026-04-06
 **Author:** Manus AI  
 **Purpose:** To provide a set of flexible principles and recommended patterns for file and directory organization, adaptable to diverse project environments.
 
@@ -127,3 +123,49 @@ A common structure for a Go backend service.
 -   **Be Pragmatic:** The best structure is the one that works for your team and your project. Don't be afraid to deviate from these patterns if you have a good reason.
 -   **Refactor as You Go:** A project's file structure is not set in stone. As the project evolves, don't be afraid to refactor the file structure to better reflect the current state of the codebase.
 -   **Consistency is Key:** Whatever structure you choose, be consistent. An inconsistent structure is often worse than no structure at all.
+
+---
+
+## VI. Example
+
+**Problem:** The Dojo Genesis repository had grown organically from 5 skills to 47 skills, plus seeds, scouts, specs, and thinking artifacts. New files were being placed inconsistently -- some scouts landed in `docs/`, others in `scouts/`, and one was in the root directory. A new agent onboarding to the repository could not predict where to find anything.
+
+**Process:**
+1. Listed the root directory and identified 12 top-level entries, 6 of which were documentation files that belonged in subdirectories.
+2. Applied Core Principle 1 (Group by Feature/Domain): reorganized into `skills/` (reusable workflows), `seeds/` (extracted patterns), `scouts/` (strategic explorations), `specs/` (release specifications), `docs/` (formal documentation), and `thinking/` (reflections).
+3. Applied Core Principle 3 (Keep Root Clean): moved the 6 orphaned documentation files into their appropriate subdirectories based on content type.
+4. Applied Core Principle 4 (Consistent Naming): standardized all skill directories to `kebab-case` and all date-prefixed files to `YYYY-MM-DD_description.md` format.
+5. Updated README.md with a directory structure explanation following Core Principle 5 (Document Your Structure).
+
+**Outcome:** The reorganized repository had a predictable structure where any agent could locate a file by its type: need a skill? Look in `skills/`. Need a strategic analysis? Look in `scouts/`. The onboarding time for new agents dropped from ~15 minutes of exploration to ~2 minutes of reading the README structure section.
+
+**Key Insight:** The right time to reorganize is when a new type of artifact appears for the third time -- one instance is an exception, two is a coincidence, three is a pattern that deserves its own directory.
+
+---
+
+## VII. Common Pitfalls
+
+1. **Creating directories preemptively.** Building an elaborate directory structure before there is content to fill it leads to empty directories that confuse rather than clarify.
+   - *Solution:* Create directories only when you have at least 2-3 files that belong in them. Let the structure emerge from the content.
+
+2. **Nesting too deeply.** Deeply nested structures (4+ levels) make navigation tedious and file paths unwieldy, especially in commit messages and documentation references.
+   - *Solution:* Apply the "three-level rule" -- most projects should not need more than three levels of nesting (e.g., `skills/strategic-scout/references/`).
+
+3. **Mixing concerns in a single directory.** Putting specs, retrospectives, audit logs, and architecture docs all in a single `docs/` folder creates a grab-bag that grows unmanageable.
+   - *Solution:* Subdivide by artifact type when a directory exceeds ~15 files (e.g., `docs/specs/`, `docs/audits/`, `docs/retrospectives/`).
+
+4. **Inconsistent naming conventions across directories.** Using `kebab-case` for skills but `PascalCase` for specs and `snake_case` for seeds creates cognitive overhead.
+   - *Solution:* Choose one convention for directories and one for files at the project level. Document the choice in the README or CONTRIBUTING guide.
+
+5. **Reorganizing without updating references.** Moving files to better locations but not updating the links, imports, or references that point to them creates broken references throughout the codebase.
+   - *Solution:* After any reorganization, run a grep for the old paths and update all references. Use the documentation-auditor skill to verify no broken links remain.
+
+---
+
+## VIII. Related Skills
+
+- **documentation-auditor** -- Use after a reorganization to verify that all internal links and references still resolve correctly.
+- **repo-status** -- Generates the annotated directory tree that makes file organization visible. Run repo-status to assess the current structure before reorganizing.
+- **pointer-directories** -- Handles the specific case of empty directories that serve as intentional references to external content, preventing accidental deletion during cleanup.
+- **status-writer** -- The STATUS.md file this skill helps organize is itself a key artifact that benefits from consistent placement at the project root.
+- **health-supervisor** -- Uses the file structure as input for its health assessment. A well-organized repository produces a more accurate and useful health audit.

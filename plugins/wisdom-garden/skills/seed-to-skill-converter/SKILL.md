@@ -1,33 +1,27 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: seed-to-skill-converter
-description: Elevate a frequently-used Dojo Seed into a fully-fledged reusable Skill with templates and workflows. Use when a seed has proven value and describes a repeatable process.
+description: A process for elevating a valuable Dojo Seed into a fully-fledged, reusable Skill, formalizing its wisdom and making it an active part of our workflow.
 triggers:
-  - "promote this seed to a skill"
-  - "convert this seed into a skill"
-  - "make this seed into a skill"
-  - "formalize this pattern"
-  - "turn this seed active"
+  - "convert this seed into a full skill"
+  - "promote this seed to a reusable skill"
+  - "elevate this pattern into a formal skill"
 metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
+  version: "1.1"
   tool_dependencies:
     - file_system
     - bash
-    - meta_skill
   portable: true
-  tier: 3
+  tier: 1
   agents:
+    - research-agent
     - implementation-agent
 ---
 
 # Seed-to-Skill Converter Skill
 
-**Version:** 1.0  
-**Created:** 2026-02-04  
+**Version:** 1.1
+**Created:** 2026-02-04
+**Last Updated:** 2026-04-06
 **Author:** Manus AI  
 **Purpose:** To provide a structured process for identifying when a Dojo Seed has become important enough to be promoted into a reusable Skill, and to guide the conversion process.
 
@@ -69,7 +63,7 @@ Analyze the Seed and break down its core components:
 
 ### Step 3: Draft the Skill Using the Standard Template
 
-Create a new directory in `SKILLS/` and a `SKILL.md` file. Use the standard Skill template (see `skill-creation` skill) to structure the new Skill. The components deconstructed in Step 2 will form the core of the new Skill's content.
+Create a new directory in `SKILLS/` and a `SKILL.md` file. Use the standard Skill template (see `skill-creator` skill) to structure the new Skill. The components deconstructed in Step 2 will form the core of the new Skill's content.
 
 | Seed Component | Skill Section |
 | :--- | :--- |
@@ -116,3 +110,53 @@ This would likely become a Skill called `mindful-workflow-check`. The workflow w
 -   **Skills Should Be Actionable:** A Skill must describe a *process*. If a Seed is purely a philosophical reminder, it should remain a Seed.
 -   **Skills Require Maintenance:** Once a Seed becomes a Skill, it is part of our formal infrastructure and must be kept up-to-date.
 -   **The Goal is Utility:** The purpose of this conversion is to create a useful instrument. If the resulting Skill is not useful, the conversion has failed.
+
+---
+
+## VI. Example
+
+**Problem:** During the April 2026 community repo ingestion pipeline, the seed "Compilation as Contract" had been referenced in 5 separate sessions -- once during the Gateway v0.2.0 frontend spec, twice during the parallel tracks sprint, once during the HTMLCraft Studio handoff, and once during a retrospective. The seed stated: "Require `go build` or `cargo check` to pass as the acceptance gate for parallel agent work." It was clearly a multi-step process masquerading as a one-line reminder.
+
+**Process:**
+1. **Identified the candidate:** The seed had been referenced 5 times in 10 days and described a concrete process (not just a philosophical reminder), meeting both frequency and actionability criteria.
+2. **Deconstructed the seed's wisdom:**
+   - Core Insight: Compilation is a zero-ambiguity acceptance test that catches interface mismatches before runtime.
+   - Trigger: Whenever commissioning parallel tracks that will share interfaces (API contracts, TypeScript types, component props).
+   - Process: (a) Write shared interface contracts, (b) add `go build ./...` or `cargo check` as the final step in each track's prompt, (c) require passing build as the acceptance criterion, (d) run build on the merged result.
+   - Desired Outcome: Zero integration surprises at merge time.
+3. **Drafted the skill:** Created `skills/compilation-as-contract/SKILL.md` with sections mapping seed components to skill sections per the conversion table.
+4. **Defined workflow and templates:** Added a "Compilation Gate Template" -- a reusable markdown snippet that could be appended to any implementation prompt, specifying the exact build commands and expected outputs.
+5. **Committed:** Added the new skill to `dojo-genesis/skills/` and made it immediately available.
+
+**Outcome:** The "Compilation as Contract" skill was used in the next 3 parallel track commissions. All 3 integrations compiled on first merge attempt. The seed went from a passive reminder to an active quality gate that agents could invoke by name.
+
+**Key Insight:** The strongest candidates for seed-to-skill conversion are seeds that describe a process you find yourself explaining repeatedly. If you are copy-pasting a seed's instructions into prompts, it should be a skill.
+
+---
+
+## VII. Common Pitfalls
+
+1. **Promoting seeds too early.** Converting a seed after its first use, before it has proven its value across different contexts, locks in an approach that may not generalize.
+   - *Solution:* Apply the "three-reference rule" -- a seed earns promotion only after being referenced in at least 3 different contexts (different projects, different sprints, or different agents).
+
+2. **Losing the seed's conciseness in the skill.** The original seed was 2 sentences of potent insight. The resulting skill is 300 lines of over-explained process that buries the core wisdom.
+   - *Solution:* Keep the Philosophy section (Section I) close to the original seed's language. The seed's voice is the skill's soul. Expand in the Workflow section, not in the Philosophy.
+
+3. **Creating skills that are just longer seeds.** The conversion produces a skill that restates the insight but does not add a concrete, step-by-step workflow or templates.
+   - *Solution:* The acid test: can an agent execute this skill without asking any clarifying questions? If the workflow section requires interpretation, it needs more specific steps, file paths, or templates.
+
+4. **Forgetting to retire the seed.** The seed continues to be referenced directly even after the skill exists, creating two competing sources of truth.
+   - *Solution:* After converting a seed to a skill, update the original seed to include a pointer: "This seed has been promoted to a full skill. See `skills/[skill-name]/SKILL.md`."
+
+5. **Converting philosophical seeds into procedural skills.** Some seeds are purely reflective ("the practice is the product") and do not describe a process. Forcing them into a skill template produces an awkward, unusable artifact.
+   - *Solution:* Before starting conversion, apply the actionability test from Section II: does the seed describe a multi-step process? If it is purely a reminder or philosophical anchor, it should remain a seed.
+
+---
+
+## VIII. Related Skills
+
+- **process-to-skill-workflow** -- The meta-workflow that wraps this converter. Use process-to-skill-workflow when starting from a raw process; use seed-to-skill-converter when starting from an already-documented seed.
+- **skill-creator** -- Provides the standard SKILL.md template structure and the `init_skill.py` initialization script used in Step 3.
+- **seed-reflector** -- The upstream skill that creates the seeds this converter promotes. Use seed-reflector to capture patterns, then this converter to promote the most valuable ones.
+- **seed-module-library** -- The registry of all active seeds. Check this library to identify high-frequency seeds that are candidates for conversion.
+- **skill-maintenance-ritual** -- Once a seed becomes a skill, it enters the maintenance lifecycle. Use skill-maintenance-ritual for ongoing accuracy and completeness reviews.

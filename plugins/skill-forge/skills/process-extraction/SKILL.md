@@ -1,150 +1,202 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: process-extraction
-description: Extract repeatable workflows from conversation transcripts and codify them as skills
+description: >
+  Transform a completed, successful workflow into a reusable skill by first
+  documenting it as a process example, then extracting the generalizable pattern.
+  Use when you've completed a complex multi-step task that should be standardized,
+  when you find yourself repeating the same sequence of actions, during
+  retrospectives, or when capturing institutional knowledge from one-off processes.
 triggers:
-  - "extract workflow from conversation"
-  - "codify process as skill"
-  - "turn transcript into skill"
+  - "extract a reusable process from what we just did"
+  - "turn this workflow into a skill"
+  - "document this repeatable pattern"
 metadata:
   version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
   tool_dependencies:
     - file_system
     - bash
   portable: true
   tier: 1
   agents:
+    - research-agent
     - implementation-agent
 ---
 
-# Process-to-Skill Workflow
+# Process Extraction
 
-**Version:** 1.0
-**Created:** 2026-02-07
-**Author:** Manus AI
-**Purpose:** To provide a structured, repeatable process for identifying a valuable workflow, documenting it with concrete examples, and transforming it into a reusable skill.
+## I. Philosophy: From One-Off Process to Institutional Knowledge
 
----
+Every time someone completes a complex task successfully, they generate implicit knowledge -- a sequence of decisions, actions, and course corrections that led to a good outcome. This implicit knowledge is valuable, but it's also fragile: it lives in a single conversation, a single mind, a single moment. Without capture, it evaporates.
 
-## I. The Philosophy: From Process to Practice
+Process extraction is the discipline of making implicit knowledge explicit. The key insight is that **you must document the specific process before abstracting the general pattern.** The specific is the anchor. Without it, generalization drifts into theory.
 
-We often develop valuable, multi-step processes for complex tasks. These processes are a form of implicit knowledge, a sequence of actions that leads to a high-quality outcome. This skill is about making that implicit knowledge explicit, transforming a one-off process into a repeatable practice.
-
-By documenting a valuable workflow and then using the `/seed-to-skill-converter` to formalize it, we build a library of institutional knowledge that can be shared, improved, and reliably executed by any agent.
-
----
+The process example is the proof. The skill is the tool. You cannot build a reliable tool without first understanding -- in concrete detail -- what the tool must do.
 
 ## II. When to Use This Skill
 
--   **After completing a complex, multi-step task** that you believe will be repeated in the future.
--   **When you find yourself manually repeating the same sequence of actions** across different projects.
--   **During a retrospective**, when you identify a successful workflow that should be standardized.
--   **When you want to onboard a new agent** to a complex process.
+- **After completing a complex, multi-step task** that produced a good outcome and is likely to be repeated
+- **When you find yourself repeating the same sequence of actions** across different projects or contexts
+- **During a retrospective** when a successful workflow is identified for standardization
+- **When onboarding someone** to a complex process that needs to be reproducible
+- **When a conversation transcript contains a valuable workflow** that should be preserved
+- **When institutional knowledge exists only in one person's head** and needs to be formalized
+- **After a debugging session** that revealed a systematic diagnostic approach
 
----
+**When NOT to use:** If the process was unsuccessful, capture it as a retrospective lesson, not a skill. If the process is trivial (1-2 steps), it doesn't warrant a skill.
 
-## III. The Workflow
+## III. The Extraction Workflow
 
-This is a 4-step workflow for transforming a process into a skill.
+### Step 1: Document the Specific Process
 
-### Step 1: Identify and Document the Process
+**Goal:** Create a detailed record of what actually happened, not what should have happened.
 
-**Goal:** Create a detailed record of the valuable workflow with concrete examples.
+**Actions:**
+1. Identify the source: conversation transcript, memory, or user description
+2. Create a process example document with these sections:
+   - **Context:** When and why the process was used
+   - **Input:** What the process started with
+   - **Output:** What the process produced
+   - **Steps Taken:** Every significant action, in order, with goals and outcomes
+   - **Key Decisions:** What was decided, why, and what alternatives were considered
+   - **What Worked:** Success factors and why they mattered
+   - **What Was Hard:** Challenges encountered and how they were resolved
+   - **Reusable Pattern:** The generalizable principle (the kernel of the future skill)
 
-1.  **Identify a Candidate Process:** Select a recently completed workflow that was successful and is likely to be repeated.
-2.  **Use the Process Example Template:** Create a new markdown file and use the template at `references/process_example_template.md` to document the process.
-3.  **Be Detailed:** For each step, document the goal, actions taken, tools used, inputs, and outputs.
-4.  **Extract Key Insights:** Document the key learnings, non-obvious steps, and reusable patterns from the process.
+3. Save as `docs/examples/[YYYY-MM-DD]_[process-name].md`
 
-### Step 2: Convert the Process to a Skill
+**Output:** Complete process example document.
 
-**Goal:** Use the `/seed-to-skill-converter` to transform the documented process into a SKILL.md file.
+**Key Insight:** Be specific. "Searched for relevant files" is too vague. "Used grep to find all files containing the error message, then read the top 3 results to identify the root cause" is specific enough to reproduce.
 
-1.  **Invoke the Converter:** Use the command `/seed-to-skill-converter` on the process example document you just created.
-2.  **Deconstruct the Process:** The converter will guide you through deconstructing the process into its core components (insight, trigger, process, outcome).
-3.  **Draft the Skill:** The converter will then help you draft a `SKILL.md` file using the standard template.
+**Decision Point:** If the user cannot describe the process in sufficient detail, ask targeted questions: "What did you do first? What made you decide to take that approach? What surprised you?"
 
-### Step 3: Refine and Enhance the Skill
+### Step 2: Extract the Generalizable Pattern
 
-**Goal:** Improve the generated `SKILL.md` file to be a production-ready skill.
+**Goal:** Transform the specific process into a reusable skill.
 
-1.  **Add a Quality Checklist:** Include a checklist of yes/no questions to ensure the skill is used correctly.
-2.  **Add Best Practices:** Document any non-obvious best practices or pitfalls to avoid.
-3.  **Create Bundled Resources:** If the skill requires any scripts, templates, or reference files, create them in the skill's directory.
+**Actions:**
+1. Read the process example with fresh eyes
+2. Map process components to skill sections:
 
-### Step 4: Validate and Deliver the Skill
+   | Process Section | Skill Section |
+   |---|---|
+   | Context + Reusable Pattern | I. Philosophy |
+   | Steps Taken (generalized) | III. Workflow |
+   | What Worked | IV. Best Practices |
+   | What Was Hard | VI. Common Pitfalls |
+   | Key Decisions | Decision points in III. Workflow |
 
-**Goal:** Ensure the skill is complete, correct, and ready for use.
+3. Generalize: replace specific file names with placeholders, specific tools with generic descriptions, specific contexts with categories
+4. Preserve the reasoning: keep the *why* behind each step, even as you generalize the *what*
 
-1.  **Validate Structure:** Check that the SKILL.md has all required sections: Philosophy, When to Use, Workflow, Best Practices, Quality Checklist. Grade against the skill-audit rubric.
-2.  **Test the Skill:** Use the skill in a real scenario to verify the workflow is complete and the instructions are clear.
-3.  **Place the Skill:** Add the skill directory to the appropriate plugin in the repository.
+**Output:** Skill draft with sections mapped from the process example.
 
----
+**Key Insight:** The hardest part of generalization is knowing what to keep specific. Keep the reasoning (why), generalize the implementation (what). If a step's value comes from a specific technique, keep the technique.
+
+### Step 3: Refine the Skill
+
+**Goal:** Ensure the skill faithfully represents the process.
+
+**Actions:**
+1. Compare the skill back to the process example, section by section
+2. Check: Does the skill capture everything that made the process work?
+3. Check: Is anything lost in generalization?
+4. Check: Would someone following the skill make the same key decisions?
+5. Check: Are the hard parts (from "What Was Hard") addressed in the workflow or pitfalls?
+6. If gaps exist, update the skill
+
+**Output:** Refined skill that faithfully represents the process.
+
+**Key Insight:** The process example is the truth. If the skill contradicts the example, the skill is wrong. If the skill omits something from the example, the skill is incomplete.
+
+### Step 4: Validate
+
+**Goal:** Confirm the skill is ready for independent use.
+
+**Actions:**
+1. Ask the validation question: "If a new agent encountered [the original situation], would this skill guide them to the same quality outcome?"
+2. If "no" or "maybe": identify what's missing, return to Step 3
+3. If "yes": the skill is ready
+4. Present both the process example and the skill to the user
+
+**Output:** Validated skill and process example, both saved to appropriate locations.
+
+**Key Insight:** The validation question is non-negotiable. It's the difference between a skill that looks good and a skill that works.
 
 ## IV. Best Practices
 
--   **Focus on the "Why":** When documenting the process, don't just list the steps. Explain *why* each step is important.
--   **Generalize the Pattern:** The goal is to create a reusable skill, so abstract the specific details of your example into a general pattern.
--   **The Template is Your Friend:** The `process_example_template.md` is designed to capture all the information needed for a successful conversion.
--   **Iterate:** The first version of a skill is rarely perfect. Be prepared to iterate on it after using it in a real-world scenario.
+### Start with the Specific, Always
 
----
+Never skip the process example. Even if the pattern seems obvious, documenting the specific process reveals details that abstraction hides. The example is the foundation.
+
+### Preserve the Reasoning
+
+When generalizing, it's tempting to strip the "why" and keep only the "what." Resist this. The reasoning is what makes a skill adaptable to new situations. Steps without reasoning are brittle.
+
+### Capture Decisions, Not Just Actions
+
+The most valuable parts of a process are often the decision points: "I chose X over Y because Z." These decisions become the branching logic in the skill's workflow.
+
+### Document What Was Hard
+
+Challenges and failures are the most valuable input for a skill's Common Pitfalls section. If someone struggled with a step, future users will too.
+
+### Generalize Gradually
+
+Don't try to create a universal skill from one example. Generalize only as far as the evidence supports. One example supports a specific skill. Three examples support a broader pattern.
 
 ## V. Quality Checklist
 
-Before delivering the skill, ensure you can answer "yes" to all of the following questions:
-
--   [ ] Have you documented the process with concrete examples using the provided template?
--   [ ] Have you used the `/seed-to-skill-converter` to generate the initial `SKILL.md`?
--   [ ] Have you added a quality checklist and best practices to the skill?
--   [ ] Have you created any necessary bundled resources (scripts, templates, references)?
--   [ ] Have you validated the skill structure against the skill-audit rubric?
--   [ ] Have you placed the skill in the appropriate plugin directory?
-
----
+- [ ] Process example document exists with all sections filled
+- [ ] Steps in the process example are specific enough to reproduce
+- [ ] Key decisions include alternatives considered and rationale
+- [ ] "What Was Hard" section has at least one entry
+- [ ] Skill was derived from the process example, not invented independently
+- [ ] Every workflow step in the skill traces back to a step in the process example
+- [ ] Key decisions from the process appear as decision points in the skill workflow
+- [ ] Challenges appear in the skill's Common Pitfalls section
+- [ ] The validation question was asked and answered "yes"
+- [ ] Both process example and skill are saved to appropriate locations
 
 ## VI. Common Pitfalls
 
-### Documenting Too Specifically
+### Skipping the Process Example
 
-**Problem:** Recording every detail of the specific instance instead of the generalizable pattern. The resulting skill only works for one exact scenario.
+**Problem:** Jumping straight to skill creation without documenting the specific process. The resulting skill is theoretical, not grounded in reality.
 
-**Solution:** After documenting the concrete example, do a second pass where you replace specific names, paths, and values with placeholders and describe the *category* of thing, not the instance.
+**Solution:** Always create the process example first. Even if it feels redundant, the act of documenting reveals details you'd otherwise forget.
 
-### Skipping the "Why"
+### Over-Generalizing from One Example
 
-**Problem:** A process document that says "do X, then do Y, then do Z" without explaining why each step matters. The resulting skill is fragile — any deviation breaks it because the user can't adapt.
+**Problem:** Creating a universal skill from a single process instance. The skill makes assumptions that only hold in the original context.
 
-**Solution:** For every step, add one sentence: "This matters because..." If you can't explain why, the step may be unnecessary.
+**Solution:** Generalize conservatively. Flag assumptions that might not hold in other contexts. Note in the skill: "Based on [N] observed instances. May need refinement after further application."
 
-### Premature Formalization
+### Losing the "Why" in Generalization
 
-**Problem:** Turning a process into a skill after doing it once. One instance isn't enough to know what's essential vs. accidental. The skill encodes noise alongside signal.
+**Problem:** The skill describes what to do but not why. When users encounter a situation that doesn't match exactly, they can't adapt.
 
-**Solution:** Wait until you've done the process at least twice — ideally three times — before extracting it. The second and third times reveal which steps are truly reusable.
+**Solution:** For every workflow step, include the goal (why) alongside the actions (what). The goal is portable; the actions may need to change.
 
----
+### Ignoring What Was Hard
 
-## VII. Example
+**Problem:** The process example glosses over challenges, so the skill has no pitfalls section. Future users hit the same walls with no guidance.
 
-**Context:** After the third time running a "merge and reconcile plugin directories" workflow, the team recognized a repeatable pattern: inventory both sides, map naming differences, do renames, copy additive content, update cross-references, verify.
+**Solution:** Explicitly ask: "What was the hardest part? Where did you almost go wrong? What would you tell someone to watch out for?"
 
-**Step 1 output:** A detailed process example documenting the specific merge (which directories, which files, which renames), with key insights like "always rename longest strings first to avoid partial matches" and "verify zero stale references after replacement."
+## VII. Example: Extracting a Deployment Process into a Skill
 
-**Step 2 output:** A generalized "directory-reconciliation" SKILL.md with a 5-step workflow: Inventory → Map → Transform → Update References → Verify.
+**Context:** After running a complex zero-downtime database migration, a team wanted to capture the process for future migrations.
 
-**Step 3 refinements:** Added a pitfall about filesystem permission restrictions preventing deletions, and a quality checklist item about checking JSON manifests alongside markdown files.
+**Process Example Highlights:**
+- 12 steps covering pre-migration checks, backup, staged rollout, monitoring, and rollback criteria
+- Key decision: chose blue-green deployment over rolling update because the schema change was breaking
+- What was hard: coordinating the cutover window with dependent services
 
----
+**Resulting Skill:** `execute-zero-downtime-migration`
+- Philosophy: explains why zero-downtime matters and the cost of getting it wrong
+- Workflow: 8 generalized steps (consolidated from the 12 specific steps)
+- Decision point at Step 3: "If schema change is breaking, use blue-green. If additive, use rolling update."
+- Pitfall: "Forgetting to notify dependent services" (from "What Was Hard")
 
-## VIII. Related Skills
-
-- **skill-creation** — For building new skills from scratch (this skill starts from a completed process)
-- **seed-extraction** — For capturing smaller patterns as seeds before they're ready to be full skills
-- **seed-to-skill-converter** — The tool used in Step 2 to transform documented processes into SKILL.md format
-- **retrospective** — Often the trigger for identifying processes worth extracting
+The skill was validated against the original process and two subsequent migrations.
