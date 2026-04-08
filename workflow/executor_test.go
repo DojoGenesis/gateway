@@ -682,3 +682,164 @@ func TestExecute_StepOrder(t *testing.T) {
 		t.Errorf("c completed at %d but d ran at %d (should be later)", cComplete, dRun)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// 11. TestExecute_WithSkillRunner — verify SkillRunner dispatch
+// ---------------------------------------------------------------------------
+
+// mockSkillRunner records calls and returns configurable outputs.
+type mockSkillRunner struct {
+	mu      sync.Mutex
+	calls   []skillRunCall
+	outputs map[string]string // skillName -> output
+	errors  map[string]error  // skillName -> error
+}
+
+type skillRunCall struct {
+	SkillName string
+	Input     map[string]string
+}
+
+func (m *mockSkillRunner) RunSkill(_ context.Context, skillName string, input map[string]string) (string, error) {
+	m.mu.Lock()
+	m.calls = append(m.calls, skillRunCall{SkillName: skillName, Input: input})
+	m.mu.Unlock()
+
+	if m.errors != nil {
+		if err, ok := m.errors[skillName]; ok {
+			return "", err
+		}
+	}
+	if m.outputs != nil {
+		if out, ok := m.outputs[skillName]; ok {
+			return out, nil
+		}
+	}
+	return fmt.Sprintf("real-output:%s", skillName), nil
+}
+
+func (m *mockSkillRunner) allCalls() []skillRunCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]skillRunCall, len(m.calls))
+	copy(out, m.calls)
+	return out
+}
+
+func TestExecute_WithSkillRunner(t *testing.T) {
+	store := newTestCAS(t)
+	def := &WorkflowDefinition{
+		Version:      "1.0.0",
+		Name:         "skill-runner-test",
+		ArtifactType: WorkflowArtifactType,
+		Steps: []Step{
+			{ID: "s1", Skill: "strategic-scout", Inputs: map[string]string{"topic": "agents"}},
+			{ID: "s2", Skill: "debugging", Inputs: map[string]string{"issue": "timeout"}, DependsOn: []string{"s1"}},
+		},
+	}
+	storeWorkflow(t, store, def)
+
+	runner := &mockSkillRunner{
+		outputs: map[string]string{
+			"strategic-scout": "scout-result",
+			"debugging":       "debug-result",
+		},
+	}
+
+	exec := NewWorkflowExecutor(store, noopEventFn, runner)
+	result, err := exec.Execute(context.Background(), "skill-runner-test")
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	if result.Status != "completed" {
+		t.Errorf("Status = %q, want %q", result.Status, "completed")
+	}
+
+	// Verify outputs came from the runner, not the simulated fallback.
+	s1 := result.StepResults["s1"]
+	if s1.Output != "scout-result" {
+		t.Errorf("step s1 output = %q, want %q", s1.Output, "scout-result")
+	}
+	s2 := result.StepResults["s2"]
+	if s2.Output != "debug-result" {
+		t.Errorf("step s2 output = %q, want %q", s2.Output, "debug-result")
+	}
+
+	// Verify the runner received the correct inputs.
+	calls := runner.allCalls()
+	if len(calls) != 2 {
+		t.Fatalf("expected 2 skill runs, got %d", len(calls))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 12. TestExecute_SkillRunnerFailure — skill returns error, step fails
+// ---------------------------------------------------------------------------
+
+func TestExecute_SkillRunnerFailure(t *testing.T) {
+	store := newTestCAS(t)
+	def := linearDef("runner-fail-test")
+	storeWorkflow(t, store, def)
+
+	runner := &mockSkillRunner{
+		errors: map[string]error{
+			"skill-b": fmt.Errorf("skill-b crashed"),
+		},
+	}
+
+	exec := NewWorkflowExecutor(store, noopEventFn, runner)
+	result, err := exec.Execute(context.Background(), "runner-fail-test")
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	if result.Status != "failed" {
+		t.Errorf("Status = %q, want %q", result.Status, "failed")
+	}
+
+	// "a" should complete, "b" should fail, "c" should be skipped.
+	if sr := result.StepResults["a"]; sr.Status != "completed" {
+		t.Errorf("step a: want completed, got %q", sr.Status)
+	}
+	if sr := result.StepResults["b"]; sr.Status != "failed" {
+		t.Errorf("step b: want failed, got %q", sr.Status)
+	}
+	if sr := result.StepResults["c"]; sr.Status != "skipped" {
+		t.Errorf("step c: want skipped, got %q", sr.Status)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 13. TestNewWorkflowExecutor_BackwardCompat — no runner arg still works
+// ---------------------------------------------------------------------------
+
+func TestNewWorkflowExecutor_BackwardCompat(t *testing.T) {
+	store := newTestCAS(t)
+	def := &WorkflowDefinition{
+		Version:      "1.0.0",
+		Name:         "compat-test",
+		ArtifactType: WorkflowArtifactType,
+		Steps: []Step{
+			{ID: "x", Skill: "skill-x", Inputs: map[string]string{}},
+		},
+	}
+	storeWorkflow(t, store, def)
+
+	// No runner argument — backward compatible constructor call.
+	exec := NewWorkflowExecutor(store, noopEventFn)
+	result, err := exec.Execute(context.Background(), "compat-test")
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	if result.Status != "completed" {
+		t.Errorf("Status = %q, want %q", result.Status, "completed")
+	}
+
+	// Output should be the simulated fallback.
+	sr := result.StepResults["x"]
+	if !strings.Contains(sr.Output, "output of skill") {
+		t.Errorf("expected simulated output, got %q", sr.Output)
+	}
+}

@@ -262,3 +262,5 @@ func (s *Server) handleAdminMCPStatus(c *gin.Context) {
 		"healthy":       healthy,
 	})
 }
+
+// handleAdminCosts is defined in handle_admin_costs.go (Gap 3 extended version).

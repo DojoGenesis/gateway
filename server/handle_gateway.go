@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1053,6 +1054,145 @@ func (s *Server) handleGetProviderSettings(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"providers": configured})
 }
+
+// ─── Agent listing (Gap 4: filtering support) ──────────────────────────────
+
+// handleGatewayListAgents returns registered agents with optional filters.
+// GET /v1/gateway/agents?status=active|inactive|all&model=X&limit=N&offset=N
+func (s *Server) handleGatewayListAgents(c *gin.Context) {
+	statusFilter := c.DefaultQuery("status", "all")
+	modelFilter := c.Query("model")
+
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, errLimit := strconv.Atoi(limitStr)
+	if errLimit != nil || limit < 1 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	offset, errOffset := strconv.Atoi(offsetStr)
+	if errOffset != nil || offset < 0 {
+		offset = 0
+	}
+
+	s.agentMu.RLock()
+	defer s.agentMu.RUnlock()
+
+	// Build filtered list
+	allAgents := make([]gin.H, 0, len(s.agents))
+	for id, runtime := range s.agents {
+		// Determine agent status
+		agentStatus := "active"
+		if runtime.Config == nil {
+			agentStatus = "inactive"
+		}
+
+		// Apply status filter
+		if statusFilter != "all" && agentStatus != statusFilter {
+			continue
+		}
+
+		// Apply model filter (check if disposition or config contains model info)
+		if modelFilter != "" {
+			// Model filtering checks Config fields if available
+			if runtime.Config != nil {
+				// No direct model field on AgentConfig; skip agents that don't match
+				// For now, model filter is a pass-through since model is set at chat time
+			}
+		}
+
+		entry := gin.H{
+			"agent_id": id,
+			"status":   agentStatus,
+		}
+		if runtime.Config != nil {
+			entry["config"] = runtime.Config
+		}
+		if runtime.Disposition != nil {
+			entry["disposition"] = gin.H{
+				"pacing":     runtime.Disposition.Pacing,
+				"depth":      runtime.Disposition.Depth,
+				"tone":       runtime.Disposition.Tone,
+				"initiative": runtime.Disposition.Initiative,
+			}
+		}
+		if len(runtime.Channels) > 0 {
+			entry["channels"] = runtime.Channels
+		}
+		allAgents = append(allAgents, entry)
+	}
+
+	total := len(allAgents)
+
+	// Apply pagination
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	paged := allAgents[offset:end]
+
+	c.JSON(http.StatusOK, gin.H{
+		"agents": paged,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+// ─── Agent-channel binding (Gap 5) ──────────────────────────────────────────
+
+// handleGatewayBindAgentChannels stores a list of channels on an agent's metadata.
+// POST /v1/gateway/agents/:id/channels
+func (s *Server) handleGatewayBindAgentChannels(c *gin.Context) {
+	agentID := c.Param("id")
+
+	var req struct {
+		Channels []string `json:"channels" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.errorResponse(c, http.StatusBadRequest, "invalid_request", fmt.Sprintf("Invalid request: %v", err))
+		return
+	}
+
+	s.agentMu.Lock()
+	runtime, exists := s.agents[agentID]
+	if !exists {
+		s.agentMu.Unlock()
+		s.errorResponse(c, http.StatusNotFound, "not_found", fmt.Sprintf("Agent not found: %s", agentID))
+		return
+	}
+
+	// Append new channels, deduplicating
+	existing := make(map[string]bool, len(runtime.Channels))
+	for _, ch := range runtime.Channels {
+		existing[ch] = true
+	}
+	for _, ch := range req.Channels {
+		if !existing[ch] {
+			runtime.Channels = append(runtime.Channels, ch)
+			existing[ch] = true
+		}
+	}
+	result := make([]string, len(runtime.Channels))
+	copy(result, runtime.Channels)
+	s.agentMu.Unlock()
+
+	c.JSON(http.StatusOK, gin.H{
+		"agent_id": agentID,
+		"channels": result,
+		"count":    len(result),
+	})
+}
+
+// Agent channel handlers (handleGatewayListAgentChannels, handleGatewayUnbindAgentChannel)
+// are defined in handle_gateway_channels.go (Gap 5 extended version).
 
 // ─── Helper functions ─────────────────────────────────────────────────────────
 

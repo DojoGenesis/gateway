@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/handlers"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/server/middleware"
 	wfapi "github.com/TresPies-source/AgenticGatewayByDojoGenesis/workflow/api"
 )
 
@@ -67,8 +68,14 @@ func (s *Server) setupRoutes() {
 
 			// Agent management with disposition
 			gateway.POST("/agents", s.handleGatewayCreateAgent)
+			gateway.GET("/agents", s.handleGatewayListAgents)
 			gateway.GET("/agents/:id", s.handleGatewayGetAgent)
 			gateway.POST("/agents/:id/chat", s.handleGatewayAgentChat)
+
+			// Agent-channel binding (Gap 5)
+			gateway.POST("/agents/:id/channels", s.handleGatewayBindAgentChannels)
+			gateway.GET("/agents/:id/channels", s.handleGatewayListAgentChannels)
+			gateway.DELETE("/agents/:id/channels/:channel", s.handleGatewayUnbindAgentChannel)
 
 			// Orchestration DAG execution
 			gateway.POST("/orchestrate", s.handleGatewayOrchestrate)
@@ -120,6 +127,10 @@ func (s *Server) setupRoutes() {
 		settings.GET("/providers", s.handleGetProviderSettings)
 	}
 
+	// ─── ADA Validation (Gap 20) ────────────────────────────────────
+	// Public endpoint — accessible from frontend without admin auth.
+	s.router.POST("/api/ada/validate", s.handleADAValidate)
+
 	// ─── Workflow API (Era 3) ────────────────────────────────────────
 	// CRUD: POST/GET /api/workflows, PUT/GET /api/workflows/:name/canvas,
 	// POST /api/workflows/:name/validate, GET /api/skills.
@@ -138,6 +149,9 @@ func (s *Server) setupRoutes() {
 	s.router.POST("/api/workflows/:name/execute", s.handleWorkflowExecute)
 	s.router.GET("/api/workflows/:run_id/execution", s.handleWorkflowExecutionStream)
 
+	// ─── WebSocket: real-time workflow execution events (Era 3) ──────
+	s.router.GET("/api/ws/workflow", s.wsHub.HandleWS)
+
 	// ─── Workflow Builder SPA (Era 3) ────────────────────────────────
 	// Served from embedded dist/ compiled by `make build-spa`.
 	// SvelteKit base path is /workflow, so all internal links resolve here.
@@ -145,8 +159,31 @@ func (s *Server) setupRoutes() {
 	s.router.GET("/workflow", wbHandler)
 	s.router.GET("/workflow/*filepath", wbHandler)
 
+	// ─── CAS API ────────────────────────────────────────────────────────
+	if s.workflowCAS != nil {
+		casGroup := s.router.Group("/api/cas")
+		{
+			// Existing content/tags endpoints
+			casGroup.GET("/tags", s.handleCASListTags)
+			casGroup.GET("/tags/:name/:version", s.handleCASResolveTag)
+			casGroup.POST("/tags", s.handleCASCreateTag)
+			casGroup.DELETE("/tags/:name/:version", s.handleCASDeleteTag)
+			casGroup.GET("/content/:ref", s.handleCASGetContent)
+			casGroup.POST("/content", s.handleCASPutContent)
+			casGroup.POST("/gc", s.handleCASGarbageCollect)
+
+			// Gap 1: /api/cas/refs/* endpoints
+			casGroup.GET("/refs", s.handleCASListRefs)
+			casGroup.GET("/refs/:ref", s.handleCASGetRef)
+			casGroup.HEAD("/refs/:ref", s.handleCASHeadRef)
+			casGroup.POST("/refs", s.handleCASStoreRef)
+			casGroup.GET("/export", s.handleCASExport)
+		}
+	}
+
 	// ─── Admin Routes (v1.0.0) ───────────────────────────────────────
 	admin := s.router.Group("/admin")
+	admin.Use(middleware.AdminAuthMiddleware())
 	{
 		// Health and diagnostics
 		admin.GET("/health", s.handleAdminHealth)
@@ -155,6 +192,7 @@ func (s *Server) setupRoutes() {
 
 		// Provider status
 		admin.GET("/providers", s.handleAdminProviders)
+		admin.GET("/providers/:name/history", s.handleAdminProviderHistory)
 
 		// Metrics
 		admin.GET("/metrics/prometheus", s.handleAdminMetrics)
@@ -162,5 +200,8 @@ func (s *Server) setupRoutes() {
 		// MCP server management
 		admin.GET("/mcp/servers", s.handleAdminMCPServers)
 		admin.GET("/mcp/status", s.handleAdminMCPStatus)
+
+		// Cost aggregation
+		admin.GET("/costs", s.handleAdminCosts)
 	}
 }

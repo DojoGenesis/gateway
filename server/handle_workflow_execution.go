@@ -119,8 +119,9 @@ func (s *Server) handleWorkflowExecute(c *gin.Context) {
 	runID := uuid.New().String()
 	s.execBus.Register(runID)
 
-	executor := workflow.NewWorkflowExecutor(s.workflowCAS, func(_, stepID, status string) {
+	executor := workflow.NewWorkflowExecutor(s.workflowCAS, func(wfID, stepID, status string) {
 		s.execBus.Publish(runID, stepID, status)
+		s.wsHub.Publish(wfID, stepID, status)
 	})
 
 	// Execute in a background goroutine; use a detached context so the

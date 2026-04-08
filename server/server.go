@@ -50,6 +50,9 @@ type AgentRuntime struct {
 	Validator     *validation.Validator
 	Reflection    *reflection.Engine
 	Proactive     *intelligence.ProactiveEngine
+
+	// Channels lists the channel IDs this agent is bound to.
+	Channels []string
 }
 
 // ServerConfig holds server-specific configuration.
@@ -59,6 +62,11 @@ type ServerConfig struct {
 	AuthMode        string // "none", "api_key", "custom"
 	Environment     string // "development", "production"
 	ShutdownTimeout time.Duration
+	// Auth token TTLs (configurable, defaults: access=24h, refresh=7d)
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
+	// Admin API key for /admin/* endpoints (empty = unauthenticated)
+	AdminAPIKey string
 }
 
 // Server is the main HTTP server that ties all framework modules together.
@@ -109,6 +117,12 @@ type Server struct {
 	// Workflow execution (Era 3)
 	workflowCAS cas.Store
 	execBus     *ExecutionBus
+
+	// Provider latency tracking (Gap 13)
+	latencyTracker *services.ProviderLatencyTracker
+
+	// WebSocket hub for real-time workflow execution events (Era 3)
+	wsHub *WorkflowWSHub
 }
 
 // New creates a new Server with all dependencies injected.
@@ -126,6 +140,12 @@ func New(deps ServerDeps) *Server {
 
 	if cfg.ShutdownTimeout == 0 {
 		cfg.ShutdownTimeout = 30 * time.Second
+	}
+	if cfg.AccessTokenTTL == 0 {
+		cfg.AccessTokenTTL = 24 * time.Hour
+	}
+	if cfg.RefreshTokenTTL == 0 {
+		cfg.RefreshTokenTTL = 7 * 24 * time.Hour
 	}
 
 	if cfg.Environment == "production" {
@@ -160,7 +180,12 @@ func New(deps ServerDeps) *Server {
 		agents:                make(map[string]*AgentRuntime),
 		workflowCAS:           deps.WorkflowCAS,
 		execBus:               newExecutionBus(),
+		latencyTracker:        services.NewProviderLatencyTracker(60),
+		wsHub:                 NewWorkflowWSHub(),
 	}
+
+	// Start WebSocket broadcast loop in background.
+	go s.wsHub.Run()
 
 	s.setupMiddleware()
 	s.setupRoutes()
@@ -185,15 +210,22 @@ func (s *Server) setupMiddleware() {
 	// Rate limiting middleware (per-IP token bucket)
 	s.router.Use(middleware.RateLimitMiddleware(middleware.DefaultRateLimitConfig()))
 
-	// CORS middleware
-	s.router.Use(cors.New(cors.Config{
-		AllowOrigins:     s.cfg.AllowedOrigins,
+	// CORS middleware — supports wildcard "*" for development
+	corsConfig := cors.Config{
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Content-Type", "Authorization", "X-Request-ID"},
 		ExposeHeaders:    []string{"X-Request-ID"},
 		AllowCredentials: true,
 		MaxAge:           3600,
-	}))
+	}
+	if len(s.cfg.AllowedOrigins) == 1 && s.cfg.AllowedOrigins[0] == "*" {
+		// Dynamic origin: reflect the requesting origin (dev mode)
+		corsConfig.AllowAllOrigins = true
+		corsConfig.AllowCredentials = false // AllowAllOrigins + credentials is invalid
+	} else {
+		corsConfig.AllowOrigins = s.cfg.AllowedOrigins
+	}
+	s.router.Use(cors.New(corsConfig))
 
 	// Request ID middleware
 	s.router.Use(requestIDMiddleware())

@@ -10,26 +10,42 @@ import (
 	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/cas"
 )
 
+// SkillRunner executes a named skill with the given inputs and returns the
+// output string. Implementations bridge the workflow executor to the skill
+// runtime (e.g. skill.Executor). The workflow package defines this interface
+// to avoid importing the skill package directly.
+type SkillRunner interface {
+	RunSkill(ctx context.Context, skillName string, input map[string]string) (string, error)
+}
+
 // WorkflowExecutor manages workflow execution lifecycle.
 // It resolves workflow definitions from CAS, validates them, executes
 // steps in dependency order (parallel where possible), and publishes
 // lifecycle events via the eventFn callback.
 type WorkflowExecutor struct {
-	cas     cas.Store
-	eventFn func(workflowID, stepID, status string)
+	cas         cas.Store
+	eventFn     func(workflowID, stepID, status string)
+	skillRunner SkillRunner
 }
 
 // NewWorkflowExecutor returns a WorkflowExecutor backed by the given CAS store.
 // eventFn is called with (workflowID, stepID, status) for each step lifecycle
 // event (e.g. "running", "completed", "failed", "skipped").
 // If eventFn is nil, events are silently dropped.
-func NewWorkflowExecutor(store cas.Store, eventFn func(string, string, string)) *WorkflowExecutor {
+// runner is an optional SkillRunner for dispatching steps to the skill runtime;
+// if nil, steps fall back to a simulated execution (useful for tests).
+func NewWorkflowExecutor(store cas.Store, eventFn func(string, string, string), runner ...SkillRunner) *WorkflowExecutor {
 	if eventFn == nil {
 		eventFn = func(string, string, string) {}
 	}
+	var sr SkillRunner
+	if len(runner) > 0 && runner[0] != nil {
+		sr = runner[0]
+	}
 	return &WorkflowExecutor{
-		cas:     store,
-		eventFn: eventFn,
+		cas:         store,
+		eventFn:     eventFn,
+		skillRunner: sr,
 	}
 }
 
@@ -272,15 +288,21 @@ func (e *WorkflowExecutor) resolveWorkflow(ctx context.Context, name string) (*W
 	return def, nil
 }
 
-// executeStep simulates step execution with a minimal sleep.
-// In a production implementation this would dispatch to the skill runtime.
+// executeStep dispatches to the registered SkillRunner if available,
+// otherwise falls back to a simulated execution for backward compatibility.
 func (e *WorkflowExecutor) executeStep(ctx context.Context, step Step) (string, error) {
 	// Check for cancellation before executing.
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
 
-	// Simulate execution with a brief pause to allow concurrency to be observable.
+	// Dispatch to the real skill runtime when a runner is configured.
+	if e.skillRunner != nil {
+		return e.skillRunner.RunSkill(ctx, step.Skill, step.Inputs)
+	}
+
+	// Fallback: simulate execution with a brief pause to allow concurrency
+	// to be observable. This path is used when no SkillRunner is wired (tests).
 	select {
 	case <-ctx.Done():
 		return "", ctx.Err()
