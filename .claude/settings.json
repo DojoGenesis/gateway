@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hook": "if echo \"$TOOL_INPUT\" | grep -q 'SKILL.md'; then bash scripts/validate-skills.sh; fi"
+      }
+    ]
+  }
+}
