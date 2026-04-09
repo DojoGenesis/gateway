@@ -23,6 +23,10 @@ func NewKimiProvider(apiKey string) *KimiProvider {
 				{ID: "kimi-k2.5", Name: "Kimi K2.5", Provider: "kimi", ContextSize: 256000, Cost: 1.0},
 				{ID: "kimi-k2", Name: "Kimi K2", Provider: "kimi", ContextSize: 256000, Cost: 0.8},
 				{ID: "kimi-k2-0905", Name: "Kimi K2 0905", Provider: "kimi", ContextSize: 256000, Cost: 0.8},
+				{ID: "kimi-latest", Name: "Kimi Latest", Provider: "kimi", ContextSize: 256000, Cost: 1.0},
+				{ID: "moonshot-v1-8k", Name: "Moonshot V1 8K", Provider: "kimi", ContextSize: 8000, Cost: 0.5},
+				{ID: "moonshot-v1-32k", Name: "Moonshot V1 32K", Provider: "kimi", ContextSize: 32000, Cost: 0.6},
+				{ID: "moonshot-v1-128k", Name: "Moonshot V1 128K", Provider: "kimi", ContextSize: 128000, Cost: 0.8},
 			},
 			info: &provider.ProviderInfo{
 				Name:         "kimi",

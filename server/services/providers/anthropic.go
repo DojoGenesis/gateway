@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/DojoGenesis/gateway/provider"
 )
@@ -38,9 +39,14 @@ func (p *AnthropicProvider) GetInfo(ctx context.Context) (*provider.ProviderInfo
 
 func (p *AnthropicProvider) ListModels(ctx context.Context) ([]provider.ModelInfo, error) {
 	return []provider.ModelInfo{
+		// Canonical date-stamped IDs
 		{ID: "claude-sonnet-4-20250514", Name: "Claude Sonnet 4", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
 		{ID: "claude-haiku-4-20250414", Name: "Claude Haiku 4", Provider: "anthropic", ContextSize: 200000, Cost: 0.25},
 		{ID: "claude-opus-4-20250514", Name: "Claude Opus 4", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
+		// Short-form aliases that users actually type (routed to Anthropic API which resolves them)
+		{ID: "claude-sonnet-4-6", Name: "Claude Sonnet 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
+		{ID: "claude-haiku-4-5", Name: "Claude Haiku 4.5", Provider: "anthropic", ContextSize: 200000, Cost: 0.25},
+		{ID: "claude-opus-4-6", Name: "Claude Opus 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
 	}, nil
 }
 
@@ -100,19 +106,7 @@ func (p *AnthropicProvider) GenerateCompletion(ctx context.Context, req *provide
 		maxTokens = 4096
 	}
 
-	// Build Anthropic-format messages -- extract system message
-	var system string
-	var messages []anthropicMessage
-	for _, m := range req.Messages {
-		if m.Role == "system" {
-			system = m.Content
-			continue
-		}
-		messages = append(messages, anthropicMessage{
-			Role:    m.Role,
-			Content: m.Content,
-		})
-	}
+	system, messages := convertToAnthropicMessages(req.Messages)
 
 	aReq := anthropicRequest{
 		Model:       model,
@@ -191,15 +185,7 @@ func (p *AnthropicProvider) GenerateCompletionStream(ctx context.Context, req *p
 		maxTokens = 4096
 	}
 
-	var system string
-	var messages []anthropicMessage
-	for _, m := range req.Messages {
-		if m.Role == "system" {
-			system = m.Content
-			continue
-		}
-		messages = append(messages, anthropicMessage{Role: m.Role, Content: m.Content})
-	}
+	system, messages := convertToAnthropicMessages(req.Messages)
 
 	aReq := anthropicRequest{
 		Model: model, Messages: messages, MaxTokens: maxTokens,
@@ -261,6 +247,83 @@ func (p *AnthropicProvider) CallTool(ctx context.Context, req *provider.ToolCall
 
 func (p *AnthropicProvider) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
 	return nil, fmt.Errorf("Anthropic does not provide an embeddings endpoint")
+}
+
+// convertToAnthropicMessages converts provider messages into Anthropic API format.
+// It extracts the system prompt, converts "tool" role messages into user messages
+// with tool_result content blocks, and merges consecutive tool results into a single
+// user message (Anthropic requires alternating user/assistant roles).
+func convertToAnthropicMessages(msgs []provider.Message) (system string, messages []anthropicMessage) {
+	for _, m := range msgs {
+		if m.Role == "system" {
+			system = m.Content
+			continue
+		}
+		// Convert OpenAI-style "tool" role into Anthropic tool_result user message.
+		if m.Role == "tool" {
+			block := map[string]interface{}{
+				"type":        "tool_result",
+				"tool_use_id": m.ToolCallID,
+				"content":     m.Content,
+			}
+			// Merge into the previous user message if it already contains tool_result blocks
+			// to avoid consecutive user messages (which Anthropic rejects).
+			if n := len(messages); n > 0 && messages[n-1].Role == "user" {
+				if blocks, ok := messages[n-1].Content.([]map[string]interface{}); ok {
+					messages[n-1].Content = append(blocks, block)
+					continue
+				}
+			}
+			messages = append(messages, anthropicMessage{
+				Role:    "user",
+				Content: []map[string]interface{}{block},
+			})
+			continue
+		}
+		// Convert assistant messages that carry tool_use calls into content-block format.
+		if m.Role == "assistant" && len(m.ToolCalls) > 0 {
+			var blocks []map[string]interface{}
+			if m.Content != "" {
+				blocks = append(blocks, map[string]interface{}{
+					"type": "text",
+					"text": m.Content,
+				})
+			}
+			for _, tc := range m.ToolCalls {
+				input := tc.Arguments
+				if input == nil {
+					input = map[string]interface{}{}
+				}
+				blocks = append(blocks, map[string]interface{}{
+					"type":  "tool_use",
+					"id":    tc.ID,
+					"name":  tc.Name,
+					"input": input,
+				})
+			}
+			messages = append(messages, anthropicMessage{
+				Role:    "assistant",
+				Content: blocks,
+			})
+			continue
+		}
+		// Safety: reject any remaining "tool" role that somehow slipped through.
+		if m.Role != "user" && m.Role != "assistant" {
+			slog.Warn("dropping message with unexpected role for Anthropic",
+				"role", m.Role, "content_preview", truncateStr(m.Content, 80))
+			continue
+		}
+		messages = append(messages, anthropicMessage{Role: m.Role, Content: m.Content})
+	}
+	return system, messages
+}
+
+// truncateStr truncates a string to maxLen runes.
+func truncateStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 func convertToAnthropicTools(tools []provider.Tool) []anthropicTool {

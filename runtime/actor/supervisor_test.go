@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DojoGenesis/gateway/runtime/actor"
+	"github.com/TresPies-source/AgenticGatewayByDojoGenesis/runtime/actor"
 )
 
 // testHandler is a simple AgentHandler for testing.

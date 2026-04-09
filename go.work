@@ -10,7 +10,9 @@ use (
 	./memory
 	./orchestration
 	./provider
+	./runtime/actor
 	./runtime/cas
+	./runtime/d1client
 	./runtime/event
 	./runtime/wasm
 	./server

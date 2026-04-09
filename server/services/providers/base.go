@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -54,6 +55,12 @@ func (b *BaseProvider) SetKeyResolver(resolver APIKeyResolver) {
 	b.KeyResolver = resolver
 }
 
+// SetAPIKey updates the static API key on the provider.
+// This allows hot-updating a registered provider's key without restart.
+func (b *BaseProvider) SetAPIKey(key string) {
+	b.APIKey = key
+}
+
 // DoRequest executes an HTTP request with standard headers and error handling.
 func (b *BaseProvider) DoRequest(ctx context.Context, method, path string, body io.Reader, extraHeaders map[string]string) (*http.Response, error) {
 	url := b.BaseURL + path
@@ -86,6 +93,7 @@ func (b *BaseProvider) DoRequest(ctx context.Context, method, path string, body 
 func (b *BaseProvider) StreamSSE(ctx context.Context, resp *http.Response, ch chan<- string) {
 	defer resp.Body.Close()
 	scanner := bufio.NewScanner(resp.Body)
+	gotData := false
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
@@ -95,13 +103,24 @@ func (b *BaseProvider) StreamSSE(ctx context.Context, resp *http.Response, ch ch
 
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
+			// Log non-empty, non-SSE lines — these are often API error responses
+			// that would otherwise be silently dropped.
+			if line != "" && !strings.HasPrefix(line, ":") && !strings.HasPrefix(line, "event:") && !strings.HasPrefix(line, "id:") && !strings.HasPrefix(line, "retry:") {
+				slog.Warn("non-SSE line in stream response",
+					"provider", b.Name, "line", line)
+			}
 			continue
 		}
 		data := strings.TrimPrefix(line, "data: ")
 		if data == "[DONE]" {
 			return
 		}
+		gotData = true
 		ch <- data
+	}
+	if !gotData {
+		slog.Warn("SSE stream closed with zero data lines",
+			"provider", b.Name, "status", resp.StatusCode)
 	}
 }
 

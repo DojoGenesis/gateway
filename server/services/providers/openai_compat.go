@@ -215,7 +215,23 @@ func (p *openaiCompatibleProvider) GenerateEmbedding(ctx context.Context, text s
 func convertToOAIMessages(msgs []provider.Message) []oaiMessage {
 	result := make([]oaiMessage, len(msgs))
 	for i, m := range msgs {
-		result[i] = oaiMessage{Role: m.Role, Content: m.Content, ToolCallID: m.ToolCallID}
+		msg := oaiMessage{Role: m.Role, Content: m.Content, ToolCallID: m.ToolCallID}
+		// Convert provider.ToolCall to OpenAI format so assistant messages
+		// that invoked tools include the tool_calls array. Without this,
+		// subsequent "tool" role messages are rejected by the API.
+		if len(m.ToolCalls) > 0 {
+			msg.ToolCalls = make([]oaiToolCall, len(m.ToolCalls))
+			for j, tc := range m.ToolCalls {
+				argsJSON, _ := json.Marshal(tc.Arguments)
+				msg.ToolCalls[j] = oaiToolCall{
+					ID:   tc.ID,
+					Type: "function",
+				}
+				msg.ToolCalls[j].Function.Name = tc.Name
+				msg.ToolCalls[j].Function.Arguments = string(argsJSON)
+			}
+		}
+		result[i] = msg
 	}
 	return result
 }

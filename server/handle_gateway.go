@@ -25,6 +25,7 @@ import (
 	"github.com/DojoGenesis/gateway/pkg/reflection"
 	"github.com/DojoGenesis/gateway/pkg/validation"
 	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/server/services/providers"
 	"github.com/DojoGenesis/gateway/server/streaming"
 )
 
@@ -290,6 +291,8 @@ func (s *Server) buildToolList(ctx context.Context) []provider.Tool {
 type agentChatRequest struct {
 	Message         string `json:"message" binding:"required"`
 	UserID          string `json:"user_id"`
+	Model           string `json:"model,omitempty"`
+	Provider        string `json:"provider,omitempty"`
 	DocumentID      string `json:"document_id,omitempty"`
 	DocumentContent string `json:"document_content,omitempty"`
 	Stream          bool   `json:"stream"`
@@ -352,12 +355,21 @@ func (s *Server) handleGatewayAgentChatStream(c *gin.Context, agentID string, re
 		return
 	}
 
-	llmProvider, err := s.resolveProvider("")
-	if err != nil {
-		s.writeSSEEvent(c.Writer, flusher, events.NewErrorEvent(err.Error(), "PROVIDER_ERROR"))
-		fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
-		flusher.Flush()
-		return
+	var llmProvider provider.ModelProvider
+	var err error
+	if req.Provider != "" {
+		if prov, ok := s.pluginManager.GetProviders()[req.Provider]; ok {
+			llmProvider = prov
+		}
+	}
+	if llmProvider == nil {
+		llmProvider, err = s.resolveProvider(req.Model)
+		if err != nil {
+			s.writeSSEEvent(c.Writer, flusher, events.NewErrorEvent(err.Error(), "PROVIDER_ERROR"))
+			fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
+			flusher.Flush()
+			return
+		}
 	}
 
 	systemPrompt := s.buildAgentSystemPrompt(agentConfig, req.DocumentID, req.DocumentContent)
@@ -658,11 +670,20 @@ func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 
 	// ── Non-streaming path ──────────────────────────────────────────────────
 
-	// Resolve the LLM provider (empty model = use first available/default)
-	llmProvider, err := s.resolveProvider("")
-	if err != nil {
-		s.errorResponse(c, http.StatusServiceUnavailable, "provider_unavailable", fmt.Sprintf("No LLM provider available: %v", err))
-		return
+	// Resolve the LLM provider — honour explicit provider/model from request.
+	var llmProvider provider.ModelProvider
+	var err error
+	if req.Provider != "" {
+		if prov, ok := s.pluginManager.GetProviders()[req.Provider]; ok {
+			llmProvider = prov
+		}
+	}
+	if llmProvider == nil {
+		llmProvider, err = s.resolveProvider(req.Model)
+		if err != nil {
+			s.errorResponse(c, http.StatusServiceUnavailable, "provider_unavailable", fmt.Sprintf("No LLM provider available: %v", err))
+			return
+		}
 	}
 
 	systemPrompt := s.buildAgentSystemPrompt(agentConfig, req.DocumentID, req.DocumentContent)
@@ -1006,16 +1027,9 @@ func (s *Server) handleSetProviderKey(c *gin.Context) {
 	} else {
 		keys[req.Provider] = req.Key
 
-		// Apply the key to the live provider immediately when possible
+		// Hot-register the provider immediately so it is available without restart.
 		if s.pluginManager != nil {
-			if prov, ok := s.pluginManager.GetProviders()[req.Provider]; ok {
-				type keySettable interface {
-					SetAPIKey(string)
-				}
-				if ks, ok := prov.(keySettable); ok {
-					ks.SetAPIKey(req.Key)
-				}
-			}
+			s.hotRegisterProvider(req.Provider, req.Key)
 		}
 	}
 
@@ -1031,6 +1045,44 @@ func (s *Server) handleSetProviderKey(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"ok": true, "provider": req.Provider, "configured": req.Key != ""})
+}
+
+// hotRegisterProvider creates and registers a cloud provider with the given key.
+// If the provider is already registered, its BaseProvider.APIKey is updated in place.
+// This allows the gateway to activate cloud providers at runtime without a restart.
+func (s *Server) hotRegisterProvider(name, apiKey string) {
+	// Map provider name → factory function (same mapping as RegisterProviders in services).
+	type factory func(string) provider.ModelProvider
+	factories := map[string]factory{
+		"anthropic":    func(k string) provider.ModelProvider { return providers.NewAnthropicProvider(k) },
+		"openai":       func(k string) provider.ModelProvider { return providers.NewOpenAIProvider(k) },
+		"google":       func(k string) provider.ModelProvider { return providers.NewGoogleProvider(k) },
+		"groq":         func(k string) provider.ModelProvider { return providers.NewGroqProvider(k) },
+		"mistral":      func(k string) provider.ModelProvider { return providers.NewMistralProvider(k) },
+		"deepseek-api": func(k string) provider.ModelProvider { return providers.NewDeepSeekProvider(k) },
+		"kimi":         func(k string) provider.ModelProvider { return providers.NewKimiProvider(k) },
+	}
+
+	// If already registered, update the key directly via BaseProvider.
+	if existing, ok := s.pluginManager.GetProviders()[name]; ok {
+		type keyUpdater interface {
+			SetAPIKey(string)
+		}
+		if ku, ok := existing.(keyUpdater); ok {
+			ku.SetAPIKey(apiKey)
+		}
+		// Whether or not SetAPIKey exists, the key is now in the persistent store.
+		// BaseProvider.ResolveAPIKey will pick it up from env if needed.
+		return
+	}
+
+	// Provider not yet registered — create it and register it now.
+	f, known := factories[name]
+	if !known {
+		return // unknown provider name; nothing to do
+	}
+	p := f(apiKey)
+	s.pluginManager.RegisterProvider(name, p)
 }
 
 // handleGetProviderSettings returns which providers have keys configured (no key values).

@@ -88,7 +88,7 @@ func Load() *Config {
 
 func loadDefaults() *Config {
 	return &Config{
-		Port:           "7340",
+		Port:           "8080",
 		AllowedOrigins: []string{"http://localhost:3000", "http://localhost:3003"},
 		Environment:    "development",
 		PluginDir:      "plugins",

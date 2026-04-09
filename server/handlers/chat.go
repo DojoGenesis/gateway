@@ -64,6 +64,7 @@ func (h *ChatHandler) SetDB(db database.DatabaseAdapter) {
 type ChatRequest struct {
 	Message   string `json:"message"`
 	Model     string `json:"model,omitempty"`
+	Provider  string `json:"provider,omitempty"`
 	Stream    bool   `json:"stream"`
 	SessionID string `json:"session_id"`
 	UserID    string `json:"user_id,omitempty"`
@@ -121,6 +122,13 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 
 	// Use new routing system
 	decision := h.classifier.Route(req.Message)
+
+	// If the request explicitly specifies a provider, honour it — this overrides the
+	// intent classifier's provider selection while preserving its handler/category logic.
+	if req.Provider != "" && h.isProviderLoaded(req.Provider) {
+		slog.Info("explicit provider from request", "provider", req.Provider)
+		decision.Provider = req.Provider
+	}
 
 	// Structured logging for routing decisions
 	slog.Info("intent classified",
@@ -500,8 +508,37 @@ func (h *ChatHandler) selectProviderWithRouting(userID, model string, decision a
 			if err == nil {
 				return providerName, model, nil
 			}
-			// Model not found in any provider — clear model so provider uses its default
-			slog.Warn("model not found in any provider, will use provider default", "model", model)
+			// Model not found in any provider's list — try prefix-based provider inference
+			// so users can pass short-form IDs like "claude-sonnet-4-6" without needing
+			// them in the ListModels registry.
+			slog.Warn("model not found in any provider, attempting prefix inference", "model", model)
+
+			lowerModel := strings.ToLower(model)
+			prefixToProvider := map[string]string{
+				"claude-":     "anthropic",
+				"gpt-":        "openai",
+				"o1-":         "openai",
+				"o3":          "openai",
+				"o4-":         "openai",
+				"chatgpt-":    "openai",
+				"gemini-":     "google",
+				"llama-":      "groq",
+				"mixtral-":    "groq",
+				"mistral-":    "mistral",
+				"codestral-":  "mistral",
+				"deepseek-":   "deepseek",
+				"moonshot-":   "kimi",
+				"kimi-":       "kimi",
+			}
+			for prefix, provName := range prefixToProvider {
+				if strings.HasPrefix(lowerModel, prefix) {
+					if h.isProviderLoaded(provName) {
+						slog.Info("model matched by prefix inference", "model", model, "provider", provName)
+						return provName, model, nil
+					}
+				}
+			}
+			slog.Warn("prefix inference found no loaded provider, falling through to intent classifier", "model", model)
 		}
 	}
 
@@ -520,6 +557,16 @@ func (h *ChatHandler) selectProviderWithRouting(userID, model string, decision a
 
 	// Final fallback: empty string (default provider)
 	return "", "", nil
+}
+
+// isProviderLoaded returns true if the named provider is currently registered
+// and reachable in the plugin manager.
+func (h *ChatHandler) isProviderLoaded(name string) bool {
+	if h.pluginMgr == nil {
+		return false
+	}
+	_, err := h.pluginMgr.GetProvider(name)
+	return err == nil
 }
 
 // getUserTier determines the user tier based on user ID.

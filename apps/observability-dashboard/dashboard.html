@@ -96,6 +96,45 @@ body { font-family: var(--font); background: var(--bg); color: var(--fg); line-h
 /* Connection banner */
 .disconnected { background: var(--red); color: #fff; text-align: center; padding: 4px; font-size: 11px; display: none; }
 .disconnected.show { display: block; }
+
+/* Settings gear */
+.settings-btn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--dim); cursor: pointer; padding: 4px 8px; font-size: 14px; line-height: 1; transition: color 0.2s, border-color 0.2s; }
+.settings-btn:hover { color: var(--fg); border-color: var(--accent); }
+
+/* Ingest status pill */
+.pill.ingest { border-color: var(--dim); color: var(--dim); font-size: 10px; }
+.pill.ingest.active { border-color: var(--green); color: var(--green); }
+.pill.ingest.error { border-color: var(--yellow); color: var(--yellow); }
+
+/* History panel */
+.history-panel { padding: 16px; overflow-y: auto; height: calc(100% - 40px); }
+.history-section { margin-bottom: 24px; }
+.history-section h3 { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+
+/* Cost trend chart */
+.cost-chart { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-bottom: 20px; position: relative; }
+.cost-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+.cost-bar { width: 100%; min-height: 2px; background: var(--accent); border-radius: 2px 2px 0 0; opacity: 0.8; transition: height 0.3s; }
+.cost-bar-label { font-size: 9px; color: var(--dim); font-family: var(--mono); margin-top: 4px; }
+.cost-bar-value { font-size: 9px; color: var(--fg); font-family: var(--mono); margin-bottom: 2px; }
+
+/* Tool success rate table */
+.history-table { width: 100%; border-collapse: collapse; font-size: 11px; font-family: var(--mono); }
+.history-table th { text-align: left; color: var(--dim); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 10px; text-transform: uppercase; }
+.history-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.history-table .tool-name { color: var(--accent); }
+.history-table .success-high { color: var(--green); }
+.history-table .success-mid { color: var(--yellow); }
+.history-table .success-low { color: var(--red); }
+
+/* Session list */
+.session-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 4px; font-size: 11px; font-family: var(--mono); }
+.session-item .session-id { color: var(--accent); overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.session-item .session-meta { color: var(--dim); display: flex; gap: 12px; }
+.session-item .session-cost { color: var(--fg); }
+
+/* Loading/empty states for history */
+.history-loading { color: var(--dim); font-size: 12px; padding: 20px; text-align: center; }
 </style>
 </head>
 <body>
@@ -108,6 +147,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--fg); line-h
       <span class="pill live" id="pill-agents">Agents: 0</span>
       <span class="pill" id="pill-dags">DAGs: 0</span>
       <span class="pill" id="pill-budget">Budget: --%</span>
+      <span class="pill ingest" id="pill-ingest">D1: idle</span>
+      <button class="settings-btn" onclick="openSettings()" title="Telemetry API settings">&#9881;</button>
     </div>
   </div>
 
@@ -152,10 +193,25 @@ body { font-family: var(--font); background: var(--bg); color: var(--fg); line-h
       <span class="tab active" onclick="switchView('dag')">DAG</span>
       <span class="tab" onclick="switchView('tokens')">Tokens</span>
       <span class="tab" onclick="switchView('latency')">Latency</span>
+      <span class="tab" onclick="switchView('history')">History</span>
     </div>
     <div id="view-dag" class="dag-canvas"></div>
     <div id="view-tokens" class="chart-area" style="display:none"></div>
     <div id="view-latency" class="chart-area" style="display:none"></div>
+    <div id="view-history" class="history-panel" style="display:none">
+      <div class="history-section">
+        <h3>7-Day Cost Trend</h3>
+        <div id="history-cost-chart" class="cost-chart"><div class="history-loading">Loading cost data...</div></div>
+      </div>
+      <div class="history-section">
+        <h3>Tool Success Rates</h3>
+        <div id="history-tools-table"><div class="history-loading">Loading tool data...</div></div>
+      </div>
+      <div class="history-section">
+        <h3>Recent Sessions</h3>
+        <div id="history-sessions-list"><div class="history-loading">Loading sessions...</div></div>
+      </div>
+    </div>
   </div>
 
   <!-- Bottom Panel: Event Feed -->
@@ -180,6 +236,133 @@ const state = {
   maxFeedLines: 200,
 };
 
+// ─── Telemetry API Config ────────────────────────────────────────────
+const TELEMETRY_API = localStorage.getItem('dojo-telemetry-api') || 'https://dojo-chat.trespiesdesign.workers.dev';
+
+// ─── D1 Ingest Bridge ───────────────────────────────────────────────
+let ingestBuffer = [];
+let sessionId = null;
+let ingestFlushTimer = null;
+let ingestStats = { sent: 0, failed: 0 };
+
+async function telemetryFetch(path) {
+  try {
+    const res = await fetch(`${TELEMETRY_API}${path}`, { mode: 'cors' });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+async function flushIngestBuffer() {
+  if (ingestBuffer.length === 0) return;
+  const batch = ingestBuffer.splice(0, ingestBuffer.length);
+  const pill = document.getElementById('pill-ingest');
+  try {
+    const res = await fetch(`${TELEMETRY_API}/api/telemetry/ingest`, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, events: batch })
+    });
+    if (res.ok) {
+      ingestStats.sent += batch.length;
+      pill.textContent = `D1: ${ingestStats.sent}`;
+      pill.className = 'pill ingest active';
+    } else {
+      ingestStats.failed += batch.length;
+      pill.textContent = `D1: err ${res.status}`;
+      pill.className = 'pill ingest error';
+    }
+  } catch (err) {
+    ingestStats.failed += batch.length;
+    pill.textContent = 'D1: offline';
+    pill.className = 'pill ingest error';
+    console.warn('[ingest] flush failed:', err.message);
+  }
+}
+
+function pushToIngestBuffer(evt) {
+  ingestBuffer.push({ type: evt.type || '', data: evt.data || {}, ts: Date.now() });
+  if (ingestBuffer.length >= 50) flushIngestBuffer();
+}
+
+function startIngestTimer() {
+  if (ingestFlushTimer) clearInterval(ingestFlushTimer);
+  ingestFlushTimer = setInterval(flushIngestBuffer, 5000);
+}
+
+// ─── Settings ────────────────────────────────────────────────────────
+function openSettings() {
+  const current = localStorage.getItem('dojo-telemetry-api') || TELEMETRY_API;
+  const newUrl = prompt('Telemetry API Base URL:', current);
+  if (newUrl !== null && newUrl.trim() !== '') {
+    localStorage.setItem('dojo-telemetry-api', newUrl.trim());
+    alert('Telemetry API updated. Reload the dashboard to apply.');
+  }
+}
+
+// ─── History Panel Renderers ─────────────────────────────────────────
+async function loadHistoryData() {
+  const [costs, tools, sessions] = await Promise.all([
+    telemetryFetch('/api/telemetry/costs?range=7d'),
+    telemetryFetch('/api/telemetry/tools?range=7d'),
+    telemetryFetch('/api/telemetry/sessions?limit=20')
+  ]);
+  renderCostTrend(costs);
+  renderToolTable(tools);
+  renderSessionList(sessions);
+}
+
+function renderCostTrend(data) {
+  const container = document.getElementById('history-cost-chart');
+  if (!data || !data.days || data.days.length === 0) {
+    container.innerHTML = '<div class="history-loading">No cost data available</div>';
+    return;
+  }
+  const maxCost = Math.max(...data.days.map(d => d.cost), 0.01);
+  container.innerHTML = '';
+  data.days.forEach(day => {
+    const wrap = document.createElement('div');
+    wrap.className = 'cost-bar-wrap';
+    const pct = Math.max(2, (day.cost / maxCost) * 100);
+    wrap.innerHTML = `<span class="cost-bar-value">$${day.cost.toFixed(2)}</span><div class="cost-bar" style="height:${pct}%"></div><span class="cost-bar-label">${day.label || day.date}</span>`;
+    container.appendChild(wrap);
+  });
+}
+
+function renderToolTable(data) {
+  const container = document.getElementById('history-tools-table');
+  if (!data || !data.tools || data.tools.length === 0) {
+    container.innerHTML = '<div class="history-loading">No tool data available</div>';
+    return;
+  }
+  let html = '<table class="history-table"><thead><tr><th>Tool</th><th>Calls</th><th>Avg Latency</th><th>Success</th></tr></thead><tbody>';
+  data.tools.forEach(t => {
+    const pct = t.success_rate != null ? t.success_rate : (t.calls > 0 ? Math.round(((t.calls - (t.errors || 0)) / t.calls) * 100) : 100);
+    const cls = pct >= 95 ? 'success-high' : pct >= 80 ? 'success-mid' : 'success-low';
+    html += `<tr><td class="tool-name">${t.name}</td><td>${t.calls}</td><td>${t.avg_latency_ms || 0}ms</td><td class="${cls}">${pct}%</td></tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function renderSessionList(data) {
+  const container = document.getElementById('history-sessions-list');
+  if (!data || !data.sessions || data.sessions.length === 0) {
+    container.innerHTML = '<div class="history-loading">No session data available</div>';
+    return;
+  }
+  container.innerHTML = '';
+  data.sessions.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'session-item';
+    const idShort = (s.session_id || s.id || '').substring(0, 12);
+    const ts = s.created_at ? new Date(s.created_at).toLocaleDateString() : '';
+    el.innerHTML = `<span class="session-id" title="${s.session_id || s.id || ''}">${idShort}...</span><span class="session-meta"><span>${s.tool_calls || 0} calls</span><span class="session-cost">$${(s.total_cost || 0).toFixed(3)}</span><span>${ts}</span></span>`;
+    container.appendChild(el);
+  });
+}
+
 // ─── SSE Connection ──────────────────────────────────────────────────
 let evtSource = null;
 let reconnectTimer = null;
@@ -193,6 +376,8 @@ function connect() {
     state.connected = true;
     document.getElementById('conn-banner').classList.remove('show');
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    if (!sessionId) sessionId = crypto.randomUUID();
+    startIngestTimer();
   };
 
   evtSource.onmessage = (e) => {
@@ -234,6 +419,7 @@ function handleEvent(evt) {
   addFeedLine(type, data);
   updateKPIs();
   updateToolList();
+  pushToIngestBuffer(evt);
 }
 
 // ─── Event Handlers ──────────────────────────────────────────────────
@@ -349,7 +535,7 @@ function renderLatencyChart() {
 
 function switchView(view) {
   state.activeView = view;
-  ['dag', 'tokens', 'latency'].forEach(v => {
+  ['dag', 'tokens', 'latency', 'history'].forEach(v => {
     document.getElementById(`view-${v}`).style.display = v === view ? '' : 'none';
   });
   document.querySelectorAll('.panel-title .tab').forEach(t => {
@@ -358,6 +544,7 @@ function switchView(view) {
   if (view === 'dag') renderDAG();
   else if (view === 'tokens') renderTokenChart();
   else if (view === 'latency') renderLatencyChart();
+  else if (view === 'history') loadHistoryData();
 }
 
 function addFeedLine(type, data) {
@@ -463,6 +650,9 @@ function runDemo() {
 
 // ─── Init ────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // Generate session ID upfront (SSE onopen will also set it, but demo mode needs it early)
+  if (!sessionId) sessionId = crypto.randomUUID();
+  startIngestTimer();
   // Try SSE, fall back to demo
   try { connect(); } catch(e) { /* will auto-reconnect */ }
   // Run demo after short delay if no events received

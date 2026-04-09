@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -318,9 +319,18 @@ func (s *Server) resolveProvider(model string) (provider.ModelProvider, error) {
 		return nil, fmt.Errorf("no plugin manager configured")
 	}
 
-	// Try each provider to find one that has the requested model
+	// If model is empty, use the first available provider.
+	if model == "" {
+		providers := s.pluginManager.GetProviders()
+		for _, prov := range providers {
+			return prov, nil
+		}
+		return nil, fmt.Errorf("no providers available")
+	}
+
+	// Step 1: Exact model match — ask each provider if it has this model.
 	providers := s.pluginManager.GetProviders()
-	for name, prov := range providers {
+	for _, prov := range providers {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		models, err := prov.ListModels(ctx)
 		cancel()
@@ -332,11 +342,30 @@ func (s *Server) resolveProvider(model string) (provider.ModelProvider, error) {
 				return prov, nil
 			}
 		}
-		// If model not found by exact match, check if provider name matches model prefix
-		_ = name
 	}
 
-	// Fallback: try using the first available provider
+	// Step 2: Model-prefix-to-provider inference.
+	lowerModel := strings.ToLower(model)
+	prefixMap := map[string][]string{
+		"anthropic": {"claude-"},
+		"openai":    {"gpt-", "o1-", "o3", "o4-", "chatgpt-"},
+		"google":    {"gemini-"},
+		"groq":      {"llama-", "mixtral-"},
+		"mistral":   {"mistral-", "codestral-"},
+		"deepseek":  {"deepseek-"},
+		"kimi":      {"moonshot-", "kimi-"},
+	}
+	for providerName, prefixes := range prefixMap {
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(lowerModel, prefix) {
+				if prov, ok := providers[providerName]; ok {
+					return prov, nil
+				}
+			}
+		}
+	}
+
+	// Step 3: Fallback — try the first available provider.
 	for _, prov := range providers {
 		return prov, nil
 	}
