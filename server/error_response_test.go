@@ -50,7 +50,7 @@ func newTestServer() (*Server, *gin.Engine) {
 	})
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),

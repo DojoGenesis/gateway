@@ -12,7 +12,7 @@ import (
 func TestLoadDefaults(t *testing.T) {
 	cfg := loadDefaults()
 
-	assert.Equal(t, "8080", cfg.Port)
+	assert.Equal(t, "7340", cfg.Port)
 	assert.Equal(t, []string{"http://localhost:3000", "http://localhost:3003"}, cfg.AllowedOrigins)
 	assert.Equal(t, "development", cfg.Environment)
 	assert.Equal(t, "plugins", cfg.PluginDir)
@@ -219,7 +219,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "valid config",
 			config: &Config{
-				Port:      "8080",
+				Port:      "7340",
 				PluginDir: "plugins",
 				Providers: []ProviderConfig{
 					{Name: "mock", PluginPath: "plugins/mock"},
@@ -247,7 +247,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "empty plugin_dir",
 			config: &Config{
-				Port:      "8080",
+				Port:      "7340",
 				PluginDir: "",
 			},
 			expectErr: true,
@@ -256,7 +256,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "origin missing scheme",
 			config: &Config{
-				Port:           "8080",
+				Port:           "7340",
 				PluginDir:      "plugins",
 				AllowedOrigins: []string{"localhost:3000"},
 			},
@@ -266,7 +266,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "wildcard origin is valid",
 			config: &Config{
-				Port:           "8080",
+				Port:           "7340",
 				PluginDir:      "plugins",
 				AllowedOrigins: []string{"*"},
 			},
@@ -275,7 +275,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "https origin is valid",
 			config: &Config{
-				Port:           "8080",
+				Port:           "7340",
 				PluginDir:      "plugins",
 				AllowedOrigins: []string{"https://example.com"},
 			},
@@ -284,7 +284,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "mcp_apps origin missing scheme",
 			config: &Config{
-				Port:      "8080",
+				Port:      "7340",
 				PluginDir: "plugins",
 				MCPApps: MCPAppsConfig{
 					AllowedOrigins: []string{"example.com"},
@@ -296,7 +296,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "duplicate provider names",
 			config: &Config{
-				Port:      "8080",
+				Port:      "7340",
 				PluginDir: "plugins",
 				Providers: []ProviderConfig{
 					{Name: "mock", PluginPath: "plugins/mock"},
@@ -309,7 +309,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "empty provider name",
 			config: &Config{
-				Port:      "8080",
+				Port:      "7340",
 				PluginDir: "plugins",
 				Providers: []ProviderConfig{
 					{Name: "", PluginPath: "plugins/mock"},
@@ -321,7 +321,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "empty plugin path",
 			config: &Config{
-				Port:      "8080",
+				Port:      "7340",
 				PluginDir: "plugins",
 				Providers: []ProviderConfig{
 					{Name: "mock", PluginPath: ""},
@@ -333,7 +333,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "invalid default_provider",
 			config: &Config{
-				Port:      "8080",
+				Port:      "7340",
 				PluginDir: "plugins",
 				Providers: []ProviderConfig{
 					{Name: "mock", PluginPath: "plugins/mock"},
@@ -348,7 +348,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "invalid guest_provider",
 			config: &Config{
-				Port:      "8080",
+				Port:      "7340",
 				PluginDir: "plugins",
 				Providers: []ProviderConfig{
 					{Name: "mock", PluginPath: "plugins/mock"},
@@ -363,7 +363,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "negative query_limit",
 			config: &Config{
-				Port:      "8080",
+				Port:      "7340",
 				PluginDir: "plugins",
 				Providers: []ProviderConfig{
 					{Name: "mock", PluginPath: "plugins/mock"},
@@ -398,7 +398,7 @@ func TestLoad(t *testing.T) {
 	defer os.Unsetenv("CONFIG_PATH")
 
 	cfg := Load()
-	assert.Equal(t, "8080", cfg.Port)
+	assert.Equal(t, "7340", cfg.Port)
 	assert.Equal(t, "plugins", cfg.PluginDir)
 }
 
@@ -502,7 +502,7 @@ func TestValidateAutoRoutingWithProviders(t *testing.T) {
 	// "auto" is a special keyword that should always be valid, even when
 	// providers are configured and "auto" isn't one of their names.
 	cfg := &Config{
-		Port:      "8080",
+		Port:      "7340",
 		PluginDir: "plugins",
 		Providers: []ProviderConfig{
 			{Name: "ollama", Enabled: true, PluginPath: "ollama/ollama"},
@@ -526,7 +526,7 @@ func TestValidateAutoRoutingWithProviders(t *testing.T) {
 
 func TestValidationWithMixedEnabledProviders(t *testing.T) {
 	cfg := &Config{
-		Port:      "8080",
+		Port:      "7340",
 		PluginDir: "plugins",
 		Providers: []ProviderConfig{
 			{Name: "enabled", Enabled: true, PluginPath: "plugins/enabled"},

@@ -70,7 +70,7 @@ func TestAgentLifecycle_CreateAndRetrieve(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
@@ -121,7 +121,7 @@ func TestDAGRetrieval_WithPlan(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
@@ -200,7 +200,7 @@ func TestHealthEndpoint_BasicResponse(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		startTime:      time.Now().Add(-10 * time.Second),
@@ -233,7 +233,7 @@ func TestModelsEndpoint_NoProviders(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
@@ -262,7 +262,7 @@ func TestToolsEndpoint_ListTools(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
@@ -291,7 +291,7 @@ func TestAdminHealth_BasicResponse(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		startTime:      time.Now(),
@@ -320,7 +320,7 @@ func TestAdminConfig_BasicResponse(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:            "8080",
+			Port:            "7340",
 			Environment:     "test",
 			AuthMode:        "api_key",
 			ShutdownTimeout: 30 * time.Second,
@@ -343,7 +343,7 @@ func TestAdminConfig_BasicResponse(t *testing.T) {
 
 	serverConf, ok := resp["server"].(map[string]interface{})
 	require.True(t, ok)
-	assert.Equal(t, "8080", serverConf["port"])
+	assert.Equal(t, "7340", serverConf["port"])
 	assert.Equal(t, "test", serverConf["environment"])
 }
 
@@ -352,7 +352,7 @@ func TestAdminMetrics_PrometheusFormat(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		startTime:      time.Now(),
@@ -386,7 +386,7 @@ func TestMemoryStore_InvalidContextType(t *testing.T) {
 	// Since we don't have one, we test the nil-check path instead.
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),

@@ -7,7 +7,7 @@
 // Usage:
 //
 //	logging.Init("production")
-//	slog.Info("server starting", "port", 8080)
+//	slog.Info("server starting", "port", 7340)
 package logging
 
 import (

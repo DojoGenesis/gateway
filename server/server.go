@@ -30,6 +30,7 @@ import (
 	"github.com/DojoGenesis/gateway/server/middleware"
 	"github.com/DojoGenesis/gateway/server/services"
 	"github.com/DojoGenesis/gateway/server/trace"
+	"github.com/DojoGenesis/gateway/specialist"
 )
 
 const Version = "1.1.0"
@@ -123,6 +124,10 @@ type Server struct {
 
 	// WebSocket hub for real-time workflow execution events (Era 3)
 	wsHub *WorkflowWSHub
+
+	// Specialist dispatch (Phase 2): routes requests to specialist agents
+	// based on intent classification. Nil means specialist dispatch is disabled.
+	specialistRouter *specialist.Router
 }
 
 // New creates a new Server with all dependencies injected.
@@ -130,7 +135,7 @@ func New(deps ServerDeps) *Server {
 	cfg := deps.Config
 	if cfg == nil {
 		cfg = &ServerConfig{
-			Port:            "8080",
+			Port:            "7340",
 			AllowedOrigins:  []string{"http://localhost:3000"},
 			AuthMode:        "api_key",
 			Environment:     "production",
@@ -179,6 +184,7 @@ func New(deps ServerDeps) *Server {
 		orchestrations:        NewOrchestrationStore(),
 		agents:                make(map[string]*AgentRuntime),
 		workflowCAS:           deps.WorkflowCAS,
+		specialistRouter:      deps.SpecialistRouter,
 		execBus:               newExecutionBus(),
 		latencyTracker:        services.NewProviderLatencyTracker(60),
 		wsHub:                 NewWorkflowWSHub(),

@@ -20,7 +20,7 @@ func TestSSEStreamingLifecycle(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
@@ -118,7 +118,7 @@ func TestSSEStreamingLifecycle_CompletedOrchestration(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),
@@ -174,7 +174,7 @@ func TestSSEStreamingLifecycle_NotFound(t *testing.T) {
 
 	s := &Server{
 		cfg: &ServerConfig{
-			Port:        "8080",
+			Port:        "7340",
 			Environment: "test",
 		},
 		orchestrations: NewOrchestrationStore(),

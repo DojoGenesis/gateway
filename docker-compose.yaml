@@ -10,10 +10,10 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "7340:7340"
     environment:
       # Server configuration
-      PORT: "8080"
+      PORT: "7340"
       ENVIRONMENT: "production"
 
       # MCP configuration

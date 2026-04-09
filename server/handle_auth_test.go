@@ -67,7 +67,7 @@ func newAuthTestServer(t *testing.T) (*Server, *gin.Engine) {
 	s := &Server{
 		router: router,
 		cfg: &ServerConfig{
-			Port:            "8080",
+			Port:            "7340",
 			Environment:     "test",
 			AccessTokenTTL:  24 * time.Hour,
 			RefreshTokenTTL: 7 * 24 * time.Hour,

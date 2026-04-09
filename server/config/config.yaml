@@ -1,7 +1,7 @@
 # AgenticGateway v1.0.0 Configuration
 
 # Server settings
-port: "8080"
+port: "7340"
 python_backend_url: "http://localhost:8001"
 environment: "development"
 plugin_dir: "plugins"
