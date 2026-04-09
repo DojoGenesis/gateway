@@ -1,7 +1,7 @@
 ---
 name: workspace-navigation
 model: sonnet
-description: Produces correct file placement, frontmatter, and navigation paths for shared agent workspaces. Use when: "organize this in the workspace", "where does this belong in the structure", "find the decision that answers this", "set up a collaboration repo".
+description: "Produces correct file placement, frontmatter, and navigation paths for shared agent workspaces. Use when: 'organize this in the workspace', 'where does this belong in the structure', 'find the decision that answers this', 'set up a collaboration repo'."
 triggers:
   - "organize this in the workspace"
   - "where does this belong in the structure"
@@ -12,7 +12,7 @@ metadata:
   version: "1.1"
   created: "2026-02-02"
   author: "Manus"
-  tool_dependencies: ["Read", "Glob", "Grep", "Write"]
+  tool_dependencies: ["file_system"]
   portable: true
   tier: 2
   agents: ["agent-orchestration"]

@@ -3,6 +3,16 @@ name: release-specification
 model: opus
 description: Produces a production-ready release specification document (Full or Lean format) including current-state audit, technical architecture with code examples, implementation plan, and risk assessment. Use when 'write a release spec', 'create a release specification for vX.X.X', or 'ground this spec in the codebase'.
 category: specification-driven-development
+triggers:
+  - "write a release spec"
+  - "create a release specification"
+  - "ground this spec in the codebase"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
+  - "bash"
 
 inputs:
   - name: release_context

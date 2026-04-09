@@ -1,8 +1,19 @@
 ---
 name: repo-status
 model: sonnet
-description: Produces a comprehensive `.status.md` status document combining filesystem exploration, semantic clusters, file importance ranking, and health assessment — a single artifact any agent or human can use as the starting point for a project. Use when: "give me a complete repo overview", "understand this codebase", "create a system map", "build a mental model", "prepare a handoff document".
+description: "Produces a comprehensive `.status.md` status document combining filesystem exploration, semantic clusters, file importance ranking, and health assessment — a single artifact any agent or human can use as the starting point for a project. Use when: 'give me a complete repo overview', 'understand this codebase', 'create a system map', 'build a mental model', 'prepare a handoff document'."
 category: system-health
+triggers:
+  - "give me a complete repo overview"
+  - "understand this codebase"
+  - "create a system map"
+  - "build a mental model"
+  - "prepare a handoff document"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: repo_path

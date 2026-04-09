@@ -1,8 +1,21 @@
 ---
 name: skill-maintenance
 model: sonnet
-description: Produces a maintained skills directory with updated names, unified terminology, repaired cross-references, and a git commit documenting every change and what was preserved. Use when: "update these skill names", "refactor the skills directory", "clean up skill references", "rename this skill", "audit the skills ecosystem", "deprecate this skill", "add version history to a skill".
+description: "Produces a maintained skills directory with updated names, unified terminology, repaired cross-references, and a git commit documenting every change and what was preserved. Use when: 'update these skill names', 'refactor the skills directory', 'clean up skill references', 'rename this skill', 'audit the skills ecosystem', 'deprecate this skill', 'add version history to a skill'."
 category: skill-forge
+triggers:
+  - "update these skill names"
+  - "refactor the skills directory"
+  - "clean up skill references"
+  - "rename this skill"
+  - "audit the skills ecosystem"
+  - "deprecate this skill"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
+  - "bash"
 
 inputs:
   - name: skills_directory

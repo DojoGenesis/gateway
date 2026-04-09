@@ -1,8 +1,19 @@
 ---
 name: seed-to-skill-converter
 model: sonnet
-description: Produces a new SKILL.md file by converting a proven Dojo Seed into a fully-structured skill with philosophy, workflow, templates, and quality checklist. Use when: "promote this seed to a skill", "convert this seed into a skill", "make this seed into a skill", "formalize this pattern", "turn this seed active".
+description: "Produces a new SKILL.md file by converting a proven Dojo Seed into a fully-structured skill with philosophy, workflow, templates, and quality checklist. Use when: 'promote this seed to a skill', 'convert this seed into a skill', 'make this seed into a skill', 'formalize this pattern', 'turn this seed active'."
 category: wisdom-garden
+triggers:
+  - "promote this seed to a skill"
+  - "convert this seed into a skill"
+  - "make this seed into a skill"
+  - "formalize this pattern"
+  - "turn this seed active"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: seed_path

@@ -1,8 +1,19 @@
 ---
 name: research-synthesis
 model: sonnet
-description: Produces a unified Synthesis Document organized by themes with cross-source evidence, contradictions surfaced, and concrete recommendations. Use when: 'synthesize these research files', 'find patterns across these sources', 'consolidate my notes into insights', 'create a literature review', 'what do these sources agree and disagree on'.
+description: "Produces a unified Synthesis Document organized by themes with cross-source evidence, contradictions surfaced, and concrete recommendations. Use when: 'synthesize these research files', 'find patterns across these sources', 'consolidate my notes into insights', 'create a literature review', 'what do these sources agree and disagree on'."
 category: continuous-learning
+triggers:
+  - "synthesize these research files"
+  - "find patterns across these sources"
+  - "consolidate my notes into insights"
+  - "create a literature review"
+  - "what do these sources agree and disagree on"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: research_files

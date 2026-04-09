@@ -1,8 +1,20 @@
 ---
 name: documentation-audit
 model: sonnet
-description: Produces a committed audit log file enumerating documentation drift — inaccuracies, broken links, missing sections, and outdated information — with severity ratings and action taken. Use when: "docs seem out of date", "audit the documentation", "is the README accurate", "check for broken links", "before onboarding a new team member".
+description: "Produces a committed audit log file enumerating documentation drift — inaccuracies, broken links, missing sections, and outdated information — with severity ratings and action taken. Use when: 'docs seem out of date', 'audit the documentation', 'is the README accurate', 'check for broken links', 'before onboarding a new team member'."
 category: system-health
+triggers:
+  - "docs seem out of date"
+  - "audit the documentation"
+  - "is the README accurate"
+  - "check for broken links"
+  - "before onboarding a new team member"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
+  - "bash"
 
 inputs:
   - name: docs_path

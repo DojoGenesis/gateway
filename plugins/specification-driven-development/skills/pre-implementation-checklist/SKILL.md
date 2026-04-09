@@ -3,6 +3,16 @@ name: pre-implementation-checklist
 model: sonnet
 description: "Produces a completed pre-implementation checklist appended to a specification document, confirming vision clarity, technical readiness, implementation plan completeness, and Track 0 codebase alignment before any agent is commissioned. Use when: 'verify the spec is ready', 'run the pre-commission check', 'is this spec ready to hand off', 'gate this before we commission'."
 category: specification-driven-development
+triggers:
+  - "verify the spec is ready"
+  - "run the pre-commission check"
+  - "is this spec ready to hand off"
+  - "gate this before we commission"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: spec_path

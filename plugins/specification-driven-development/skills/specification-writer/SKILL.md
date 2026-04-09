@@ -3,6 +3,16 @@ name: specification-writer
 model: opus
 description: "Produces a format-calibrated specification document — Full (5,000-15,000 words, all sections), Lean (1,000-3,000 words, agent-ready), or Minimal (delta + code examples) — matched to the scope and audience of the request. Use when: 'write a spec for this feature', 'spec out this release', 'design the architecture for X', 'document this for the implementation agent'."
 category: specification-driven-development
+triggers:
+  - "write a spec for this feature"
+  - "spec out this release"
+  - "design the architecture for X"
+  - "document this for the implementation agent"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: feature_description

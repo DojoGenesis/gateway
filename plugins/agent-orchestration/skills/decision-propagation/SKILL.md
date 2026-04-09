@@ -1,8 +1,17 @@
 ---
 name: decision-propagation
 model: opus
-description: Produces a set of surgical edits across all documents affected by an architectural decision, plus a decisions block in STATUS.md that serves as the coherence checkpoint. Use when: 'propagate this decision through the system', 'trace where this decision echoes', 'this decision changes the scope — where else must it flow'.
+description: "Produces a set of surgical edits across all documents affected by an architectural decision, plus a decisions block in STATUS.md that serves as the coherence checkpoint. Use when: 'propagate this decision through the system', 'trace where this decision echoes', 'this decision changes the scope — where else must it flow'."
 category: agent-orchestration
+triggers:
+  - "propagate this decision through the system"
+  - "trace where this decision echoes"
+  - "this decision changes the scope where else must it flow"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: decision

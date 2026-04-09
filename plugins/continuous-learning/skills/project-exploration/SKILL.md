@@ -1,8 +1,19 @@
 ---
 name: project-exploration
 model: sonnet
-description: Produces an Exploration Brief rating a project GREEN/YELLOW/RED for collaboration fit, with architecture snapshot, resonance map, and ranked entry points. Use when: 'explore this project', 'assess this codebase', 'should we collaborate on this', 'onboard me to this repo', 'evaluate this project for fit'.
+description: "Produces an Exploration Brief rating a project GREEN/YELLOW/RED for collaboration fit, with architecture snapshot, resonance map, and ranked entry points. Use when: 'explore this project', 'assess this codebase', 'should we collaborate on this', 'onboard me to this repo', 'evaluate this project for fit'."
 category: continuous-learning
+triggers:
+  - "explore this project"
+  - "assess this codebase"
+  - "should we collaborate on this"
+  - "onboard me to this repo"
+  - "evaluate this project for fit"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: repo_path

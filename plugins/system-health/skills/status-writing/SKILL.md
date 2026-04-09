@@ -1,8 +1,19 @@
 ---
 name: status-writing
 model: sonnet
-description: Produces an updated STATUS.md file as a single source of truth for project health — covering current state, active workstreams, blockers, and next steps. Use when: "create a status file", "update the project status", "document where we are", "what's the current state", "create a status dashboard".
+description: "Produces an updated STATUS.md file as a single source of truth for project health — covering current state, active workstreams, blockers, and next steps. Use when: 'create a status file', 'update the project status', 'document where we are', 'what is the current state', 'create a status dashboard'."
 category: system-health
+triggers:
+  - "create a status file"
+  - "update the project status"
+  - "document where we are"
+  - "what is the current state"
+  - "create a status dashboard"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: project_context

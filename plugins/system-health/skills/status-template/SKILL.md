@@ -1,8 +1,19 @@
 ---
 name: status-template
 model: sonnet
-description: Produces a comprehensive `.status.md` file using a 10-section schema that bridges heartbeat (current state), anatomy (directory structure), and checkup (health assessment) perspectives into one document. Use when: "write a status report", "give me the lay of the land", "where are we right now", "prepare a handoff document", "document the current codebase state".
+description: "Produces a comprehensive `.status.md` file using a 10-section schema that bridges heartbeat (current state), anatomy (directory structure), and checkup (health assessment) perspectives into one document. Use when: 'write a status report', 'give me the lay of the land', 'where are we right now', 'prepare a handoff document', 'document the current codebase state'."
 category: system-health
+triggers:
+  - "write a status report"
+  - "give me the lay of the land"
+  - "where are we right now"
+  - "prepare a handoff document"
+  - "document the current codebase state"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: repo_path

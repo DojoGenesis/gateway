@@ -1,8 +1,19 @@
 ---
 name: retrospective
 model: opus
-description: Produces a Retrospective Document with structured reflection (what went well, what was hard, what to change) and seeds for the memory garden. Use when: 'do a retrospective', 'what did we learn from this sprint', 'reflect on this release', 'harvest the learnings', 'what went well and what was hard'.
+description: "Produces a Retrospective Document with structured reflection (what went well, what was hard, what to change) and seeds for the memory garden. Use when: 'do a retrospective', 'what did we learn from this sprint', 'reflect on this release', 'harvest the learnings', 'what went well and what was hard'."
 category: continuous-learning
+triggers:
+  - "do a retrospective"
+  - "what did we learn from this sprint"
+  - "reflect on this release"
+  - "harvest the learnings"
+  - "what went well and what was hard"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: context

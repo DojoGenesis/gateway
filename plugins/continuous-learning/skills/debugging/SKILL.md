@@ -1,8 +1,19 @@
 ---
 name: debugging
 model: sonnet
-description: Produces a Debug Report documenting root cause, fix applied, and lessons learned through systematic hypothesis testing. Use when: 'debug this error', 'why is this failing', 'investigate the issue', 'find the root cause', 'fix this bug systematically'.
+description: "Produces a Debug Report documenting root cause, fix applied, and lessons learned through systematic hypothesis testing. Use when: 'debug this error', 'why is this failing', 'investigate the issue', 'find the root cause', 'fix this bug systematically'."
 category: continuous-learning
+triggers:
+  - "debug this error"
+  - "why is this failing"
+  - "investigate the issue"
+  - "find the root cause"
+  - "fix this bug systematically"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: error_description
