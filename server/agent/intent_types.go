@@ -60,11 +60,12 @@ type IntentScore struct {
 }
 
 type RoutingDecision struct {
-	Handler    string
-	Template   string
-	Provider   string
-	Fallback   string
-	Confidence float64
-	Category   IntentCategory
-	Reasoning  []string
+	Handler           string
+	Template          string
+	Provider          string
+	Fallback          string
+	Confidence        float64
+	Category          IntentCategory
+	Reasoning         []string
+	SpecialistAgentID string // bridges category → specialist agent
 }

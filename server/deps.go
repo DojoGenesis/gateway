@@ -13,6 +13,7 @@ import (
 	"github.com/DojoGenesis/gateway/server/maintenance"
 	"github.com/DojoGenesis/gateway/server/services"
 	"github.com/DojoGenesis/gateway/server/trace"
+	"github.com/DojoGenesis/gateway/specialist"
 )
 
 // ServerDeps holds all injectable dependencies for the Server.
@@ -38,6 +39,10 @@ type ServerDeps struct {
 	MemoryStore         gateway.MemoryStore
 	AppManager          *apps.AppManager
 	AuthDB              *sql.DB
+
+	// SpecialistRouter dispatches requests to specialist agents based on
+	// intent classification. If nil, specialist dispatch is disabled.
+	SpecialistRouter *specialist.Router
 
 	// WorkflowCAS is the CAS store used for workflow definition lookup and execution.
 	// If nil, the /api/workflows/* and execution endpoints are disabled.

@@ -237,7 +237,7 @@ const state = {
 };
 
 // ─── Telemetry API Config ────────────────────────────────────────────
-const TELEMETRY_API = localStorage.getItem('dojo-telemetry-api') || 'https://dojo-chat.trespiesdesign.workers.dev';
+const TELEMETRY_API = localStorage.getItem('dojo-telemetry-api') || 'https://dojo-telemetry.trespiesdesign.workers.dev';
 
 // ─── D1 Ingest Bridge ───────────────────────────────────────────────
 let ingestBuffer = [];
@@ -315,17 +315,20 @@ async function loadHistoryData() {
 
 function renderCostTrend(data) {
   const container = document.getElementById('history-cost-chart');
-  if (!data || !data.days || data.days.length === 0) {
+  // API returns { trend: [{day, total_cost, total_tokens}], ... }
+  const days = data && data.trend ? data.trend : [];
+  if (days.length === 0) {
     container.innerHTML = '<div class="history-loading">No cost data available</div>';
     return;
   }
-  const maxCost = Math.max(...data.days.map(d => d.cost), 0.01);
+  const maxCost = Math.max(...days.map(d => d.total_cost || 0), 0.01);
   container.innerHTML = '';
-  data.days.forEach(day => {
+  days.forEach(day => {
+    const cost = day.total_cost || 0;
     const wrap = document.createElement('div');
     wrap.className = 'cost-bar-wrap';
-    const pct = Math.max(2, (day.cost / maxCost) * 100);
-    wrap.innerHTML = `<span class="cost-bar-value">$${day.cost.toFixed(2)}</span><div class="cost-bar" style="height:${pct}%"></div><span class="cost-bar-label">${day.label || day.date}</span>`;
+    const pct = Math.max(2, (cost / maxCost) * 100);
+    wrap.innerHTML = `<span class="cost-bar-value">$${cost.toFixed(2)}</span><div class="cost-bar" style="height:${pct}%"></div><span class="cost-bar-label">${day.day || ''}</span>`;
     container.appendChild(wrap);
   });
 }
@@ -356,9 +359,10 @@ function renderSessionList(data) {
   data.sessions.forEach(s => {
     const el = document.createElement('div');
     el.className = 'session-item';
-    const idShort = (s.session_id || s.id || '').substring(0, 12);
-    const ts = s.created_at ? new Date(s.created_at).toLocaleDateString() : '';
-    el.innerHTML = `<span class="session-id" title="${s.session_id || s.id || ''}">${idShort}...</span><span class="session-meta"><span>${s.tool_calls || 0} calls</span><span class="session-cost">$${(s.total_cost || 0).toFixed(3)}</span><span>${ts}</span></span>`;
+    // API returns: id, started_at, total_cost, total_tokens, total_tool_calls, total_errors
+    const idShort = (s.id || '').substring(0, 12);
+    const ts = s.started_at ? new Date(s.started_at * 1000).toLocaleDateString() : '';
+    el.innerHTML = `<span class="session-id" title="${s.id || ''}">${idShort}...</span><span class="session-meta"><span>${s.total_tool_calls || 0} calls</span><span class="session-cost">$${(s.total_cost || 0).toFixed(3)}</span><span>${ts}</span></span>`;
     container.appendChild(el);
   });
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/DojoGenesis/gateway/disposition"
 	"github.com/DojoGenesis/gateway/mcp"
 	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/specialist"
 	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 	pkgdisposition "github.com/DojoGenesis/gateway/pkg/disposition"
 	"github.com/DojoGenesis/gateway/pkg/gateway"
@@ -335,6 +336,20 @@ func main() {
 		slog.Info("gateway memory store initialized")
 	}
 
+	// ─── Initialize Specialist Dispatch ──────────────────────────────
+	specialistRegistry := specialist.NewSpecialistRegistry()
+	for _, sc := range specialist.DefaultSpecialists() {
+		if err := specialistRegistry.Register(sc); err != nil {
+			slog.Warn("failed to register specialist", "name", sc.Name, "error", err)
+		}
+	}
+	specialistPool := specialist.NewSpecialistPool(specialistRegistry)
+	if err := specialistPool.InitializeAll(); err != nil {
+		slog.Warn("specialist pool initialization failed", "error", err)
+	}
+	specialistRouter := specialist.NewRouter(specialistPool)
+	slog.Info("specialist dispatch initialized", "specialists", len(specialistRegistry.List()))
+
 	// ─── Initialize Auth Database (Portal v1.0) ─────────────────────
 	var authDB *sql.DB
 	authDBDir := getEnv("AUTH_DB_DIR", ".dojo")
@@ -409,6 +424,7 @@ func main() {
 		MemoryStore:         memoryStore,
 		AppManager:          appManager,
 		AuthDB:              authDB,
+		SpecialistRouter:    specialistRouter,
 	})
 
 	if err := server.Start(); err != nil {

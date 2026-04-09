@@ -48,3 +48,4 @@ Thumbs.db
 .test_*
 dojo
 gateway
+workers/telemetry/node_modules/
