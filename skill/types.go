@@ -63,6 +63,14 @@ type SkillDefinition struct {
 	// LoadedAt is when the skill was registered
 	LoadedAt time.Time `json:"loaded_at"`
 
+	// Inputs declares typed input ports for workflow connections (Era 3).
+	// Populated from the YAML frontmatter inputs block.
+	Inputs []PortDef `json:"inputs,omitempty"`
+
+	// Outputs declares typed output ports for workflow connections (Era 3).
+	// Populated from the YAML frontmatter outputs block.
+	Outputs []PortDef `json:"outputs,omitempty"`
+
 	// Version from YAML metadata
 	Version string `json:"version,omitempty"`
 
@@ -71,6 +79,18 @@ type SkillDefinition struct {
 
 	// Author from YAML metadata
 	Author string `json:"author,omitempty"`
+}
+
+// PortDef describes a typed input or output port on a skill.
+// This mirrors pkg/skill.PortDefinition but lives in the skill package
+// to avoid a cross-module import cycle.
+type PortDef struct {
+	Name        string `yaml:"name" json:"name"`
+	Type        string `yaml:"type" json:"type"`
+	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+	Required    bool   `yaml:"required,omitempty" json:"required,omitempty"`
+	Default     any    `yaml:"default,omitempty" json:"default,omitempty"`
+	Format      string `yaml:"format,omitempty" json:"format,omitempty"`
 }
 
 // MetadataBlock represents the nested metadata section (per spec)
@@ -110,7 +130,12 @@ type Metadata struct {
 	Version          string                 `yaml:"version,omitempty"`
 	Created          string                 `yaml:"created,omitempty"`
 	Author           string                 `yaml:"author,omitempty"`
-	Extra            map[string]interface{} `yaml:",inline"` // Catch-all for unknown fields
+
+	// Port declarations (Era 3 — backward compatible: missing = empty slices)
+	Inputs  []PortDef `yaml:"inputs,omitempty"`
+	Outputs []PortDef `yaml:"outputs,omitempty"`
+
+	Extra map[string]interface{} `yaml:",inline"` // Catch-all for unknown fields
 }
 
 // ValidToolDependencies is the allowlist of valid tool dependency types

@@ -1,14 +1,22 @@
 <script lang="ts">
-	import { createWorkflow, validateWorkflow } from '$lib/api';
-	import type { WorkflowDefinition } from '$lib/types';
+	import { createWorkflow, validateWorkflow, saveCanvas as apiSaveCanvas } from '$lib/api';
+	import type { WorkflowDefinition, CanvasState } from '$lib/types';
+	import { canUndo, canRedo } from '$lib/stores/history.svelte.js';
+
+	// Reactive derivation of undo/redo availability
+	const undoAvailable = $derived(canUndo());
+	const redoAvailable = $derived(canRedo());
 
 	interface Props {
 		workflowName: string;
 		onWorkflowNameChange?: (name: string) => void;
 		getDefinition?: () => WorkflowDefinition;
+		getCanvasState?: () => CanvasState;
 		onAutoLayout?: () => void;
 		onLoadWorkflow?: () => void;
 		onRunWorkflow?: () => void;
+		onUndo?: () => void;
+		onRedo?: () => void;
 		isRunning?: boolean;
 	}
 
@@ -16,9 +24,12 @@
 		workflowName,
 		onWorkflowNameChange,
 		getDefinition,
+		getCanvasState,
 		onAutoLayout,
 		onLoadWorkflow,
 		onRunWorkflow,
+		onUndo,
+		onRedo,
 		isRunning = false
 	}: Props = $props();
 
@@ -41,7 +52,16 @@
 		saveState = 'saving';
 		saveError = null;
 		try {
-			await createWorkflow(def);
+			// 1. Save workflow.json to CAS
+			const result = await createWorkflow(def);
+
+			// 2. Save workflow.canvas.json to CAS (if canvas state is available)
+			if (getCanvasState) {
+				const canvas = getCanvasState();
+				canvas.workflow_ref = result.ref;
+				await apiSaveCanvas(def.name, canvas);
+			}
+
 			saveState = 'saved';
 			setTimeout(() => {
 				saveState = 'idle';
@@ -103,6 +123,26 @@
 	</div>
 
 	<div class="toolbar__actions">
+		<!-- Undo -->
+		<button
+			class="toolbar__btn"
+			onclick={() => onUndo?.()}
+			disabled={!undoAvailable}
+			title="Undo (Cmd+Z)"
+		>
+			↩ Undo
+		</button>
+
+		<!-- Redo -->
+		<button
+			class="toolbar__btn"
+			onclick={() => onRedo?.()}
+			disabled={!redoAvailable}
+			title="Redo (Cmd+Shift+Z)"
+		>
+			↪ Redo
+		</button>
+
 		<!-- Validate -->
 		<button
 			class="toolbar__btn toolbar__btn--validate"

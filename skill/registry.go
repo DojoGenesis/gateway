@@ -307,6 +307,16 @@ func parseSkillFile(filePath string, pluginName string) (*SkillDefinition, error
 		Version:          version,
 		Created:          created,
 		Author:           author,
+		// Era 3 port declarations — empty slices when not declared (backward compat).
+		Inputs:  meta.Inputs,
+		Outputs: meta.Outputs,
+	}
+
+	if skill.Inputs == nil {
+		skill.Inputs = []PortDef{}
+	}
+	if skill.Outputs == nil {
+		skill.Outputs = []PortDef{}
 	}
 
 	return skill, nil

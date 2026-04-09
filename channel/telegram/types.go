@@ -10,8 +10,18 @@ package telegram
 // Update is the top-level payload that Telegram sends to a registered webhook.
 // See https://core.telegram.org/bots/api#update
 type Update struct {
-	UpdateID int      `json:"update_id"`
-	Message  *Message `json:"message,omitempty"`
+	UpdateID      int            `json:"update_id"`
+	Message       *Message       `json:"message,omitempty"`
+	CallbackQuery *CallbackQuery `json:"callback_query,omitempty"`
+}
+
+// CallbackQuery represents an incoming callback query from an inline keyboard.
+// See https://core.telegram.org/bots/api#callbackquery
+type CallbackQuery struct {
+	ID      string   `json:"id"`
+	From    *User    `json:"from"`
+	Message *Message `json:"message,omitempty"`
+	Data    string   `json:"data,omitempty"`
 }
 
 // Message represents an individual Telegram message.

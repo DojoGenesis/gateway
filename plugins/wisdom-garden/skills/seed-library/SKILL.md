@@ -1,25 +1,18 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: seed-library
-description: Maintain curated library of wisdom seeds for reuse and reference
-triggers:
-  - "manage seed library"
-  - "organize wisdom seeds"
-  - "curate knowledge library"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - script_execution
-    - file_system
-    - bash
-  portable: true
-  tier: 2
-  agents:
-    - research-agent
+model: sonnet
+description: Suggests and loads Dojo Seed Patches as reusable thinking modules, producing a ranked seed recommendation with a full application guide. Use when: "which seed applies here", "suggest a seed pattern", "apply a seed to this", "what pattern should we use", "load the seed library".
+category: wisdom-garden
+
+inputs:
+  - name: context
+    type: string
+    description: The current situation or problem context to match against seed patterns
+    required: true
+outputs:
+  - name: seed_recommendation
+    type: string
+    description: Ranked seed recommendation with full application guide for the current context
 ---
 
 # Seed Module Library
@@ -425,3 +418,25 @@ When Dojo is reasoning, it can reference seeds:
 - **Evolution:** Seeds updated when patterns improve
 - **Reuse:** Seeds used across multiple sessions
 - **Learning:** New seeds added as patterns emerge
+
+## Output
+
+- A seed recommendation saved to `/home/ubuntu/seed-suggestions.md` — top 3 ranked seeds with relevance scores and file paths
+- A seed application guide saved to `/home/ubuntu/seed-<seed_id>-applied.md` — full seed content, application checklist, and next steps
+- Usage tracked automatically in `/home/ubuntu/.seed-usage.json`
+
+## Examples
+
+**Scenario 1:** User says "which seed applies to multi-agent coordination?" → runs `suggest_seeds.py multi-agent coordination`, returns top 3 (Agent Connect, Three-Tiered Governance, Shared Infrastructure) with relevance scores, saves to `seed-suggestions.md`.
+
+**Scenario 2:** User says "apply the Context Iceberg seed" → runs `apply_seed.py 03_context_iceberg`, loads full seed content, generates application checklist for the current task, saves guide to `seed-03_context_iceberg-applied.md`.
+
+## Edge Cases
+
+- If no keywords match any seed triggers, prompt the user for the core problem being solved (cost? coordination? trust?) rather than returning an empty result.
+- If the user requests a seed by name that does not exist in the library, list the 13 available seeds and ask for clarification.
+
+## Anti-Patterns
+
+- Suggesting a seed without running the suggestion script — keyword matching is essential for relevance; do not rely on recall alone.
+- Applying a seed without reading the full seed content — skimming the trigger and skipping "What It Refuses" leads to misapplication.

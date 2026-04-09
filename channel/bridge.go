@@ -101,16 +101,18 @@ func (b *ChannelBridge) AddTrigger(spec TriggerSpec) {
 	)
 }
 
-// BusHandler returns a subscriber function for InProcessBus.Subscribe.
-// Typical wiring:
+// BusHandler returns a subscriber function for NATSBus.Subscribe (or
+// InProcessBus.Subscribe in tests).
+// Typical production wiring:
 //
-//	bus    := &channel.InProcessBus{}
-//	gw     := channel.NewWebhookGateway(bus, creds)
-//	bridge := channel.NewChannelBridge(runner)
+//	adapter   := NewNATSBusAdapter(eventBus)
+//	natsBus   := channel.NewNATSBus(adapter, channel.WithNATSSubscriber(adapter))
+//	gw        := channel.NewWebhookGateway(natsBus, creds)
+//	bridge    := channel.NewChannelBridge(runner)
 //	gw.Register("slack", slackAdapter)
 //	bridge.Register("slack", slackAdapter)
 //	bridge.AddTrigger(channel.TriggerSpec{Platform: "slack", Workflow: "my-flow"})
-//	bus.Subscribe(bridge.BusHandler(ctx))
+//	natsBus.Subscribe(bridge.BusHandler(ctx))
 func (b *ChannelBridge) BusHandler(ctx context.Context) func(string, Event) {
 	return func(_ string, evt Event) {
 		if err := b.HandleEvent(ctx, evt); err != nil {
@@ -234,39 +236,11 @@ func (b *ChannelBridge) buildReply(
 }
 
 // ---------------------------------------------------------------------------
-// InProcessBus — synchronous in-process event bus.
-// For production replace with the NATS-backed bus from runtime/event.
-// ---------------------------------------------------------------------------
-
-// InProcessBus is a synchronous in-process event bus. It implements
-// EventPublisher (passed to WebhookGateway) and exposes Subscribe so
-// ChannelBridge can register a handler via BusHandler.
+// InProcessBus has been retired from the production hot path (Era 3 Phase 1
+// Track A). It is defined in inprocess_bus.go and remains exported so
+// subpackage smoke tests (slack/, discord/, telegram/) can import it.
 //
-// Subscribers are called synchronously in the Publish goroutine, which
-// guarantees ordering in tests and keeps the flywheel deterministic during
-// early development. Production deployments should use the NATS bus.
-type InProcessBus struct {
-	mu          sync.RWMutex
-	subscribers []func(string, Event)
-}
-
-// Publish calls all registered subscribers with subject and event.
-// Implements EventPublisher.
-func (b *InProcessBus) Publish(subject string, evt Event) error {
-	b.mu.RLock()
-	subs := make([]func(string, Event), len(b.subscribers))
-	copy(subs, b.subscribers)
-	b.mu.RUnlock()
-
-	for _, sub := range subs {
-		sub(subject, evt)
-	}
-	return nil
-}
-
-// Subscribe registers fn to be called for every published event.
-func (b *InProcessBus) Subscribe(fn func(subject string, evt Event)) {
-	b.mu.Lock()
-	b.subscribers = append(b.subscribers, fn)
-	b.mu.Unlock()
-}
+// Production code in cmd/dojo/bridge.go uses NATSBus (nats_bus.go) backed
+// by the runtime/event NATS + JetStream bus. InProcessBus MUST NOT appear
+// in any production code path.
+// ---------------------------------------------------------------------------

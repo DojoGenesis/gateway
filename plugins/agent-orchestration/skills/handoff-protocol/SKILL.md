@@ -1,29 +1,30 @@
 ---
 name: handoff-protocol
-description: A structured protocol for handing off work between autonomous agents, ensuring context is preserved, goals are clear, and the receiving agent is set up for success.
-triggers:
-  - "hand this off to another agent"
-  - "prepare a handoff package for the next agent"
-  - "pass the baton on this task"
-metadata:
-  version: "1.0"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - implementation-agent
-    - research-agent
-    - strategic-agent
+model: sonnet
+description: Produces a structured handoff package (markdown document) containing objective, required context file list, task definition, definition of done, constraints, and next steps for the receiving agent. Use when: 'hand off to the next agent', 'prepare this for handoff', 'is this handoff package complete', 'ensure nothing is lost in the transition'.
+category: agent-orchestration
+
+inputs:
+  - name: objective
+    type: string
+    description: The objective being handed off to the receiving agent
+    required: true
+  - name: context_files
+    type: string[]
+    description: List of context file paths the receiving agent needs
+    required: false
+outputs:
+  - name: handoff_package
+    type: string
+    description: Structured handoff markdown document with objective, context files, task definition, definition of done, and constraints
 ---
 
 # Agent Handoff Protocol Skill
 
-**Version:** 1.0
-**Created:** 2026-02-11
-**Author:** Tres Pies Design
-**Purpose:** To provide a clear, repeatable protocol for handing off work between agents, ensuring no loss of context and a high probability of success.
+**Version:** 1.0  
+**Created:** 2026-02-04  
+**Author:** Manus AI  
+**Purpose:** To provide a clear, repeatable protocol for handing off work between agents (e.g., Manus to implementation agents, Manus to Cipher), ensuring no loss of context and a high probability of success.
 
 ---
 
@@ -37,10 +38,10 @@ This protocol transforms the handoff from a hopeful transfer into a rigorous, ve
 
 ## II. When to Use This Skill
 
-- **Always** use this skill when one agent's work is complete and another agent must begin the next phase
-- **Spec → Implementation:** When a specification is complete and ready for implementation
-- **Research → Synthesis:** When research is complete and needs synthesis or application
-- **Any Agent → Any Agent:** Whenever responsibility for a task is transferred
+-   **Always** use this skill when one agent's work is complete and another agent must begin the next phase.
+-   **Manus → Implementation Agent:** When a specification is complete and ready for implementation.
+-   **Manus → Cipher:** When research is complete and a creative or divergent perspective is needed.
+-   **Any Agent → Any Agent:** Whenever responsibility for a task is transferred.
 
 ---
 
@@ -59,9 +60,9 @@ Before initiating the handoff, the sending agent must verify the package against
 The sending agent initiates the handoff by creating a task for the receiving agent, with the handoff package as the primary input.
 
 **Example Handoff Task:**
-- **Agent:** Implementation Agent (Zenflow, Claude Code, etc.)
-- **Task:** Implement the breadcrumb navigation feature
-- **Input:** `handoffs/2026-02-11_breadcrumb_handoff.md`
+-   **Agent:** Implementation Agent (Zenflow, Claude Code, etc.)
+-   **Task:** Implement the v0.0.26 Breadcrumb feature.
+-   **Input:** `handoffs/v0.0.26/01_breadcrumb_handoff.md`
 
 ### Step 4: The Receiving Agent's Acceptance
 
@@ -96,20 +97,20 @@ The receiving agent's first action is to read the handoff package and confirm th
 [A comprehensive list of all files, documents, and resources the receiving agent MUST read before starting work. Use full paths.]
 
 **Core Documents:**
-- **Specification:** `[path/to/specification.md]`
-- **Status:** `[path/to/STATUS.md]`
+-   **Specification:** `[path/to/specification.md]`
+-   **Status:** `[path/to/STATUS.md]`
 
 **Key Conversation Summaries:**
-- `[path/to/conversation_summary_1.md]`
-- `[path/to/conversation_summary_2.md]`
+-   `[path/to/conversation_summary_1.md]`
+-   `[path/to/conversation_summary_2.md]`
 
 **Relevant Seeds or Skills:**
-- `[path/to/seed.md]`
-- `[path/to/skill.md]`
+-   `[path/to/seed.md]`
+-   `[path/to/skill.md]`
 
 **Pattern Files / Code Examples:**
-- `[path/to/pattern_file_1.tsx]`
-- `[path/to/pattern_file_2.go]`
+-   `[path/to/pattern_file_1.tsx]`
+-   `[path/to/pattern_file_2.go]`
 
 ---
 
@@ -123,9 +124,9 @@ The receiving agent's first action is to read the handoff package and confirm th
 
 [How will we know the receiving agent's work is complete? This must be a list of binary, testable success criteria.]
 
-- [ ] [Success Criterion 1]
-- [ ] [Success Criterion 2]
-- [ ] [Success Criterion 3]
+-   [ ] [Success Criterion 1]
+-   [ ] [Success Criterion 2]
+-   [ ] [Success Criterion 3]
 
 ---
 
@@ -133,9 +134,9 @@ The receiving agent's first action is to read the handoff package and confirm th
 
 [What are the explicit constraints on the receiving agent's work?]
 
-- **DO NOT** modify files outside of the specified scope.
-- **DO NOT** make architectural decisions without consulting [Sending Agent Name].
-- **MUST** follow the patterns established in the provided pattern files.
+-   **DO NOT** modify files outside of the specified scope.
+-   **DO NOT** make architectural decisions without consulting [Sending Agent Name].
+-   **MUST** follow the patterns established in the provided pattern files.
 
 ---
 
@@ -143,171 +144,47 @@ The receiving agent's first action is to read the handoff package and confirm th
 
 [What happens after the receiving agent is done? Who takes the next handoff?]
 
-- Upon completion, notify [Next Agent Name] and hand off the results for the next phase (e.g., QA, documentation).
+-   Upon completion, notify [Next Agent Name] and hand off the results for the next phase (e.g., QA, documentation).
 ```
 
 ---
 
 ## V. Handoff Checklist (for Sending Agent)
 
-- [ ] **Is the Objective a single, clear sentence?**
-- [ ] **Are all links in the Required Context section valid and pointing to the correct files?**
-- [ ] **Is the Task Definition unambiguous and complete?**
-- [ ] **Is the Definition of Done a list of testable, binary criteria?**
-- [ ] **Are the Constraints clear and explicit?**
-- [ ] **Is the next step after completion clearly defined?**
+-   [ ] **Is the Objective a single, clear sentence?**
+-   [ ] **Are all links in the Required Context section valid and pointing to the correct files?**
+-   [ ] **Is the Task Definition unambiguous and complete?**
+-   [ ] **Is the Definition of Done a list of testable, binary criteria?**
+-   [ ] **Are the Constraints clear and explicit?**
+-   [ ] **Is the next step after completion clearly defined?**
 
 ---
 
 ## VI. Best Practices
 
-### No Implicit Context
-If it's not in the handoff package, it doesn't exist. Never assume the receiving agent knows something.
+-   **No Implicit Context:** If it's not in the handoff package, it doesn't exist. Never assume the receiving agent knows something.
+-   **Over-communicate:** It is better to provide too much context than too little.
+-   **The Receiver is the Gatekeeper:** Empower the receiving agent to reject incomplete handoffs. This maintains quality across the ecosystem.
+-   **Standardize Handoff Locations:** Create a `handoffs/` directory in each project to store these packages, creating a clear audit trail.
 
-### Over-communicate
-It is better to provide too much context than too little.
+## Output
 
-### The Receiver is the Gatekeeper
-Empower the receiving agent to reject incomplete handoffs. This maintains quality across the ecosystem.
+- A `handoffs/` directory entry containing the completed handoff package as a markdown file (e.g., `handoffs/v0.0.26/01_feature_handoff.md`)
+- The package includes: objective sentence, required context file list with full paths, task definition, definition-of-done checklist, explicit constraints, and next-steps attribution
+- A completed self-assessment against the Handoff Checklist (Section V)
 
-### Standardize Handoff Locations
-Create a `handoffs/` directory in each project to store these packages, creating a clear audit trail.
+## Examples
 
-### Include Attribution
-Always include who made the handoff and when. This enables future agents to trace decisions and context.
+**Scenario 1:** Specification writing is complete and an implementation agent must build the feature → skill produces a handoff package at `handoffs/v0.0.26/breadcrumb_handoff.md` with the spec path, pattern file paths, definition of done as binary checkboxes, and a constraint list preventing architectural changes.
 
-### Link, Don't Duplicate
-Reference source documents rather than copying their entire contents. This prevents drift and keeps the handoff package focused.
+**Scenario 2:** Research phase is complete and a creative agent must synthesize findings → skill produces a handoff package naming all research files, framing the synthesis objective in one sentence, and defining what a complete synthesis looks like.
 
----
+## Edge Cases
 
-## VII. Common Patterns
+- If the receiving agent is unknown at handoff time, leave the "To" field as `[TBD]` and note that the package will be routed by the orchestrator — do not hold the package waiting for that information.
+- If required context files do not yet exist (e.g., a spec that is still being written), flag them as `[PENDING — do not begin until available]` rather than omitting them from the list.
 
-### Pattern 1: Implementation Handoff
+## Anti-Patterns
 
-**When:** Spec is complete, ready for code implementation
-
-**Key Elements:**
-- Link to full specification
-- Pattern files showing established code conventions
-- Exact file paths for files to create/modify
-- Test coverage requirements in Definition of Done
-
-**Example Objective:**
-> Implement breadcrumb navigation component with state management integration
-
-### Pattern 2: Research Handoff
-
-**When:** Research question needs to be explored
-
-**Key Elements:**
-- Clear research question framing
-- Suggested starting sources
-- Scope boundaries (what's in/out of scope)
-- Output format specification
-
-**Example Objective:**
-> Research and synthesize context compression techniques for LLM-based agents
-
-### Pattern 3: Review Handoff
-
-**When:** Work needs quality review before finalization
-
-**Key Elements:**
-- Link to work to be reviewed
-- Review criteria (checklist)
-- Known concerns to investigate
-- Decision authority (who approves)
-
-**Example Objective:**
-> Review backend API specification for completeness and consistency with system architecture
-
-### Pattern 4: Cross-Session Handoff
-
-**When:** Continuing work across agent sessions or different agents
-
-**Key Elements:**
-- Compressed context summary of previous session
-- Current state documentation
-- Next steps clearly defined
-- Memory artifacts attached
-
-**Example Objective:**
-> Continue implementation of entity backend from previous session, starting with schema definition
-
----
-
-## VIII. Integration with Other Skills
-
-### With `workspace-navigation`
-- Store handoffs in `00_Active/handoffs/` directory
-- Move to archive after completion
-- Link from workspace README for discoverability
-
-### With `decision-propagation`
-- Include decision records in Required Context
-- Reference decision IDs for traceability
-- Update decision impact tracking after handoff completion
-
-### With `agent-teaching`
-- Attach teaching artifacts for knowledge transfer
-- Include learning resources in Required Context
-- Use peer-to-peer tone in task explanation
-
----
-
-## IX. Quality Indicators
-
-**Good Handoff Package:**
-- Receiver can begin work immediately without questions
-- All links work and point to current resources
-- Success criteria are measurable and binary
-- Context is comprehensive but not duplicative
-- Constraints prevent common mistakes
-
-**Bad Handoff Package:**
-- Receiver needs to ask clarifying questions
-- References "see above" or "as discussed"
-- Broken links or missing resources
-- Vague success criteria ("good quality")
-- Unstated assumptions about receiver's knowledge
-
----
-
-## X. Troubleshooting
-
-### "Receiver rejected my handoff"
-- Review the 6-point checklist — which criteria failed?
-- Ask receiver specifically what's missing
-- Update package and resubmit
-- Consider if task definition is truly unambiguous
-
-### "I'm not sure what to include"
-- Ask: "Could the receiver complete this with zero questions?"
-- If no, add more context
-- Err on side of over-communication
-- Include pattern files and examples
-
-### "Handoff package is getting too long"
-- Link to detailed docs rather than duplicating
-- Use summaries in Required Context with links to full content
-- Focus Task Definition on what to do, not how (unless implementation details are critical)
-
----
-
-## XI. Skill Metadata
-
-**Token Savings:** ~5,000-10,000 tokens per handoff (prevents back-and-forth clarification)
-**Quality Impact:** Reduces failed handoffs by ~80% when checklist is followed
-**Maintenance:** Review template quarterly; update based on handoff rejection patterns
-
-**Related Skills:**
-- `workspace-navigation` — For organizing handoffs in shared workspaces
-- `agent-teaching` — For transferring knowledge to receiving agents
-- `decision-propagation` — For including decision context in handoffs
-
----
-
-**Last Updated:** 2026-02-11
-**Maintained By:** Tres Pies Design
-**Status:** Active
+- Writing the handoff package as a prose summary rather than a structured template — the receiving agent cannot programmatically check what it has and what it is missing.
+- Marking the handoff complete before verifying all links in the Required Context section resolve to actual files — broken paths silently block the receiving agent.

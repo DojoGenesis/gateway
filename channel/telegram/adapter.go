@@ -93,8 +93,8 @@ func (a *TelegramAdapter) VerifySignature(r *http.Request) error {
 }
 
 // HandleWebhook processes a single inbound Telegram webhook POST. It verifies
-// the signature, normalizes the payload, and writes 200 OK. On error it writes
-// the appropriate HTTP status.
+// the signature, normalizes the payload (message or callback_query), and writes
+// 200 OK. On error it writes the appropriate HTTP status.
 func (a *TelegramAdapter) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	if err := a.VerifySignature(r); err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -117,16 +117,22 @@ func (a *TelegramAdapter) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 }
 
 // Normalize parses raw Telegram Update JSON and returns a ChannelMessage.
-// Returns an error if the payload is malformed or contains no message.
+// Supports both "message" and "callback_query" update types.
+// Returns an error if the payload is malformed or contains no actionable data.
 func (a *TelegramAdapter) Normalize(raw []byte) (*channel.ChannelMessage, error) {
 	var update Update
 	if err := json.Unmarshal(raw, &update); err != nil {
 		return nil, fmt.Errorf("telegram: normalize: invalid JSON: %w", err)
 	}
 
+	// Handle callback_query first (inline keyboard button press).
+	if update.CallbackQuery != nil {
+		return a.normalizeCallbackQuery(update.CallbackQuery)
+	}
+
 	msg := update.Message
 	if msg == nil {
-		return nil, fmt.Errorf("telegram: normalize: update contains no message")
+		return nil, fmt.Errorf("telegram: normalize: update contains no message or callback_query")
 	}
 	if msg.Chat == nil {
 		return nil, fmt.Errorf("telegram: normalize: message missing chat")
@@ -177,6 +183,105 @@ func (a *TelegramAdapter) Normalize(raw []byte) (*channel.ChannelMessage, error)
 	}
 
 	return cm, nil
+}
+
+// normalizeCallbackQuery converts a Telegram callback_query into a ChannelMessage.
+func (a *TelegramAdapter) normalizeCallbackQuery(cq *CallbackQuery) (*channel.ChannelMessage, error) {
+	if cq.From == nil {
+		return nil, fmt.Errorf("telegram: callback_query missing 'from' field")
+	}
+
+	cm := &channel.ChannelMessage{
+		ID:        cq.ID,
+		Platform:  platform,
+		Text:      cq.Data,
+		Timestamp: time.Now().UTC(),
+		Metadata: map[string]interface{}{
+			"callback_query_id": cq.ID,
+			"event_type":        "callback_query",
+		},
+	}
+
+	cm.UserID = strconv.FormatInt(cq.From.ID, 10)
+	cm.UserName = cq.From.Username
+	if cm.UserName == "" {
+		cm.UserName = cq.From.FirstName
+	}
+
+	// If the callback_query has a source message, use its chat as the channel.
+	if cq.Message != nil && cq.Message.Chat != nil {
+		cm.ChannelID = strconv.FormatInt(cq.Message.Chat.ID, 10)
+		cm.ReplyTo = strconv.Itoa(cq.Message.MessageID)
+	}
+
+	return cm, nil
+}
+
+// StartLongPolling runs the getUpdates long-polling loop for dev environments
+// where a public webhook URL is not available. It calls handler for each
+// normalized ChannelMessage. The loop runs until ctx is cancelled.
+// This is a blocking call.
+func (a *TelegramAdapter) StartLongPolling(ctx context.Context, handler func(*channel.ChannelMessage)) error {
+	if a.token == "" {
+		return fmt.Errorf("telegram: long-polling requires a bot token")
+	}
+
+	var offset int
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		url := fmt.Sprintf("%s/bot%s/getUpdates?offset=%d&timeout=30", apiBaseURL, a.token, offset)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return fmt.Errorf("telegram: long-poll build request: %w", err)
+		}
+
+		resp, err := a.httpClient.Do(req)
+		if err != nil {
+			// Context cancellation is a clean shutdown, not an error.
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			// Transient error — back off and retry.
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		var result struct {
+			OK     bool     `json:"ok"`
+			Result []Update `json:"result"`
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		for _, upd := range result.Result {
+			offset = upd.UpdateID + 1
+
+			raw, err := json.Marshal(upd)
+			if err != nil {
+				continue
+			}
+			msg, err := a.Normalize(raw)
+			if err != nil {
+				continue
+			}
+			handler(msg)
+		}
+	}
 }
 
 // Send delivers a ChannelMessage to the Telegram chat identified by

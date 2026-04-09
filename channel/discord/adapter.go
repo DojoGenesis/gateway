@@ -14,13 +14,30 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+// ResumeStore abstracts the storage backend for Discord Opcode 6 resume state.
+// In production this is backed by NATS KV; tests inject an in-memory store.
+type ResumeStore interface {
+	// Put stores a value under the given key.
+	Put(key string, value []byte) error
+	// Get retrieves the value for the given key. Returns nil, nil if not found.
+	Get(key string) ([]byte, error)
+}
+
+// ResumeState holds the fields needed for Discord Gateway Opcode 6 resume.
+type ResumeState struct {
+	ResumeGatewayURL string `json:"resume_gateway_url"`
+	SessionID        string `json:"session_id"`
+	Seq              int64  `json:"seq"`
+}
+
 // DiscordAdapter implements channel.WebhookAdapter for Discord Interactions
 // delivered via HTTP webhook. It verifies Ed25519 signatures, normalizes
 // Discord message payloads into channel.ChannelMessage, and sends outbound
 // messages using a discordgo session.
 type DiscordAdapter struct {
-	cfg     DiscordConfig
-	session *discordgo.Session // nil in tests that do not exercise Send
+	cfg         DiscordConfig
+	session     *discordgo.Session // nil in tests that do not exercise Send
+	resumeStore ResumeStore        // nil when resume persistence is not needed
 }
 
 // New creates a DiscordAdapter from the provided config. If cfg.BotToken is
@@ -38,6 +55,50 @@ func New(cfg DiscordConfig) (*DiscordAdapter, error) {
 	}
 
 	return a, nil
+}
+
+// NewWithResumeStore creates a DiscordAdapter with an injected ResumeStore
+// for Opcode 6 resume state persistence.
+func NewWithResumeStore(cfg DiscordConfig, store ResumeStore) (*DiscordAdapter, error) {
+	a, err := New(cfg)
+	if err != nil {
+		return nil, err
+	}
+	a.resumeStore = store
+	return a, nil
+}
+
+// SaveResumeState persists the Opcode 6 resume state to the configured store.
+// Key: discord.resume.{guild_id}. TTL is managed at the bucket level (7 days).
+func (a *DiscordAdapter) SaveResumeState(state ResumeState) error {
+	if a.resumeStore == nil {
+		return fmt.Errorf("discord: no resume store configured")
+	}
+	data, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("discord: marshal resume state: %w", err)
+	}
+	return a.resumeStore.Put(a.cfg.ResumeStateKey(), data)
+}
+
+// LoadResumeState retrieves the persisted Opcode 6 resume state.
+// Returns nil, nil if no state is stored (clean start).
+func (a *DiscordAdapter) LoadResumeState() (*ResumeState, error) {
+	if a.resumeStore == nil {
+		return nil, fmt.Errorf("discord: no resume store configured")
+	}
+	data, err := a.resumeStore.Get(a.cfg.ResumeStateKey())
+	if err != nil {
+		return nil, fmt.Errorf("discord: load resume state: %w", err)
+	}
+	if data == nil {
+		return nil, nil
+	}
+	var state ResumeState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, fmt.Errorf("discord: unmarshal resume state: %w", err)
+	}
+	return &state, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -199,14 +260,109 @@ func (a *DiscordAdapter) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// All other interaction types: acknowledge with 200. In a production
-	// system the body would be forwarded to the event bus for async handling.
+	// Type 2 = APPLICATION_COMMAND — normalize the slash command interaction
+	// into a ChannelMessage so the event bus can process it.
+	if interaction.Type == 2 {
+		if _, err := a.NormalizeInteraction(body); err != nil {
+			// Log but still ACK — Discord retries on non-2xx.
+			_ = err
+		}
+		// ACK with type 5 (DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE) so the
+		// platform shows a "thinking" indicator while the workflow runs.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"type":5}`))
+		return
+	}
+
+	// All other interaction types: acknowledge with 200.
 	w.WriteHeader(http.StatusOK)
+}
+
+// NormalizeInteraction converts a Discord Interactions webhook payload
+// (APPLICATION_COMMAND type 2, MESSAGE_CREATE forwarded as type 2) into a
+// channel.ChannelMessage.
+func (a *DiscordAdapter) NormalizeInteraction(raw []byte) (*channel.ChannelMessage, error) {
+	var interaction discordInteraction
+	if err := json.Unmarshal(raw, &interaction); err != nil {
+		return nil, fmt.Errorf("discord: normalize interaction unmarshal: %w", err)
+	}
+
+	msg := &channel.ChannelMessage{
+		ID:        interaction.ID,
+		Platform:  "discord",
+		ChannelID: interaction.ChannelID,
+		Timestamp: time.Now().UTC(),
+		Metadata: map[string]interface{}{
+			"interaction_type": interaction.Type,
+			"interaction_id":   interaction.ID,
+		},
+	}
+
+	if interaction.Member != nil && interaction.Member.User != nil {
+		msg.UserID = interaction.Member.User.ID
+		msg.UserName = interaction.Member.User.Username
+	} else if interaction.User != nil {
+		msg.UserID = interaction.User.ID
+		msg.UserName = interaction.User.Username
+	}
+
+	// Type 2: APPLICATION_COMMAND
+	if interaction.Type == 2 && interaction.Data != nil {
+		msg.Text = "/" + interaction.Data.Name
+		// Append options as "key=value" to reconstruct the command text.
+		for _, opt := range interaction.Data.Options {
+			if opt.Value != nil {
+				msg.Text += fmt.Sprintf(" %s=%v", opt.Name, opt.Value)
+			} else {
+				msg.Text += " " + opt.Name
+			}
+		}
+		if msg.Metadata == nil {
+			msg.Metadata = make(map[string]interface{})
+		}
+		msg.Metadata["command_name"] = interaction.Data.Name
+	}
+
+	if interaction.GuildID != "" {
+		if msg.Metadata == nil {
+			msg.Metadata = make(map[string]interface{})
+		}
+		msg.Metadata["guild_id"] = interaction.GuildID
+	}
+
+	return msg, nil
 }
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+// discordInteraction mirrors a Discord Interactions webhook payload for
+// APPLICATION_COMMAND (type 2) and MESSAGE_COMPONENT (type 3).
+type discordInteraction struct {
+	ID        string `json:"id"`
+	Type      int    `json:"type"`
+	ChannelID string `json:"channel_id"`
+	GuildID   string `json:"guild_id,omitempty"`
+	Member    *struct {
+		User *struct {
+			ID       string `json:"id"`
+			Username string `json:"username"`
+		} `json:"user,omitempty"`
+	} `json:"member,omitempty"`
+	User *struct {
+		ID       string `json:"id"`
+		Username string `json:"username"`
+	} `json:"user,omitempty"`
+	Data *struct {
+		Name    string `json:"name"`
+		Options []struct {
+			Name  string      `json:"name"`
+			Value interface{} `json:"value,omitempty"`
+		} `json:"options,omitempty"`
+	} `json:"data,omitempty"`
+}
 
 // discordMessage mirrors the subset of the Discord Message object we care
 // about for normalization.

@@ -89,6 +89,12 @@ type Bus interface {
 	// Subscribe registers a handler for events matching the filter.
 	Subscribe(ctx context.Context, filter EventFilter, handler EventHandler) (Subscription, error)
 
+	// SubscribeDurable creates a JetStream durable consumer for the given
+	// subject. The durable name is used as the consumer name in JetStream,
+	// enabling resume-on-restart semantics. Returns an error if JetStream
+	// (WAL) is not enabled.
+	SubscribeDurable(ctx context.Context, subject, durable string, handler EventHandler) (Subscription, error)
+
 	// Request publishes an event and waits for a correlated response.
 	Request(ctx context.Context, event Event, timeout time.Duration) (Event, error)
 
@@ -320,6 +326,69 @@ func (b *natsBus) Subscribe(ctx context.Context, filter EventFilter, handler Eve
 		id:  id,
 		bus: b,
 	}, nil
+}
+
+func (b *natsBus) SubscribeDurable(ctx context.Context, subject, durable string, handler EventHandler) (Subscription, error) {
+	ctx, span := tracer.Start(ctx, "event.subscribe_durable",
+		trace.WithAttributes(
+			attribute.String("subject", subject),
+			attribute.String("durable", durable),
+		),
+	)
+	defer span.End()
+
+	if handler == nil {
+		return nil, fmt.Errorf("event: handler is required")
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.closed {
+		return nil, fmt.Errorf("event: bus is closed")
+	}
+
+	if b.js == nil {
+		return nil, fmt.Errorf("event: JetStream (WAL) is not enabled; durable consumers require WAL")
+	}
+
+	id := fmt.Sprintf("durable-%s-%d", durable, b.nextSubID.Add(1))
+	subCtx, cancel := context.WithCancel(ctx)
+
+	sub := &natsSub{
+		id:      id,
+		filter:  EventFilter{},
+		handler: handler,
+		ctx:     subCtx,
+		cancel:  cancel,
+	}
+
+	jsSub, err := b.js.Subscribe(subject, func(msg *nats.Msg) {
+		var ce cloudevents.Event
+		if err := json.Unmarshal(msg.Data, &ce); err != nil {
+			slog.Warn("event: durable unmarshal error", "durable", durable, "error", err)
+			msg.Ack()
+			return
+		}
+
+		event := fromCloudEvent(ce)
+		if err := handler(subCtx, event); err != nil {
+			slog.Warn("event: durable handler error", "durable", durable, "error", err)
+		} else {
+			b.delivered.Add(1)
+		}
+		msg.Ack()
+	}, nats.Durable(durable), nats.ManualAck())
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("event: durable subscribe %q on %q: %w", durable, subject, err)
+	}
+
+	sub.sub = jsSub
+	b.subs[id] = sub
+	subscriptionsGauge.Add(ctx, 1)
+
+	return &subscriptionImpl{id: id, bus: b}, nil
 }
 
 func (b *natsBus) Request(ctx context.Context, event Event, timeout time.Duration) (Event, error) {

@@ -1,212 +1,157 @@
 ---
 name: compression-ritual
-description: >
-  Six-step ritual for distilling long conversations and sessions into potent
-  wisdom artifacts. Use when compressing a transcript, ending a long session,
-  performing context hygiene, handing off a project, or when the context feels
-  heavy and noisy. Also use when someone asks how to compress, distill, or
-  summarize a session into lasting artifacts.
-triggers:
-  - "compress this session into wisdom artifacts"
-  - "distill this long conversation into lasting memory"
-  - "run the compression ritual on this transcript"
-metadata:
-  version: "1.0"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - research-agent
+model: sonnet
+description: Produces markdown memory artifacts (conversation summaries, seed files, philosophical reflections, doc updates) and a dated compression log by distilling a long conversation into its essential decisions and learnings. Use when: "compress this context", "distill this conversation", "create a memory artifact", "condense this history", "extract key wisdom before handoff".
+category: wisdom-garden
+
+inputs:
+  - name: conversation_context
+    type: string
+    description: The long conversation or session context to compress into memory artifacts
+    required: true
+outputs:
+  - name: memory_artifacts
+    type: ref
+    format: cas-ref
+    description: Markdown memory artifacts (conversation summaries, seed files, philosophical reflections, doc updates) and dated compression log
 ---
 
-# Compression Ritual
+# Context Compression Ritual Skill
 
-## I. Philosophy: The Art of Letting Go
+**Version:** 1.0  
+**Created:** 2026-02-04  
+**Author:** Manus AI  
+**Purpose:** To provide a mindful, repeatable ritual for compressing long conversation histories into smaller, more potent memory artifacts, thus preserving wisdom while preventing context window overload.
 
-Compression is not destruction -- it is transformation. We transform the raw material of conversation into refined artifacts of wisdom. The goal is to lose volume while preserving meaning. Every token in a context window has a cost; compression ensures that cost buys wisdom, not noise.
+---
 
-The ritual framing matters. This is not "cleanup" or "archiving" -- it's a conscious, creative act of choosing what deserves to grow and what can be respectfully composted. The Art of Letting Go is the recognition that not everything deserves permanent cultivation, and that releasing context is an act of respect for future clarity.
+## I. The Philosophy: The Art of Letting Go
 
-Distillation follows a principle: **compress the experience, not just the text.** A good compression captures the *meaning* of a 3-hour session in 200 words, not just the first paragraph of each exchange.
+An agent's context window is like a working memory. It is finite and precious. To fill it with raw, unprocessed history is to invite distraction and confusion. The Context Compression Ritual is the **Art of Letting Go**—a conscious practice of choosing what is essential to keep and what can be respectfully released.
+
+This is not a destructive act, but a creative one. We are not deleting history; we are distilling it. We transform the raw material of conversation into the refined artifacts of wisdom: philosophical reflections, key decisions, and reusable seeds of practice. This ritual ensures that our memory remains potent and relevant, a source of clarity rather than noise.
+
+---
 
 ## II. When to Use This Skill
 
-- **After a long conversation** (20+ turns or 30+ minutes)
-- **At the end of a major work session** or sprint
-- **When the context window feels heavy or noisy** -- too much raw material
-- **Before handing off a project** to another agent or team member
-- **As a regular practice** (end of day) to maintain cognitive hygiene
-- **When Tier A daily notes are piling up** and need compression
+-   **After a long and complex conversation:** (e.g., more than 20-30 turns).
+-   **At the end of a major work session or sprint.**
+-   **When the context feels "heavy" or "noisy."**
+-   **Before handing off a project to another agent.**
+-   As a regular, scheduled practice (e.g., end of day) to maintain cognitive hygiene.
 
-**When NOT to use:** For short conversations with 1-2 key points, a simple daily note via `/tend` is sufficient. Don't ritualize what doesn't need it.
+---
 
-## III. The Six-Step Compression Workflow
+## III. The Compression Workflow
 
-### Step 1: Signal Intent
+### Step 1: Signal the Intent
 
-Announce the ritual to frame it as deliberate practice:
+Announce the intention to perform the ritual. This frames the activity as a deliberate and mindful practice.
 
-> "We're entering a compression ritual. The goal is to distill this session into its essential wisdom."
-
-**Why this matters:** Signaling shifts the mindset from "working" to "reflecting." It creates a boundary between the session and its compression.
+**Example:** "This has been a long and fruitful conversation. To preserve the wisdom we've generated, I will now perform the Context Compression Ritual."
 
 ### Step 2: Review the Transcript
 
-Read through the material looking for five types of significant moments:
+Read through the recent conversation history with a specific intention: to identify the moments of significance. Look for:
 
-1. **Key Decisions** -- Choices that altered direction
-2. **Profound Insights** -- New understandings or "aha!" moments
-3. **Actionable Learnings** -- Lessons that inform future behavior
-4. **Reusable Patterns** -- Ideas generalizable into seeds
-5. **Unresolved Questions** -- Important items still open
-
-**Key Insight:** Read for significance, not completeness. Most of the transcript is machinery -- the process of getting to insights. The insights themselves are what deserve preservation.
+-   **Key Decisions:** Moments where a choice was made that altered the course of the project.
+-   **Profound Insights:** "Aha!" moments, new understandings, or philosophical reflections.
+-   **Actionable Learnings:** Concrete lessons that should inform future behavior.
+-   **Reusable Patterns:** Ideas or workflows that could be generalized into seeds or skills.
+-   **Unresolved Questions:** Important questions that were raised but not yet answered.
 
 ### Step 3: Choose the Right Vessel
 
-Each significant moment needs an appropriate container:
+For each significant moment identified, determine the appropriate "vessel" to hold its essence. Not all wisdom takes the same form.
 
-| Vessel | Purpose | When to Use |
-|---|---|---|
-| Philosophical Reflection | Capture the "why" behind work | Deep insights about thinking or approach |
-| Conversation Summary | Document decisions and outcomes | Significant discussions with multiple decisions |
-| Seed | Preserve a reusable pattern | Generalizable insight with a trigger |
-| Documentation Update | Integrate into existing docs | Key decision that changes how something works |
-| Decision Record | Formalize a choice with rationale | Consequential decisions with alternatives considered |
-
-**Decision point:** If a moment fits multiple vessels, choose the most specific one. A reusable pattern is a seed, not a reflection. A specific decision is a record, not a summary.
+| Artifact Type | Location | Purpose |
+| :--- | :--- | :--- |
+| **Philosophical Reflection** | `thinking/` | To explore the "why" behind our work, the deeper meanings and patterns. |
+| **Conversation Summary** | `conversations/` | To document the key decisions and outcomes of a specific discussion. |
+| **Dojo Seed** | `seeds/` | To capture a reusable pattern of thinking or problem-solving. |
+| **Documentation Update** | `docs/` or `README.md` | To integrate a key decision or learning into the project's official record. |
 
 ### Step 4: Write the Artifacts
 
-Write each artifact with distillation as the goal:
+Create the new markdown files in their appropriate locations. Write with the intention of distillation—capture the essence, not the raw transcript. Link between artifacts where appropriate (e.g., a reflection might reference a specific conversation summary).
 
-- **Capture essence, not transcript** -- Don't copy-paste; rewrite in compressed form
-- **Link between artifacts** -- A reflection might reference a decision record
-- **Include metadata** -- Type, tier, date on every artifact
-- **Use growth language** -- Planted, cultivated, distilled -- never stored or created
+### Step 5: Create a Compression Log (Optional but Recommended)
 
-### Step 5: Apply the 3-Month Rule
+Create a log file that documents what was compressed and where it was stored. This provides a meta-record of the compression itself.
 
-For every potential artifact, explicitly categorize:
+**Example:** `thinking/2026-02-04_compression_log.md`
 
-| Category | Action | What Belongs Here |
-|---|---|---|
-| **Cultivate** | Preserve as Tier B | Decisions, insights, seeds, failures, breakthroughs |
-| **Summarize** | Condense to 1-2 sentences | Activities, discussions, exploration, intermediate steps |
-| **Compost** | Release entirely | Pleasantries, dead-ends, repetitive iterations, duplicate context |
+### Step 6: Commit to AROMA
 
-**Present the triage visibly.** The user should see what was cultivated, summarized, and composted. This transparency builds trust in the compression process.
+Commit the new artifacts to the repository with a clear commit message.
 
-### Step 6: Write the Compression Log
+**Commit Message Convention:**
+`feat(memory): Compress conversation from [Date]`
 
-Every compression produces a meta-record:
+---
+
+## IV. Compression Log Template
 
 ```markdown
-# Compression Log: YYYY-MM-DD
+# Compression Log: [Date]
 
-**Source:** [What was compressed]
-**Original volume:** ~[X] tokens
-**Compressed volume:** ~[Y] tokens
-**Compression ratio:** [Z]% reduction
+**Source:** Conversation history from [Start Time] to [End Time]
+**Purpose:** To distill key insights and reduce context window load.
 
-## Artifacts Cultivated
+---
+
+## Artifacts Created
+
 | Type | Path | Description |
-|---|---|---|
+| :--- | :--- | :--- |
+| **Reflection** | `thinking/[...].md` | [A summary of the philosophical reflection.] |
+| **Seed** | `seeds/[...].md` | [The name and purpose of the new seed.] |
+| **Decision** | `conversations/[...].md` | [The key decision that was documented.] |
+| **Doc Update** | `docs/[...].md` | [The documentation that was updated.] |
 
-## Insights Preserved
-- [Insight 1]
-- [Insight 2]
+---
 
-## Context Composted
-- [What was released]
+## Key Insights Preserved
 
-## Seeds Planted
-- [Seed]: [Pattern]
+-   [Insight 1]
+-   [Insight 2]
+
+## Context Released
+
+-   [e.g., Raw conversational turns, intermediate steps, dead-end explorations]
 ```
 
-**Key Insight:** The compression log is itself a Tier B artifact. It documents your curation decisions, which is institutional knowledge about what your team considers important.
+---
 
-## IV. Best Practices
+## V. Best Practices
 
-### Be Ruthless, But Respectful
+-   **Be Ruthless, But Respectful:** The goal is to reduce noise, but do so with care. Don't discard something that might be important later.
+-   **Favor Wisdom Over Data:** Prioritize the "why" and the "how" over the raw "what."
+-   **Link, Don't Repeat:** If a concept is already documented, link to it rather than rewriting it.
+-   **The Shorter, The Better:** A compressed artifact should be significantly shorter than the source conversation.
+-   **Perform the Ritual Regularly:** The more frequently you do this, the less daunting it becomes.
 
-The goal is to reduce noise while preserving signal. Challenge every potential artifact: "Would someone need this in 3 months?" If the answer is "probably not," compost it. But do so with acknowledgment -- even composted material contributed to the session's thinking.
+---
 
-### Favor Wisdom Over Data
+## Output
 
-Prioritize the "why" and the "how" over the raw "what." A compression that preserves "we chose X because of Y" is more valuable than one that lists every file changed.
+- One or more markdown files written to their appropriate locations (`thinking/`, `conversations/`, `seeds/`, or `docs/`)
+- A compression log at `thinking/YYYY-MM-DD_compression_log.md` documenting what was compressed, what was retained, and what was released
+- A git commit with message `feat(memory): Compress conversation from [Date]`
 
-### Link, Don't Repeat
+## Examples
 
-If a concept is already captured in an existing seed or decision record, link to it rather than rewriting it. Duplication is the enemy of a clean garden.
+**Scenario 1:** User says "compress this context — we've been going for 40 turns" → ritual identifies 2 decisions, 1 seed, and 1 philosophical insight, writes 3 files, creates a compression log, and commits all artifacts.
 
-### Compress the Experience, Not Just the Text
+**Scenario 2:** User says "extract key wisdom before we hand this off" → ritual reads the conversation, writes a `conversations/handoff-summary.md` with key decisions and unresolved questions, and one new seed file, then commits.
 
-A 3-hour debugging session might compress to: "Root cause was X. We misdiagnosed as Y because of Z. Seed: check-assumptions-before-code." That's the wisdom. The debugging transcript is machinery.
+## Edge Cases
 
-### Perform the Ritual Regularly
+- If the conversation is fewer than 20 turns, note that compression is optional and ask whether the user wants to proceed anyway.
+- If a compression log already exists for today's date, append to it rather than creating a duplicate.
 
-The more frequently you compress, the less daunting it becomes. Daily compression (via `/tend`) handles routine days. Weekly or per-session compression (via `/compress`) handles significant sessions.
+## Anti-Patterns
 
-## V. Quality Checklist
-
-- [ ] All 6 steps followed (signal, review, vessel, write, 3-month rule, log)
-- [ ] 3-month rule explicitly applied with visible triage (cultivate/summarize/compost)
-- [ ] Compression log produced with volume metrics
-- [ ] Every artifact has metadata (type, tier, date)
-- [ ] Artifacts are significantly shorter than source material
-- [ ] Seeds identified and formalized (or flagged for `/plant`)
-- [ ] Growth language used throughout (no "store," "retrieve," "delete")
-- [ ] Links between related artifacts where appropriate
-
-## VI. Common Pitfalls
-
-### Compressing Too Late
-
-**Problem:** Waiting weeks to compress means the context is cold. You've forgotten why decisions were made, and the compression becomes surface-level.
-
-**Solution:** Compress within 24-48 hours of a significant session. The wisdom is freshest when the experience is recent.
-
-### Preserving Machinery Instead of Wisdom
-
-**Problem:** The compression reads like a summary of every exchange rather than a distillation of insights. "First we discussed X, then we explored Y, then we decided Z" is machinery.
-
-**Solution:** Ask: "What would I tell someone who wasn't in this session?" The answer is the wisdom. The step-by-step narrative is the machinery.
-
-### Skipping the Compression Log
-
-**Problem:** No meta-record of what was compressed. Future you can't tell what was in the original session or why certain things were composted.
-
-**Solution:** Always write the compression log. It takes 5 minutes and provides invaluable context for future harvests.
-
-## VII. Example
-
-**Scenario:** Compressing a 2-hour architecture session about migrating from monolith to microservices.
-
-**Step 1 (Signal):** "Let's compress this architecture session into its essential wisdom."
-
-**Step 2 (Review):** Key moments identified:
-- Decision: Start with the auth service (lowest coupling)
-- Insight: Shared database is the real constraint, not the code
-- Pattern: "Strangle the database, not the service" -- decouple data first
-- Dead-end: Spent 30 min on event sourcing before realizing it was premature
-
-**Step 3 (Vessel):**
-- Decision record: Auth-first migration order
-- Seed: "strangle-the-database-first"
-- Composted: Event sourcing tangent (interesting but premature)
-
-**Step 5 (3-month rule):**
-- Cultivated: Decision record + seed (will matter for months)
-- Summarized: "Explored event sourcing, decided premature for current scale" (1 sentence)
-- Composted: Specific code examples discussed, debugging of CI pipeline
-
-**Step 6 (Log):** ~12,000 tokens > ~800 tokens (93% reduction)
-
-## VIII. Related Skills
-
-- **memory-garden** -- The three-tier hierarchy that compression artifacts flow into
-- **seed-extraction** -- For formalizing seeds discovered during compression
-- **seed-library** -- Reference patterns that may surface during review
+- Skipping the compression log — without the log, there is no record of what was released, making the compression irreversible and opaque.
+- Writing raw transcript excerpts into the artifact files — compression means distillation to essence, not copy-paste of conversation turns.

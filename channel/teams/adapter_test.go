@@ -3,22 +3,125 @@ package teams
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DojoGenesis/gateway/channel"
 )
+
+// ---------------------------------------------------------------------------
+// Test fixtures — generated once for the whole package test run.
+// ---------------------------------------------------------------------------
+
+var (
+	testPrivKey *rsa.PrivateKey
+	testKID     = "test-key-001"
+	testAppID   = "test-app-id-12345"
+)
+
+func TestMain(m *testing.M) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic("teams test: generate RSA key: " + err.Error())
+	}
+	testPrivKey = key
+	os.Exit(m.Run())
+}
+
+// makeJWT creates a real RS256-signed JWT with the given claims.
+// exp and nbf are Unix timestamps; pass nbf=0 to omit the claim.
+func makeJWT(t *testing.T, key *rsa.PrivateKey, kid, iss, aud string, exp, nbf int64) string {
+	t.Helper()
+
+	headerJSON, _ := json.Marshal(map[string]string{
+		"alg": "RS256",
+		"typ": "JWT",
+		"kid": kid,
+	})
+	claims := map[string]interface{}{
+		"iss": iss,
+		"aud": aud,
+		"exp": exp,
+	}
+	if nbf != 0 {
+		claims["nbf"] = nbf
+	}
+	payloadJSON, _ := json.Marshal(claims)
+
+	hdr := base64.RawURLEncoding.EncodeToString(headerJSON)
+	pay := base64.RawURLEncoding.EncodeToString(payloadJSON)
+	sigInput := hdr + "." + pay
+
+	digest := sha256.Sum256([]byte(sigInput))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatalf("makeJWT: sign: %v", err)
+	}
+	return sigInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+// jwksServerFor starts a mock JWKS HTTP server that serves the given public key.
+func jwksServerFor(t *testing.T, kid string, pub *rsa.PublicKey) *httptest.Server {
+	t.Helper()
+
+	nBytes := pub.N.Bytes()
+
+	e := pub.E
+	eBytes := make([]byte, 4)
+	eBytes[0] = byte(e >> 24)
+	eBytes[1] = byte(e >> 16)
+	eBytes[2] = byte(e >> 8)
+	eBytes[3] = byte(e)
+	// Trim leading zero bytes.
+	i := 0
+	for i < len(eBytes)-1 && eBytes[i] == 0 {
+		i++
+	}
+	eBytes = eBytes[i:]
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"keys": []map[string]string{
+			{
+				"kty": "RSA",
+				"use": "sig",
+				"kid": kid,
+				"n":   base64.RawURLEncoding.EncodeToString(nBytes),
+				"e":   base64.RawURLEncoding.EncodeToString(eBytes),
+			},
+		},
+	})
+
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(body)
+	}))
+}
+
+// newTestAdapter creates a TeamsAdapter pointing at mockJWKSSrv for key
+// fetches, without touching the real Microsoft endpoint.
+func newTestAdapter(t *testing.T, jwksSrv *httptest.Server) *TeamsAdapter {
+	t.Helper()
+	return newTeamsAdapterInternal("test-bot-token", testAppID, jwksSrv.URL, http.DefaultClient)
+}
 
 // ---------------------------------------------------------------------------
 // 1. TestTeamsAdapter_Name
 // ---------------------------------------------------------------------------
 
 func TestTeamsAdapter_Name(t *testing.T) {
-	a := NewTeamsAdapter("test-bot-token")
+	a := NewTeamsAdapter("test-bot-token", testAppID)
 	if got := a.Name(); got != "teams" {
 		t.Errorf("Name() = %q, want %q", got, "teams")
 	}
@@ -29,7 +132,7 @@ func TestTeamsAdapter_Name(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTeamsAdapter_Capabilities(t *testing.T) {
-	a := NewTeamsAdapter("test-bot-token")
+	a := NewTeamsAdapter("test-bot-token", testAppID)
 	caps := a.Capabilities()
 
 	if !caps.SupportsThreads {
@@ -54,7 +157,7 @@ func TestTeamsAdapter_Capabilities(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTeamsAdapter_Normalize_Message(t *testing.T) {
-	a := NewTeamsAdapter("test-bot-token")
+	a := NewTeamsAdapter("test-bot-token", testAppID)
 
 	act := Activity{
 		Type: "message",
@@ -93,7 +196,7 @@ func TestTeamsAdapter_Normalize_Message(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTeamsAdapter_Normalize_Reply(t *testing.T) {
-	a := NewTeamsAdapter("test-bot-token")
+	a := NewTeamsAdapter("test-bot-token", testAppID)
 
 	act := Activity{
 		Type:      "message",
@@ -120,38 +223,186 @@ func TestTeamsAdapter_Normalize_Reply(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTeamsAdapter_VerifySignature(t *testing.T) {
-	a := NewTeamsAdapter("test-bot-token")
+	jwksSrv := jwksServerFor(t, testKID, &testPrivKey.PublicKey)
+	defer jwksSrv.Close()
+	a := newTestAdapter(t, jwksSrv)
 
-	// Build a minimal valid JWT structure: three base64url-encoded parts.
-	header  := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9"
-	payload := "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IlRlc3QiLCJpYXQiOjE1MTYyMzkwMjJ9"
-	sig     := "c2lnbmF0dXJl" // "signature" in base64url
-	token   := header + "." + payload + "." + sig
+	futureExp := time.Now().Add(time.Hour).Unix()
+	pastExp := time.Now().Add(-2 * time.Hour).Unix()
 
-	t.Run("valid_structure", func(t *testing.T) {
+	t.Run("valid_token", func(t *testing.T) {
+		token := makeJWT(t, testPrivKey, testKID, botFrameworkIssuer, testAppID, futureExp, 0)
 		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
-		// Phase 0: structural check only — should not error on well-formed JWT.
 		if err := a.VerifySignature(req); err != nil {
-			t.Errorf("expected valid JWT structure to pass, got error: %v", err)
+			t.Errorf("expected valid token to pass, got: %v", err)
 		}
 	})
 
 	t.Run("missing_header", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
-
 		if err := a.VerifySignature(req); err == nil {
 			t.Error("expected error for missing Authorization header, got nil")
+		}
+	})
+
+	t.Run("non_bearer_scheme", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
+		req.Header.Set("Authorization", "Basic dXNlcjpwYXNz")
+		if err := a.VerifySignature(req); err == nil {
+			t.Error("expected error for non-Bearer scheme, got nil")
 		}
 	})
 
 	t.Run("malformed_jwt", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
 		req.Header.Set("Authorization", "Bearer notajwt")
-
 		if err := a.VerifySignature(req); err == nil {
 			t.Error("expected error for malformed JWT, got nil")
+		}
+	})
+
+	t.Run("expired_token", func(t *testing.T) {
+		token := makeJWT(t, testPrivKey, testKID, botFrameworkIssuer, testAppID, pastExp, 0)
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		err := a.VerifySignature(req)
+		if err == nil {
+			t.Error("expected error for expired token, got nil")
+		}
+		if !strings.Contains(err.Error(), "expired") {
+			t.Errorf("expected 'expired' in error, got: %v", err)
+		}
+	})
+
+	t.Run("wrong_issuer", func(t *testing.T) {
+		token := makeJWT(t, testPrivKey, testKID, "https://evil.example.com", testAppID, futureExp, 0)
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		err := a.VerifySignature(req)
+		if err == nil {
+			t.Error("expected error for wrong issuer, got nil")
+		}
+		if !strings.Contains(err.Error(), "issuer") {
+			t.Errorf("expected 'issuer' in error, got: %v", err)
+		}
+	})
+
+	t.Run("wrong_audience", func(t *testing.T) {
+		token := makeJWT(t, testPrivKey, testKID, botFrameworkIssuer, "wrong-app-id", futureExp, 0)
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		err := a.VerifySignature(req)
+		if err == nil {
+			t.Error("expected error for wrong audience, got nil")
+		}
+		if !strings.Contains(err.Error(), "audience") {
+			t.Errorf("expected 'audience' in error, got: %v", err)
+		}
+	})
+
+	t.Run("unknown_kid", func(t *testing.T) {
+		token := makeJWT(t, testPrivKey, "unknown-kid", botFrameworkIssuer, testAppID, futureExp, 0)
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		err := a.VerifySignature(req)
+		if err == nil {
+			t.Error("expected error for unknown kid, got nil")
+		}
+	})
+
+	t.Run("tampered_payload", func(t *testing.T) {
+		// Build a valid token then replace the payload with different claims.
+		token := makeJWT(t, testPrivKey, testKID, botFrameworkIssuer, testAppID, futureExp, 0)
+		parts := strings.Split(token, ".")
+
+		// Swap in a payload with a different audience — signature won't match.
+		fakeClaims, _ := json.Marshal(map[string]interface{}{
+			"iss": botFrameworkIssuer,
+			"aud": "attacker-app-id",
+			"exp": futureExp,
+		})
+		parts[1] = base64.RawURLEncoding.EncodeToString(fakeClaims)
+		tampered := strings.Join(parts, ".")
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
+		req.Header.Set("Authorization", "Bearer "+tampered)
+		if err := a.VerifySignature(req); err == nil {
+			t.Error("expected error for tampered payload, got nil")
+		}
+	})
+
+	t.Run("nbf_in_future", func(t *testing.T) {
+		// nbf well beyond clock-skew tolerance
+		futurNbf := time.Now().Add(30 * time.Minute).Unix()
+		token := makeJWT(t, testPrivKey, testKID, botFrameworkIssuer, testAppID, futureExp, futurNbf)
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		err := a.VerifySignature(req)
+		if err == nil {
+			t.Error("expected error for future nbf, got nil")
+		}
+		if !strings.Contains(err.Error(), "not yet valid") {
+			t.Errorf("expected 'not yet valid' in error, got: %v", err)
+		}
+	})
+
+	t.Run("signed_by_different_key", func(t *testing.T) {
+		// Generate a different key and sign with it — JWKS has the original key.
+		otherKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			t.Fatalf("generate key: %v", err)
+		}
+		token := makeJWT(t, otherKey, testKID, botFrameworkIssuer, testAppID, futureExp, 0)
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		if err := a.VerifySignature(req); err == nil {
+			t.Error("expected signature error, got nil")
+		}
+	})
+
+	t.Run("jwks_cache_hit", func(t *testing.T) {
+		// Wrap the shared JWKS server with a counting proxy to confirm that
+		// 3 verification calls only trigger 1 JWKS fetch (cache warms on first).
+		callCount := 0
+		proxySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callCount++
+			// Delegate to a fresh jwksServerFor handler to avoid duplicating
+			// the public-key encoding logic.
+			inner := jwksServerFor(t, testKID, &testPrivKey.PublicKey)
+			defer inner.Close()
+			resp, err := http.Get(inner.URL)
+			if err != nil {
+				http.Error(w, "proxy fetch failed", http.StatusInternalServerError)
+				return
+			}
+			defer resp.Body.Close()
+			w.Header().Set("Content-Type", "application/json")
+			io.Copy(w, resp.Body)
+		}))
+		defer proxySrv.Close()
+
+		ca := newTeamsAdapterInternal("tok", testAppID, proxySrv.URL, http.DefaultClient)
+		token := makeJWT(t, testPrivKey, testKID, botFrameworkIssuer, testAppID, futureExp, 0)
+
+		for i := 0; i < 3; i++ {
+			req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			if err := ca.VerifySignature(req); err != nil {
+				t.Fatalf("request %d: %v", i, err)
+			}
+		}
+		if callCount != 1 {
+			t.Errorf("JWKS endpoint hit %d times, want 1 (cache miss only on first)", callCount)
+		}
+	})
+
+	t.Run("oversized_token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", nil)
+		req.Header.Set("Authorization", "Bearer "+strings.Repeat("a", maxTokenBytes+1))
+		if err := a.VerifySignature(req); err == nil {
+			t.Error("expected error for oversized token, got nil")
 		}
 	})
 }
@@ -161,9 +412,11 @@ func TestTeamsAdapter_VerifySignature(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTeamsAdapter_HandleWebhook(t *testing.T) {
-	a := NewTeamsAdapter("test-bot-token")
+	jwksSrv := jwksServerFor(t, testKID, &testPrivKey.PublicKey)
+	defer jwksSrv.Close()
+	a := newTestAdapter(t, jwksSrv)
 
-	act := Activity{
+	validAct := Activity{
 		Type: "message",
 		ID:   "msg-003",
 		From: ChannelAccount{ID: "user-charlie", Name: "Charlie"},
@@ -172,24 +425,50 @@ func TestTeamsAdapter_HandleWebhook(t *testing.T) {
 		ServiceURL: "https://smba.trafficmanager.net/teams/",
 	}
 
-	raw, _ := json.Marshal(act)
+	t.Run("valid_request_returns_200", func(t *testing.T) {
+		raw, _ := json.Marshal(validAct)
+		token := makeJWT(t, testPrivKey, testKID, botFrameworkIssuer, testAppID, time.Now().Add(time.Hour).Unix(), 0)
 
-	// Build valid JWT token for the header.
-	header  := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9"
-	payload := "eyJzdWIiOiJ0ZXN0IiwiaWF0IjoxNTE2MjM5MDIyfQ"
-	sig     := "c2lnbmF0dXJl"
-	token   := header + "." + payload + "." + sig
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook/teams", bytes.NewReader(raw))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-	rec := httptest.NewRecorder()
+		a.HandleWebhook(rec, req)
 
-	a.HandleWebhook(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("HandleWebhook status = %d, want 200", rec.Code)
+		}
+	})
 
-	if rec.Code != http.StatusOK {
-		t.Errorf("HandleWebhook status = %d, want 200", rec.Code)
-	}
+	t.Run("invalid_token_returns_401", func(t *testing.T) {
+		raw, _ := json.Marshal(validAct)
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer notavalidtoken.atall.nope")
+		rec := httptest.NewRecorder()
+
+		a.HandleWebhook(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("HandleWebhook status = %d, want 401", rec.Code)
+		}
+	})
+
+	t.Run("missing_auth_returns_401", func(t *testing.T) {
+		raw, _ := json.Marshal(validAct)
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/teams", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		a.HandleWebhook(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("HandleWebhook status = %d, want 401", rec.Code)
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +487,7 @@ func TestTeamsAdapter_Send(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	a := NewTeamsAdapterWithClient("my-bot-token", &http.Client{
+	a := NewTeamsAdapterWithClient("my-bot-token", testAppID, &http.Client{
 		Transport: &urlRewriteTransport{
 			base:       http.DefaultTransport,
 			serverAddr: srv.URL,
@@ -251,7 +530,7 @@ func TestTeamsAdapter_Send(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTeamsAdapter_Send_MissingServiceURL(t *testing.T) {
-	a := NewTeamsAdapter("test-bot-token")
+	a := NewTeamsAdapter("test-bot-token", testAppID)
 
 	msg := &channel.ChannelMessage{
 		Platform:  "teams",
@@ -261,6 +540,37 @@ func TestTeamsAdapter_Send_MissingServiceURL(t *testing.T) {
 
 	if err := a.Send(context.Background(), msg); err == nil {
 		t.Error("expected error when service_url missing from metadata, got nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 9. TestRSAPublicKeyFromJWK
+// ---------------------------------------------------------------------------
+
+func TestRSAPublicKeyFromJWK(t *testing.T) {
+	pub := &testPrivKey.PublicKey
+
+	nBytes := pub.N.Bytes()
+	eVal := pub.E
+	eBytes := big.NewInt(int64(eVal)).Bytes()
+
+	entry := jwkEntry{
+		Kid: "k1",
+		Kty: "RSA",
+		Use: "sig",
+		N:   base64.RawURLEncoding.EncodeToString(nBytes),
+		E:   base64.RawURLEncoding.EncodeToString(eBytes),
+	}
+
+	got, err := rsaPublicKeyFromJWK(entry)
+	if err != nil {
+		t.Fatalf("rsaPublicKeyFromJWK: %v", err)
+	}
+	if got.N.Cmp(pub.N) != 0 {
+		t.Error("modulus mismatch")
+	}
+	if got.E != pub.E {
+		t.Errorf("exponent = %d, want %d", got.E, pub.E)
 	}
 }
 

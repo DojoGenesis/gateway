@@ -126,3 +126,55 @@ func (NoOpLimiter) Allow(_ context.Context, _ string) (bool, error) {
 func (NoOpLimiter) Wait(_ context.Context, _ string) error {
 	return nil
 }
+
+// ---------------------------------------------------------------------------
+// Per-adapter default rate limiters (ADR-018 Q15)
+// ---------------------------------------------------------------------------
+
+// NewSlackLimiter returns a rate limiter tuned to Slack's documented limits:
+// 1 message per second per channel. Burst of 1 (no bursting above rate).
+func NewSlackLimiter() *TokenBucketLimiter {
+	return NewTokenBucketLimiter(1.0, 1) // 1 msg/sec/channel
+}
+
+// NewDiscordLimiter returns a rate limiter tuned to Discord's per-guild rate
+// limits. Discord allows 5 requests per 5 seconds per channel (1 msg/sec
+// sustained, burst 5). This is the "normal" tier; bots in very large guilds
+// may have higher limits.
+func NewDiscordLimiter() *TokenBucketLimiter {
+	return NewTokenBucketLimiter(1.0, 5) // 1 msg/sec sustained, burst 5
+}
+
+// TelegramDualLimiter applies different rate limits for group chats vs direct
+// messages. Telegram allows 30 msg/sec to groups but only 1 msg/sec to DMs.
+// Keys should be prefixed: "group:{chat_id}" or "dm:{chat_id}".
+type TelegramDualLimiter struct {
+	groupLimiter *TokenBucketLimiter
+	dmLimiter    *TokenBucketLimiter
+}
+
+// NewTelegramLimiter returns a dual-mode limiter: 30 msg/sec for groups,
+// 1 msg/sec for DMs.
+func NewTelegramLimiter() *TelegramDualLimiter {
+	return &TelegramDualLimiter{
+		groupLimiter: NewTokenBucketLimiter(30.0, 30), // 30 msg/sec groups
+		dmLimiter:    NewTokenBucketLimiter(1.0, 1),   // 1 msg/sec DM
+	}
+}
+
+// Allow checks rate limits based on key prefix. Keys starting with "dm:" use
+// the DM limiter; all others use the group limiter.
+func (t *TelegramDualLimiter) Allow(ctx context.Context, key string) (bool, error) {
+	if len(key) > 3 && key[:3] == "dm:" {
+		return t.dmLimiter.Allow(ctx, key)
+	}
+	return t.groupLimiter.Allow(ctx, key)
+}
+
+// Wait blocks until allowed, respecting the correct limiter for the key prefix.
+func (t *TelegramDualLimiter) Wait(ctx context.Context, key string) error {
+	if len(key) > 3 && key[:3] == "dm:" {
+		return t.dmLimiter.Wait(ctx, key)
+	}
+	return t.groupLimiter.Wait(ctx, key)
+}

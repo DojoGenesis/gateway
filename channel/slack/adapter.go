@@ -189,11 +189,25 @@ type slackFile struct {
 }
 
 // slackEvent mirrors the inner "event" object of a Slack event_callback payload.
+// Covers "message", "app_mention", and "message_changed" event types.
 type slackEvent struct {
 	Type     string      `json:"type"`
+	Subtype  string      `json:"subtype,omitempty"`
 	User     string      `json:"user"`
 	Text     string      `json:"text"`
 	Channel  string      `json:"channel"`
+	Ts       string      `json:"ts"`
+	ThreadTs string      `json:"thread_ts"`
+	Files    []slackFile `json:"files"`
+	// message_changed carries the new version of the message in "message".
+	Message *slackEditedMessage `json:"message,omitempty"`
+}
+
+// slackEditedMessage represents the inner "message" object within a
+// "message_changed" subtype event.
+type slackEditedMessage struct {
+	User     string      `json:"user"`
+	Text     string      `json:"text"`
 	Ts       string      `json:"ts"`
 	ThreadTs string      `json:"thread_ts"`
 	Files    []slackFile `json:"files"`
@@ -226,8 +240,27 @@ func (a *SlackAdapter) Normalize(raw []byte) (*channel.ChannelMessage, error) {
 
 	evt := envelope.Event
 
+	// Determine the effective event data. For "message_changed" subtype, the
+	// updated content lives in evt.Message; for "message" and "app_mention"
+	// the outer event carries the content directly.
+	user := evt.User
+	text := evt.Text
+	tsRaw := evt.Ts
+	threadTs := evt.ThreadTs
+	files := evt.Files
+	eventType := evt.Type
+
+	if evt.Subtype == "message_changed" && evt.Message != nil {
+		user = evt.Message.User
+		text = evt.Message.Text
+		tsRaw = evt.Message.Ts
+		threadTs = evt.Message.ThreadTs
+		files = evt.Message.Files
+		eventType = "message_changed"
+	}
+
 	// Parse the Slack timestamp (Unix seconds with microsecond decimal).
-	ts, err := parseSlackTS(evt.Ts)
+	ts, err := parseSlackTS(tsRaw)
 	if err != nil {
 		// Fall back to now so normalization still succeeds.
 		ts = time.Now().UTC()
@@ -237,16 +270,17 @@ func (a *SlackAdapter) Normalize(raw []byte) (*channel.ChannelMessage, error) {
 		ID:        uuid.New().String(),
 		Platform:  platformName,
 		ChannelID: evt.Channel,
-		UserID:    evt.User,
-		Text:      evt.Text,
+		UserID:    user,
+		Text:      text,
 		Timestamp: ts,
-		ThreadID:  evt.ThreadTs,
+		ThreadID:  threadTs,
 		Metadata: map[string]interface{}{
-			"slack_ts": evt.Ts,
+			"slack_ts":         tsRaw,
+			"slack_event_type": eventType,
 		},
 	}
 
-	for _, f := range evt.Files {
+	for _, f := range files {
 		kind := classifyMime(f.Mimetype)
 		msg.Attachments = append(msg.Attachments, channel.Attachment{
 			Type:     kind,

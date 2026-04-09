@@ -28,3 +28,8 @@ type SlackConfig struct {
 	// Source: DOJO_SLACK_APPTOKEN environment variable or CredentialStore.
 	AppToken string
 }
+
+// IsSocketMode returns true when the adapter should use Socket Mode.
+func (c SlackConfig) IsSocketMode() bool {
+	return c.Mode == "socket"
+}

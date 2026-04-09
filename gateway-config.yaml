@@ -75,6 +75,35 @@ mcp:
     #     backoff_multiplier: 2.0
     #     max_backoff_ms: 5000
 
+    # ─── Pretext PDF Export ─────────────────────────────────────────────
+    # Pretext-powered PDF export with Canvas-based typography measurement.
+    # Fully-qualified tool names:
+    #   pretext:export                   pretext:configure-typography
+    - id: "pretext_pdf"
+      display_name: "Pretext PDF Export"
+      namespace_prefix: "pretext"
+      transport:
+        type: "stdio"
+        command: "node"
+        args: ["dist/index.js"]
+        working_directory: "${PRETEXT_PDF_ROOT:-/opt/mcp-servers/pretext-pdf}"
+        env:
+          NODE_ENV: "production"
+      tools:
+        allowlist: []
+        blocklist: []
+      timeouts:
+        startup: 15
+        tool_default: 60
+        health_check: 5
+      health_check:
+        enabled: true
+        interval_sec: 120
+      retry_policy:
+        max_attempts: 2
+        backoff_multiplier: 2.0
+        max_backoff_ms: 5000
+
     # ─── ZenSci Servers ───────────────────────────────────────────────────
     # Six zen-sci MCP servers, each with its own namespace prefix for
     # full tool-level observability and orchestration control.
@@ -354,8 +383,17 @@ mcp:
     tool_span_sample_rate: 1.0
 
 # ─── Channel Bridge (Era 3) ────────────────────────────────────────────────────
-# Flywheel configuration: HTTP webhook → WebhookGateway → InProcessBus
+# Flywheel configuration: HTTP webhook → WebhookGateway → NATSBus
 # → ChannelBridge → WorkflowExecutor → adapter.Send(reply)
+#
+# Era 3 Phase 1 Track A: InProcessBus retired from the production hot path.
+# All channel traffic flows through the embedded NATS + JetStream bus.
+#
+# NATS subject conventions (ADR-015 addendum):
+#   dojo.channel.message.{platform}  — inbound normalized ChannelMessage
+#   dojo.channel.reply.{platform}    — outbound reply from workflow execution
+#   JetStream durable consumer per platform: "channel-{platform}"
+#   Retention: 30 days (hot_retention)
 #
 # Each entry under `channels` maps to a registered WebhookAdapter or
 # ActorAdapter in the WebhookGateway.  The bridge uses the same platform
@@ -364,9 +402,31 @@ mcp:
 # Webhook path: POST /webhooks/{platform}
 
 channel_bridge:
-  # Backend event bus.  "inprocess" is synchronous and suitable for single-
-  # node deployments.  "nats" uses the embedded NATS bus from runtime/event.
-  bus: "inprocess"   # inprocess | nats
+  # Backend event bus.  "nats" uses the embedded NATS bus from runtime/event.
+  # "inprocess" is retained for test/dev only (gated by build tag).
+  bus: "nats"   # nats (production) | inprocess (test only)
+
+  # ─── Credential Store ─────────────────────────────────────────────────
+  # Controls how channel adapters retrieve secrets (tokens, signing keys).
+  # Era 3 Phase 1 Track A: adapters call creds.Get(ctx, platform, key)
+  # instead of reading os.Getenv directly.
+  #
+  # Supported backends:
+  #   "env"       — reads DOJO_{PLATFORM}_{KEY} from environment variables (default)
+  #   "infisical" — reads from Infisical secrets manager via go-sdk
+  #
+  # Example (Infisical):
+  #   credentials:
+  #     backend: "infisical"
+  #     infisical:
+  #       site_url: "https://app.infisical.com"
+  #       client_id: "${INFISICAL_CLIENT_ID}"
+  #       client_secret: "${INFISICAL_CLIENT_SECRET}"
+  #       project_id: "your-project-id"
+  #       environment: "prod"
+  #       secret_path: "/channel"
+  credentials:
+    backend: "env"   # env | infisical
 
   channels:
     - platform: "slack"

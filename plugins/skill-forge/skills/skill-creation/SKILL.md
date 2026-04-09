@@ -1,64 +1,50 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: skill-creation
-description: Design and implement new skills following Dojo Genesis quality standards
-triggers:
-  - "create new skill"
-  - "write skill documentation"
-  - "design skill following standards"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - implementation-agent
+model: sonnet
+description: Produces a complete SKILL.md packaged as a .skill file ready for CAS distribution. Use when: "create a new skill", "write a skill", "build a skill for this workflow", "turn this into a skill", "upgrade this to a skill".
+license: Complete terms in LICENSE.txt
+category: skill-forge
+
+inputs:
+  - name: skill_description
+    type: string
+    description: Description of the workflow or domain to formalize into a skill
+    required: true
+  - name: usage_examples
+    type: string[]
+    description: Concrete usage scenarios for the skill (1-3 examples)
+    required: false
+outputs:
+  - name: skill_package
+    type: ref
+    format: cas-ref
+    description: Complete SKILL.md packaged as a .skill file ready for CAS distribution
 ---
 
 # Skill Creator
 
-This skill provides guidance for creating effective skills.
+## Purpose
 
-## About Skills
+Use this skill to formalize a workflow or domain into a reusable, installable skill package. The output is a `.skill` file ready to be added to any agent that needs the capability.
 
-Skills are modular, self-contained packages that extend Manus's capabilities by providing specialized knowledge, workflows, and tools. Think of them as "onboarding guides" for specific domains or tasks—they transform Manus from a general-purpose agent into a specialized agent equipped with procedural knowledge that no model can fully possess.
+Invoke when:
+- A user asks to "create a skill", "write a skill", "build a skill for this workflow", or "turn this into a skill"
+- A workflow is executed repeatedly and would benefit from formalization
+- A domain requires knowledge the agent lacks by default (schemas, APIs, business rules)
+- An existing skill needs iteration or quality improvement to meet A+ standards
 
-### What Skills Provide
+## Inputs
 
-1. Specialized workflows - Multi-step procedures for specific domains
-2. Tool integrations - Instructions for working with specific file formats or APIs
-3. Domain expertise - Company-specific knowledge, schemas, business logic
-4. Bundled resources - Scripts, references, and assets for complex and repetitive tasks
+Before starting, gather:
 
-## Core Principles
+- **Concrete examples** — at least 1–3 real usage scenarios
+- **Reusable assets** the skill might need: scripts, templates, reference docs, schemas
+- **Target agent** — who will use this skill (same agent, different instance, a partner agent)
+- **Skill name** — short, lowercase, hyphenated (e.g., `bigquery-queries`, `pdf-rotation`)
 
-### Concise is Key
+Ask one targeted question at a time. Do not front-load a list of questions.
 
-The context window is a public good. Skills share the context window with everything else Manus needs: system prompt, conversation history, other Skills' metadata, and the actual user request.
-
-**Default assumption: Manus is already very smart.** Only add context Manus doesn't already have. Challenge each piece of information: "Does Manus really need this explanation?" and "Does this paragraph justify its token cost?"
-
-Prefer concise examples over verbose explanations.
-
-### Set Appropriate Degrees of Freedom
-
-Match the level of specificity to the task's fragility and variability:
-
-**High freedom (text-based instructions)**: Use when multiple approaches are valid, decisions depend on context, or heuristics guide the approach.
-
-**Medium freedom (pseudocode or scripts with parameters)**: Use when a preferred pattern exists, some variation is acceptable, or configuration affects behavior.
-
-**Low freedom (specific scripts, few parameters)**: Use when operations are fragile and error-prone, consistency is critical, or a specific sequence must be followed.
-
-Think of Manus as exploring a path: a narrow bridge with cliffs needs specific guardrails (low freedom), while an open field allows many routes (high freedom).
-
-### Anatomy of a Skill
+## Skill Anatomy
 
 Every skill consists of a required SKILL.md file and optional bundled resources:
 
@@ -75,14 +61,14 @@ skill-name/
     └── templates/        - Files used in output (templates, icons, fonts, etc.)
 ```
 
-#### SKILL.md (required)
+### SKILL.md (required)
 
 Every SKILL.md consists of:
 
-- **Frontmatter** (YAML): Contains `name` and `description` fields. These are the only fields that Manus reads to determine when the skill gets used, thus it is very important to be clear and comprehensive in describing what the skill is, and when it should be used.
+- **Frontmatter** (YAML): Contains `name` and `description` fields. These are the only fields that the agent reads to determine when the skill gets used; make the description clear and specific about what the skill produces and when to use it.
 - **Body** (Markdown): Instructions and guidance for using the skill. Only loaded AFTER the skill triggers (if at all).
 
-#### Bundled Resources (optional)
+### Bundled Resources (optional)
 
 - **`scripts/`** - Executable code for repetitive or deterministic tasks (e.g., `rotate_pdf.py`). Token efficient, can run without loading into context.
 - **`references/`** - Documentation loaded as needed (schemas, API docs, policies). Keeps SKILL.md lean. For large files (>10k words), include grep patterns in SKILL.md.
@@ -114,7 +100,15 @@ bigquery-skill/
     └── product.md
 ```
 
-Manus only loads the relevant reference file when needed.
+### Specificity Levels
+
+Match the level of specificity to the task's fragility and variability:
+
+**High freedom (text-based instructions)**: Use when multiple approaches are valid, decisions depend on context, or heuristics guide the approach.
+
+**Medium freedom (pseudocode or scripts with parameters)**: Use when a preferred pattern exists, some variation is acceptable, or configuration affects behavior.
+
+**Low freedom (specific scripts, few parameters)**: Use when operations are fragile and error-prone, consistency is critical, or a specific sequence must be followed.
 
 ## Skill Creation Process
 
@@ -251,3 +245,74 @@ After testing the skill, users may request improvements. Often this happens righ
 2. Notice struggles or inefficiencies
 3. Identify how SKILL.md or bundled resources should be updated
 4. Implement changes and test again
+
+## Output
+
+A completed skill package containing:
+
+- `SKILL.md` — valid YAML frontmatter + body with at least 8 `##` sections (A+ standard)
+- `scripts/` — tested, executable code (if applicable)
+- `references/` — domain documentation (if applicable)
+- `templates/` — output assets (if applicable)
+- No auxiliary files (no README.md, CHANGELOG.md, or human-facing docs)
+
+The delivered `.skill` file is ready to install and triggers automatically when the agent encounters matching context.
+
+## Quality Criteria
+
+An A+ skill meets all of these:
+
+- **Frontmatter** — `name` is short and hyphenated; `description` covers both what and when
+- **8+ sections** — body structured with `##` headers covering purpose, trigger/inputs, process, output, quality, examples, and anti-patterns
+- **Under 500 lines** — body stays lean; variant detail lives in `references/`
+- **No redundancy** — information appears in SKILL.md OR references, not both
+- **Imperative voice** — all instructions use action verbs
+- **Appropriate freedom** — specificity matches task fragility (see Core Principles)
+- **Tested scripts** — any bundled scripts run without errors
+- **Self-demonstrating** — the skill itself models the format it prescribes
+
+Run `quick_validate.py` before delivery to confirm requirements are met.
+
+## Examples
+
+**Example 1: Formalizing a recurring export workflow**
+
+A user runs the same BigQuery export every week and asks: "Can you turn this into a skill?"
+
+- Step 1: Confirm the exact queries, output format, and destination
+- Step 2: Identify `scripts/run_export.py` as a reusable asset; schema docs as `references/schema.md`
+- Step 3: Run `init_skill.py bigquery-weekly-export`
+- Step 4: Write SKILL.md with trigger phrase "run weekly export", reference the script, note schema location
+- Step 5: Validate and deliver
+
+**Example 2: Upgrading a 3-section skill to A+**
+
+An existing skill has only `## Overview`, `## Steps`, `## Notes` — below A+ standard.
+
+- Add the missing sections: Purpose, Inputs, Output, Quality Criteria, Examples, Anti-patterns
+- Move verbose prose from `## Steps` to `references/detailed-steps.md` if over 150 lines
+- Rewrite `## Notes` as `## Anti-patterns` with concrete failure modes
+- Validate and re-deliver
+
+## Edge Cases
+
+- Requested skill is really a seed or note, not a workflow — ask for 2–3 concrete usage scenarios before starting; if the user cannot provide them, suggest capturing a seed first
+- Existing skill directory already has a SKILL.md — treat this as iteration (Step 4), not creation from scratch; read the current file before proposing any changes
+- User wants a skill that wraps another skill — infer tier 3, add `meta_skill` to tool_dependencies, and link the referenced skill in the body's Related Skills section
+- Skill body exceeds 400 lines during drafting — pause, identify which sections contain variant or example detail, and move them to `references/` before continuing
+
+## Anti-Patterns
+
+**Over-explaining what the agent already knows.** Don't include basic API documentation the agent has in training. Only add domain-specific, proprietary, or procedural knowledge the agent cannot infer.
+
+**Vague description field.** A skill with a vague `description` will never fire. The description is the only field read before loading the skill body — be explicit about when to use it.
+
+**Monolithic SKILL.md.** A 600-line body defeats progressive disclosure. When the body exceeds ~400 lines, split variant details into `references/`.
+
+**README.md in the skill directory.** Skills are for agents, not humans. Do not include README.md, CHANGELOG.md, or any auxiliary documentation.
+
+**Skipping validation.** `quick_validate.py` catches structural errors before delivery. Running it only when something feels wrong means shipping broken skills.
+
+**Designing for one example.** A skill built for exactly one known scenario fails on edge cases. Gather multiple examples in Step 1 to expose variation and plan for it.
+
+**High freedom where low freedom is needed.** If a script must run in a specific sequence (e.g., database migration), do not leave it as a narrative description — use a script with enforced order.

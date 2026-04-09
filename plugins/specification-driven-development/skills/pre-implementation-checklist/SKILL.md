@@ -1,24 +1,18 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: pre-implementation-checklist
-description: Verify readiness before starting implementation work
-triggers:
-  - "check implementation readiness"
-  - "verify pre-implementation"
-  - "validate before coding"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - implementation-agent
+model: sonnet
+description: "Produces a completed pre-implementation checklist appended to a specification document, confirming vision clarity, technical readiness, implementation plan completeness, and Track 0 codebase alignment before any agent is commissioned. Use when: 'verify the spec is ready', 'run the pre-commission check', 'is this spec ready to hand off', 'gate this before we commission'."
+category: specification-driven-development
+
+inputs:
+  - name: spec_path
+    type: string
+    description: Path to the specification document to gate before commissioning
+    required: true
+outputs:
+  - name: checklist_result
+    type: string
+    description: Completed pre-implementation checklist confirming vision clarity, technical readiness, plan completeness, and codebase alignment
 ---
 
 # Pre-Implementation Checklist Skill
@@ -156,3 +150,29 @@ Once the checklist is complete, you can confidently commission the implementatio
 -   **Treat it as a Conversation:** Use the checklist as a final opportunity to discuss any lingering uncertainties.
 -   **Empower the Gatekeeper:** The agent responsible for the handoff (typically Manus) is empowered to halt the process if the checklist is not complete.
 -   **Adapt as Needed:** If you find that items are consistently `N/A` or that new checks are needed, propose an update to this skill.
+
+---
+
+## Output
+
+- A completed pre-implementation checklist appended to the specification document as a new section (e.g., "Section X: Pre-Implementation Checklist")
+- Each checklist item marked `[✅]` (confirmed), `[N/A]` (not applicable), or flagged for remediation with a note
+- A go/no-go decision statement at the end confirming whether the specification is cleared for commissioning
+
+## Examples
+
+**Scenario 1:** "We finished writing the v0.2.4 spec. Is it ready to hand off to implementation agents?" → Run the checklist against the spec; three items flag as incomplete (database schema not final, rollback procedure missing, Track 0 alignment not run). Stop commissioning until those three items are resolved.
+
+**Scenario 2:** "Commission these four parallel tracks against the v0.2.2 spec." → The Track 0 alignment check reveals the spec references `EntityType.CUSTOM` but the codebase has only `EntityType.VARIANT` — a Track 0 remediation prompt is written and executed before any parallel agent is started.
+
+## Edge Cases
+
+- When the spec was written more than a day ago and the codebase has changed in the interim, the Track 0 alignment check (Section 0) is the most critical item — run it last so it reflects the codebase state at the moment of commissioning
+- When commissioning a lean-format spec for a single agent, some Full Template sections (rollback procedure, feature flags) may legitimately be N/A — mark them as such rather than blocking commissioning on inapplicable items
+- When multiple specifications are being commissioned simultaneously, run this checklist independently against each spec — one passing spec does not validate another
+
+## Anti-Patterns
+
+- Treating the checklist as a rubber stamp and checking items without reading the spec section they correspond to — the checklist is a gate, not a ceremony
+- Skipping Track 0 alignment because "the spec was just written" — the codebase changes continuously; a same-day spec can still drift from a codebase that had commits merged since the spec was authored
+- Proceeding with commissioning when even one non-N/A item is unchecked — partial readiness is not readiness; a single unresolved dependency will surface as an agent blockers during implementation

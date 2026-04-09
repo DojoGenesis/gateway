@@ -1,62 +1,27 @@
 ---
 name: file-management
-description: A flexible guide for organizing files and directories in a way that is adaptable to different project environments, promoting clarity and good practice without being overly rigid.
-triggers:
-  - "organize these files and directories"
-  - "clean up this project structure"
-  - "suggest a file layout for this project"
-metadata:
-  version: "1.1"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - implementation-agent
+model: sonnet
+description: Produces a documented directory structure plan — tree layout diagram, naming convention decision, and organizational philosophy — applying patterns such as feature-domain grouping, temporal prefixes for dated artifacts, numbered directories for ordered sequences, and pointer READMEs for navigating large trees. Use when: "organize this project structure", "plan a file layout", "design a directory hierarchy", "improve folder organization", "create a project structure".
+category: skill-forge
+
+inputs:
+  - name: project_description
+    type: string
+    description: Description of the project or codebase to organize
+    required: true
+  - name: constraints
+    type: string
+    description: Naming or organizational constraints to apply
+    required: false
+outputs:
+  - name: directory_plan
+    type: string
+    description: Documented directory structure plan with tree layout diagram, naming convention decision, and organizational philosophy
 ---
 
 # File Management & Organization Skill
 
-**Version:** 1.1
-**Created:** 2026-02-04
-**Last Updated:** 2026-04-06
-**Author:** Manus AI  
-**Purpose:** To provide a set of flexible principles and recommended patterns for file and directory organization, adaptable to diverse project environments.
-
----
-
-## I. The Philosophy: A Place for Everything, and Everything in Its Place
-
-Good file organization is not about rigid, universal rules. It is about creating a system where the location of a file is intuitive and predictable within the context of its own project. A well-organized project is a pleasure to work in; a chaotic one is a source of constant friction.
-
-This skill provides a set of guiding principles, not a strict mandate. It is a flexible framework that can be adapted to the unique needs of any project, from a simple static website to a complex multi-service application. The goal is to create a sense of order and clarity that makes the project easier to understand, navigate, and maintain.
-
----
-
-## II. When to Use This Skill
-
--   **When starting a new project:** Use these principles to establish a clean and logical directory structure from the outset.
--   **When a project feels disorganized:** Use this skill to guide a refactoring of the existing file structure.
--   **When onboarding a new team member or agent:** Use this as a guide to explain the project's organizational philosophy.
-
----
-
-## III. Core Principles
-
-1.  **Group by Feature or Domain:** Whenever possible, group files related to a single feature or domain together. This is often preferable to grouping by file type (e.g., all controllers in one directory, all models in another).
-
-2.  **Separate Public from Private:** Keep the public interface of a module or service separate from its internal implementation details.
-
-3.  **Keep the Root Directory Clean:** The root of your project should be as clean as possible, containing only essential configuration files, the main entry point, and a few key directories.
-
-4.  **Use a Consistent Naming Convention:** Choose a naming convention (e.g., `kebab-case`, `snake_case`, `PascalCase`) for your files and directories and stick to it.
-
-5.  **Document Your Structure:** A project's `README.md` or `ARCHITECTURE.md` should briefly explain the organizational philosophy of the project.
-
----
-
-## IV. Recommended Patterns
+## I. Recommended Patterns
 
 These are flexible patterns that can be adapted to different environments.
 
@@ -117,55 +82,100 @@ A common structure for a Go backend service.
 
 ---
 
-## V. Best Practices
+## II. Naming Conventions
 
--   **Don't Over-Organize:** A flat structure is often better than a deeply nested one, especially in the early stages of a project.
--   **Be Pragmatic:** The best structure is the one that works for your team and your project. Don't be afraid to deviate from these patterns if you have a good reason.
--   **Refactor as You Go:** A project's file structure is not set in stone. As the project evolves, don't be afraid to refactor the file structure to better reflect the current state of the codebase.
--   **Consistency is Key:** Whatever structure you choose, be consistent. An inconsistent structure is often worse than no structure at all.
+Apply one of these consistently across the project:
 
----
+- **kebab-case** (`my-component.js`) — preferred for web projects and knowledge bases
+- **snake_case** (`my_component.py`) — preferred for Python and data projects
+- **PascalCase** (`MyComponent.tsx`) — reserved for class files and React components only; do not apply to directories
 
-## VI. Example
+**Temporal prefix pattern** — prefix dated artifacts with `YYYY-MM-DD_` so they sort chronologically without a separate timestamp field:
 
-**Problem:** The Dojo Genesis repository had grown organically from 5 skills to 47 skills, plus seeds, scouts, specs, and thinking artifacts. New files were being placed inconsistently -- some scouts landed in `docs/`, others in `scouts/`, and one was in the root directory. A new agent onboarding to the repository could not predict where to find anything.
+```
+docs/
+├── 2026-01-15_architecture-decision.md
+├── 2026-03-02_retrospective.md
+└── 2026-04-07_migration-plan.md
+```
 
-**Process:**
-1. Listed the root directory and identified 12 top-level entries, 6 of which were documentation files that belonged in subdirectories.
-2. Applied Core Principle 1 (Group by Feature/Domain): reorganized into `skills/` (reusable workflows), `seeds/` (extracted patterns), `scouts/` (strategic explorations), `specs/` (release specifications), `docs/` (formal documentation), and `thinking/` (reflections).
-3. Applied Core Principle 3 (Keep Root Clean): moved the 6 orphaned documentation files into their appropriate subdirectories based on content type.
-4. Applied Core Principle 4 (Consistent Naming): standardized all skill directories to `kebab-case` and all date-prefixed files to `YYYY-MM-DD_description.md` format.
-5. Updated README.md with a directory structure explanation following Core Principle 5 (Document Your Structure).
+**Numbered directory pattern** — prefix ordered sequences with two-digit numbers so directory listing reflects intended execution order:
 
-**Outcome:** The reorganized repository had a predictable structure where any agent could locate a file by its type: need a skill? Look in `skills/`. Need a strategic analysis? Look in `scouts/`. The onboarding time for new agents dropped from ~15 minutes of exploration to ~2 minutes of reading the README structure section.
+```
+phases/
+├── 01_discovery/
+├── 02_design/
+└── 03_implementation/
+```
 
-**Key Insight:** The right time to reorganize is when a new type of artifact appears for the third time -- one instance is an exception, two is a coincidence, three is a pattern that deserves its own directory.
+**Pointer README pattern** — place a short `README.md` at the root of any directory with 5+ subdirectories. The README names each subdirectory's purpose in one line. This is the only README that belongs in a skill-adjacent directory; it is navigation, not documentation.
 
----
+## Output
 
-## VII. Common Pitfalls
+-   A directory layout diagram (tree format) showing the proposed structure with inline comments explaining each directory's purpose
+-   A naming convention decision (kebab-case, snake_case, or PascalCase) with the rationale for the choice
+-   Optional: a short prose summary of the organizational philosophy for inclusion in the project's README or ARCHITECTURE.md
 
-1. **Creating directories preemptively.** Building an elaborate directory structure before there is content to fill it leads to empty directories that confuse rather than clarify.
-   - *Solution:* Create directories only when you have at least 2-3 files that belong in them. Let the structure emerge from the content.
+## Examples
 
-2. **Nesting too deeply.** Deeply nested structures (4+ levels) make navigation tedious and file paths unwieldy, especially in commit messages and documentation references.
-   - *Solution:* Apply the "three-level rule" -- most projects should not need more than three levels of nesting (e.g., `skills/strategic-scout/references/`).
+**Scenario 1:** "I'm starting a new Next.js app, how should I organize it?" → Produce the Generic Web Application layout from Section I, adapted with a `pages/` directory and a `hooks/` directory under `src/`, plus a recommendation to use kebab-case for file names.
 
-3. **Mixing concerns in a single directory.** Putting specs, retrospectives, audit logs, and architecture docs all in a single `docs/` folder creates a grab-bag that grows unmanageable.
-   - *Solution:* Subdivide by artifact type when a directory exceeds ~15 files (e.g., `docs/specs/`, `docs/audits/`, `docs/retrospectives/`).
+**Before (disorganized):**
+```
+/
+├── index.js
+├── helpers.js
+├── UserForm.js
+├── api_client.js
+├── styles.css
+└── tests.js
+```
 
-4. **Inconsistent naming conventions across directories.** Using `kebab-case` for skills but `PascalCase` for specs and `snake_case` for seeds creates cognitive overhead.
-   - *Solution:* Choose one convention for directories and one for files at the project level. Document the choice in the README or CONTRIBUTING guide.
+**After (organized):**
+```
+/
+├── src/
+│   ├── components/   # Reusable UI — UserForm.js
+│   ├── lib/          # Shared utilities — helpers.js, api_client.js
+│   └── styles/       # Global styles — styles.css
+├── tests/            # All test files — tests.js
+└── index.js          # Entry point only
+```
 
-5. **Reorganizing without updating references.** Moving files to better locations but not updating the links, imports, or references that point to them creates broken references throughout the codebase.
-   - *Solution:* After any reorganization, run a grep for the old paths and update all references. Use the documentation-auditor skill to verify no broken links remain.
+**Scenario 2:** "Help me restructure this knowledge base — we have seeds, retrospectives, and skill files all mixed in one folder" → Produce the AROMA-style pattern, map the existing files to the new directories, apply temporal prefix to dated docs, and add a pointer README at the root.
 
----
+**Before (mixed):**
+```
+/
+├── skill-creation.md
+├── retro-jan.md
+├── retro-march.md
+├── seed-focus-theorem.md
+└── architecture-notes.md
+```
 
-## VIII. Related Skills
+**After (structured with temporal prefixes and pointer README):**
+```
+/
+├── README.md                          # Pointer: one line per subdirectory
+├── skills/
+│   └── skill-creation/SKILL.md
+├── seeds/
+│   └── seed-focus-theorem.md
+└── docs/
+    ├── 2026-01-10_retrospective.md
+    ├── 2026-03-15_retrospective.md
+    └── 2026-04-01_architecture-notes.md
+```
 
-- **documentation-auditor** -- Use after a reorganization to verify that all internal links and references still resolve correctly.
-- **repo-status** -- Generates the annotated directory tree that makes file organization visible. Run repo-status to assess the current structure before reorganizing.
-- **pointer-directories** -- Handles the specific case of empty directories that serve as intentional references to external content, preventing accidental deletion during cleanup.
-- **status-writer** -- The STATUS.md file this skill helps organize is itself a key artifact that benefits from consistent placement at the project root.
-- **health-supervisor** -- Uses the file structure as input for its health assessment. A well-organized repository produces a more accurate and useful health audit.
+## Edge Cases
+
+-   **Existing project with inconsistent but functional structure:** Do not impose a full reorganization unless the user explicitly asks for one. Instead, identify the 1–2 most disruptive inconsistencies and propose targeted fixes only.
+-   **Project type not covered by the three patterns:** Ask one clarifying question about the dominant access pattern (e.g., "is this primarily read by humans or by code?") and adapt the closest matching pattern.
+-   **Monorepo with multiple services:** Apply the Go Backend or Web Application pattern per service; add a top-level `services/` or `apps/` directory rather than flattening everything.
+
+## Anti-Patterns
+
+-   **Imposing structure before understanding the project:** Recommending a layout without first knowing the tech stack and team size produces a structure that fits the pattern, not the project.
+-   **Nesting by file type instead of feature:** Grouping all controllers in one directory and all models in another couples unrelated features and makes feature-level changes harder to scope.
+-   **Reorganizing a working project unprompted:** If the user asked for a new feature, not a file audit, applying this skill without invitation adds risk and context-switch cost.

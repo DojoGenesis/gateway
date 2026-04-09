@@ -49,8 +49,13 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
+	case "bridge":
+		if err := runBridgeCommand(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	case "version":
-		fmt.Println("dojo v2.0.0-era2")
+		fmt.Println("dojo v3.1.0-era3")
 	case "help", "-h", "--help":
 		printUsage()
 	default:
@@ -194,6 +199,7 @@ Usage:
   dojo skill <action> [args]    Manage skills
   dojo tunnel [port]            Start a cloudflared tunnel (default port: 8080)
   dojo tunnel stop              Stop the running tunnel
+  dojo bridge                   Start Channel Bridge with NATS bus (production)
   dojo version                  Print version
   dojo help                     Show this help
 
@@ -212,8 +218,13 @@ Tunnel:
   dojo tunnel 3000              Expose http://localhost:3000 via cloudflared
   dojo tunnel stop              Kill any running cloudflared tunnel
 
+Bridge:
+  dojo bridge                   Start Channel Bridge with NATS bus (Era 3)
+
 Environment:
-  DOJO_CAS_PATH                 Path to CAS database (default: dojo-skills.db)`)
+  DOJO_CAS_PATH                 Path to CAS database (default: dojo-skills.db)
+  DOJO_DATA_DIR                 Data directory for event WAL (default: ./data)
+  DOJO_CREDENTIAL_BACKEND       Credential backend: "env" (default), "infisical"`)
 }
 
 func printSkillUsage() {

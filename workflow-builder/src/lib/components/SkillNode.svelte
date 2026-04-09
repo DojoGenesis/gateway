@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { Handle, Position } from '@xyflow/svelte';
-	import type { NodeProps } from '@xyflow/svelte';
+	import { Handle, Position, type Node } from '@xyflow/svelte';
 	import type { SkillNodeData } from '$lib/types';
+	import { encodeHandleId } from '$lib/validation.svelte.js';
 
-	// Svelte Flow passes node props via the NodeProps interface.
-	let { data } = $props<NodeProps<SkillNodeData>>();
+	// Svelte Flow passes node props including data, id, etc.
+	// We only destructure what we need.
+	let { data }: { data: SkillNodeData; [key: string]: unknown } = $props();
 
 	let expanded = $state(false);
 
@@ -20,6 +21,9 @@
 						? 'skill-node--skipped'
 						: ''
 	);
+
+	// Tooltip state for port type display
+	let hoveredPort = $state<string | null>(null);
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -33,41 +37,70 @@
 		<span class="skill-node__toggle">{expanded ? '▲' : '▼'}</span>
 	</div>
 
-	{#if expanded && data.outputs && data.outputs.length > 0}
+	{#if expanded}
 		<div class="skill-node__description">
 			<span class="skill-node__skill-label">Skill: {data.skill}</span>
 		</div>
 	{/if}
 
 	<div class="skill-node__ports">
-		<!-- Input handles (left side) -->
+		<!-- Input handles (left side) — Handle ID encodes direction:name:type -->
 		{#each data.inputs ?? [] as input, i}
+			{@const handleId = encodeHandleId('input', input)}
 			<Handle
 				type="target"
 				position={Position.Left}
-				id={input.name}
+				id={handleId}
 				style="top: {(i + 1) * 24 + 36}px"
 			/>
-			<div class="skill-node__port-label skill-node__port-label--left">
+			<div
+				class="skill-node__port-label skill-node__port-label--left"
+				onmouseenter={() => (hoveredPort = handleId)}
+				onmouseleave={() => (hoveredPort = null)}
+			>
 				<span class="port-name">{input.name}</span>
 				{#if input.required}
 					<span class="port-required" title="Required">*</span>
 				{/if}
 				<span class="port-type">{input.type}</span>
+				{#if hoveredPort === handleId}
+					<div class="port-tooltip">
+						<strong>{input.name}</strong>: {input.type}
+						{#if input.description}
+							<br /><span class="port-tooltip__desc">{input.description}</span>
+						{/if}
+						{#if input.required}
+							<br /><span class="port-tooltip__req">Required</span>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/each}
 
-		<!-- Output handles (right side) -->
+		<!-- Output handles (right side) — Handle ID encodes direction:name:type -->
 		{#each data.outputs ?? [] as output, i}
+			{@const handleId = encodeHandleId('output', output)}
 			<Handle
 				type="source"
 				position={Position.Right}
-				id={output.name}
+				id={handleId}
 				style="top: {(i + 1) * 24 + 36}px"
 			/>
-			<div class="skill-node__port-label skill-node__port-label--right">
+			<div
+				class="skill-node__port-label skill-node__port-label--right"
+				onmouseenter={() => (hoveredPort = handleId)}
+				onmouseleave={() => (hoveredPort = null)}
+			>
 				<span class="port-type">{output.type}</span>
 				<span class="port-name">{output.name}</span>
+				{#if hoveredPort === handleId}
+					<div class="port-tooltip port-tooltip--right">
+						<strong>{output.name}</strong>: {output.type}
+						{#if output.description}
+							<br /><span class="port-tooltip__desc">{output.description}</span>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/each}
 	</div>
@@ -163,6 +196,7 @@
 		height: 24px;
 		font-size: 11px;
 		color: #475569;
+		position: relative;
 	}
 
 	.skill-node__port-label--left {
@@ -191,5 +225,37 @@
 		font-weight: 700;
 		font-size: 13px;
 		line-height: 1;
+	}
+
+	/* Port type tooltip on hover */
+	.port-tooltip {
+		position: absolute;
+		left: 0;
+		top: -36px;
+		background: #1e293b;
+		color: #e2e8f0;
+		padding: 6px 10px;
+		border-radius: 6px;
+		font-size: 11px;
+		white-space: nowrap;
+		z-index: 1000;
+		pointer-events: none;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+		border: 1px solid #334155;
+	}
+
+	.port-tooltip--right {
+		left: auto;
+		right: 0;
+	}
+
+	.port-tooltip__desc {
+		color: #94a3b8;
+		font-size: 10px;
+	}
+
+	.port-tooltip__req {
+		color: #f87171;
+		font-size: 10px;
 	}
 </style>

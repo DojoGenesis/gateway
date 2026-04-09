@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/DojoGenesis/gateway/pkg/skill"
 	"github.com/DojoGenesis/gateway/runtime/cas"
 	"github.com/DojoGenesis/gateway/workflow"
 )
@@ -375,8 +377,29 @@ func (h *WorkflowHandler) validateWorkflow(w http.ResponseWriter, r *http.Reques
 // GET /api/skills — List available skills
 // ---------------------------------------------------------------------------
 
+// skillEntry is the JSON shape returned by GET /api/skills.
+// It mirrors the SkillManifest fields the Workflow Builder needs for typed
+// drag-and-drop connection validation.
+type skillEntry struct {
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Version     string                 `json:"version,omitempty"`
+	Category    string                 `json:"category,omitempty"`
+	Plugin      string                 `json:"plugin,omitempty"`
+	Inputs      []skill.PortDefinition `json:"inputs"`
+	Outputs     []skill.PortDefinition `json:"outputs"`
+	CASHash     string                 `json:"cas_hash,omitempty"`
+}
+
 // handleSkills handles GET /api/skills.
-// Returns skill manifests from CAS. Optional ?q=search filter.
+//
+// Query parameters:
+//   - q      — case-insensitive text search on name and description (optional)
+//   - limit  — maximum results to return (default 50)
+//   - offset — number of results to skip (default 0)
+//
+// Response: {"skills": [...], "total": N, "limit": N, "offset": N}
 func (h *WorkflowHandler) handleSkills(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -384,7 +407,21 @@ func (h *WorkflowHandler) handleSkills(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	query := strings.ToLower(r.URL.Query().Get("q"))
+	q := strings.ToLower(r.URL.Query().Get("q"))
+
+	// Parse pagination parameters.
+	limit := 50
+	offset := 0
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			offset = n
+		}
+	}
 
 	entries, err := h.cas.List(ctx, "skill/")
 	if err != nil {
@@ -392,18 +429,11 @@ func (h *WorkflowHandler) handleSkills(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type skillEntry struct {
-		Name        string `json:"name"`
-		Version     string `json:"version"`
-		Description string `json:"description,omitempty"`
-		Ref         string `json:"ref"`
-	}
-
-	items := make([]skillEntry, 0)
 	seen := make(map[string]bool)
+	var all []skillEntry
 
 	for _, e := range entries {
-		// Only process config tags (e.g. "skill/foo:config" at version "1.0.0").
+		// Only process config tags (e.g. "skill/foo:config").
 		if !strings.HasSuffix(e.Name, ":config") {
 			continue
 		}
@@ -419,30 +449,56 @@ func (h *WorkflowHandler) handleSkills(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		var manifest struct {
-			Name        string `json:"name"`
-			Version     string `json:"version"`
-			Description string `json:"description"`
-		}
-		if err := json.Unmarshal(data, &manifest); err != nil {
+		var m skill.SkillManifest
+		if err := json.Unmarshal(data, &m); err != nil {
 			continue
 		}
 
 		// Apply optional search filter.
-		if query != "" {
-			if !strings.Contains(strings.ToLower(manifest.Name), query) &&
-				!strings.Contains(strings.ToLower(manifest.Description), query) {
+		if q != "" {
+			if !strings.Contains(strings.ToLower(m.Name), q) &&
+				!strings.Contains(strings.ToLower(m.Description), q) {
 				continue
 			}
 		}
 
-		items = append(items, skillEntry{
-			Name:        manifest.Name,
-			Version:     manifest.Version,
-			Description: manifest.Description,
-			Ref:         "sha256:" + string(e.Ref),
+		// Ensure non-nil slices for consistent JSON serialisation.
+		inputs := m.Inputs
+		if inputs == nil {
+			inputs = []skill.PortDefinition{}
+		}
+		outputs := m.Outputs
+		if outputs == nil {
+			outputs = []skill.PortDefinition{}
+		}
+
+		all = append(all, skillEntry{
+			ID:          m.Name + "@" + m.Version,
+			Name:        m.Name,
+			Description: m.Description,
+			Version:     m.Version,
+			Inputs:      inputs,
+			Outputs:     outputs,
+			CASHash:     "sha256:" + string(e.Ref),
 		})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"skills": items})
+	total := len(all)
+
+	// Apply offset and limit.
+	if offset >= total {
+		all = []skillEntry{}
+	} else {
+		all = all[offset:]
+		if len(all) > limit {
+			all = all[:limit]
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"skills": all,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }

@@ -1,25 +1,19 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: product-positioning
-description: Define clear product positioning based on market research and competitive analysis
-triggers:
-  - "define product positioning"
-  - "create positioning statement"
-  - "develop market position"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - strategic-agent
-    - research-agent
+model: opus
+description: Produces a reframed product positioning — a before/after statement that replaces a keep-or-kill decision with a complementary role for the product — plus a set of strategic routes that leverage that role. Use when: "should we deprecate X now that we have Y", "this feature feels redundant", "we can't decide whether to keep this product", "two things in our portfolio seem to overlap".
+category: strategic-thinking
+
+inputs:
+  - name: product_tension
+    type: string
+    description: The keep-or-kill decision or overlap tension to resolve through positioning
+    required: true
+outputs:
+  - name: positioning_document
+    type: ref
+    format: cas-ref
+    description: Reframed product positioning with before/after statement and strategic routes leveraging the complementary role
 ---
 
 # Product Positioning Scout Skill
@@ -277,6 +271,32 @@ Before delivering the new strategy, ensure you can answer "yes" to all of the fo
 - **`strategic-to-tactical-workflow`** - Use this to move from positioning to implementation
 
 ---
+
+## Output
+
+- Before/after framing document: the original binary question stated explicitly, then the reframed question and its implications
+- Unique value list: 3-7 specific strengths of the product tied to concrete usage contexts, not generic adjectives
+- Strategic routes: 3-5 routes that capitalize on the reframe, each with a one-line tradeoff summary
+- Recommended positioning: the selected route with pricing, timeline, and rationale
+
+## Examples
+
+**Scenario 1:** "Should we deprecate our web app now that we have a desktop client?" → Reframe identifying the web app's unique strength (no install, shareable URL, cross-OS access) leads to a recommendation to keep the web app as the free-tier discovery and onboarding surface, with the desktop client as the paid power-user product.
+
+**Scenario 2:** "We have two note-taking features in our app — daily log and knowledge base. Should we cut one?" → Unique value analysis reveals daily log is optimized for speed and recency (quick capture, ephemeral) while knowledge base is optimized for retrieval and permanence. Reframe: they serve different moments in a user's day, not the same job. Recommendation: keep both, but make the entry points contextually distinct.
+
+## Edge Cases
+
+- If the user is certain one product must be cut for financial or resource reasons, skip the reframe and go directly to Step 5 — help them position the remaining product more strongly rather than trying to save what is already decided.
+- If both products genuinely do the same job in the same context with no meaningful differentiation, the binary may not be false — document that finding honestly and recommend consolidation.
+- If the product in question is a third-party integration rather than an owned product, route to `strategic-scout` instead — positioning is only useful for things the team controls.
+
+## Anti-Patterns
+
+- Generating a unique value list made of generic descriptors ("flexible", "powerful", "easy to use") — every item must be tied to a specific context of use where the product outperforms the alternative.
+- Reframing without running new strategic routes — a reframe that does not produce actionable routes is just a restatement of the problem in nicer language.
+- Concluding the session without documenting the before/after framing — the reframe is the primary deliverable and must be written down explicitly so it can be referenced later.
+- Treating reframing as a way to avoid hard cuts — if the unique value analysis produces nothing concrete, the honest output is "this product does not have a defensible niche."
 
 ## IX. Skill Metadata
 

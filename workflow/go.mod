@@ -2,7 +2,10 @@ module github.com/DojoGenesis/gateway/workflow
 
 go 1.25.6
 
-require github.com/DojoGenesis/gateway/runtime/cas v0.0.0
+require (
+	github.com/DojoGenesis/gateway v0.0.0
+	github.com/DojoGenesis/gateway/runtime/cas v0.0.0
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -17,4 +20,7 @@ require (
 	modernc.org/sqlite v1.48.1 // indirect
 )
 
-replace github.com/DojoGenesis/gateway/runtime/cas => ../runtime/cas
+replace (
+	github.com/DojoGenesis/gateway => ../
+	github.com/DojoGenesis/gateway/runtime/cas => ../runtime/cas
+)

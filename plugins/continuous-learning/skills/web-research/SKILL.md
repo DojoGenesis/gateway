@@ -1,41 +1,35 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: web-research
-description: Conduct web research to gather information and validate assumptions
-triggers:
-  - "research topic online"
-  - "gather web information"
-  - "validate assumptions via web"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - file_system
-    - bash
-    - web_tools
-  portable: true
-  tier: 2
-  agents:
-    - research-agent
+model: sonnet
+description: Produces a structured Research Summary document (findings, sources, attributions) from targeted web queries using Brave Search and web_fetch. Use when: 'research this online', 'find current information about X', 'verify this claim', 'gather sources on Y', 'search for what the field says about Z'.
+category: continuous-learning
+
+inputs:
+  - name: query
+    type: string
+    description: The research question or topic to investigate online
+    required: true
+outputs:
+  - name: research_summary
+    type: ref
+    format: cas-ref
+    description: Structured Research Summary document with findings, sources, and attributions from web queries
 ---
 
 # Web Research Skill
 
-**Version:** 1.0  
-**Created:** 2026-02-02  
-**Author:** Cipher 🧭 (self-taught)  
+**Version:** 1.1
+**Created:** 2026-02-02
+**Author:** Cipher (self-taught)
 **Purpose:** Effective web research using Brave Search API and web_fetch for content extraction
 
 ---
 
 ## Overview
 
-This skill encodes best practices for **web research**—finding, evaluating, and synthesizing information from online sources. It provides patterns for search query formulation, source evaluation, information synthesis, and attribution. Web research is not about collecting links—it's about building understanding from reliable sources.
+This skill encodes best practices for **web research** — finding, evaluating, and synthesizing information from online sources. It provides patterns for search query formulation, source evaluation, information synthesis, and attribution. Web research is not about collecting links — it's about building understanding from reliable sources.
 
-**Philosophy:** Good web research is surgical—targeted queries, credible sources, extracted insights, not content dumping.
+Output templates for all research modes are in `references/research-output-templates.md`.
 
 ---
 
@@ -79,15 +73,14 @@ This skill encodes best practices for **web research**—finding, evaluating, an
 3. Is this time-sensitive? (recent events, API versions, industry news)
 4. What context do I already have? (avoid re-searching known info)
 
-**Example:**
+**Examples:**
 - Bad: "AROMA"
 - Good: "AROMA agent collaboration architecture v0.0.1 specification"
-- Good: "Next.js 16.1.6 release notes changes"
 - Good: "AI agent memory management best practices 2026"
 
 ### Step 2: Formulate Search Queries
 
-**Pattern: `[topic] [context/aspect] [specific keywords] [optional: date filter]`
+**Pattern:** `[topic] [context/aspect] [specific keywords] [optional: date filter]`
 
 **Examples:**
 
@@ -110,7 +103,7 @@ This skill encodes best practices for **web research**—finding, evaluating, an
 ```
 web_search(
   query="your query here",
-  count=5,  # 5-10 results is sufficient
+  count=5,
   country="US",
   search_lang="en"
 )
@@ -138,79 +131,28 @@ web_search(
 web_fetch(
   url="https://example.com/page",
   extractMode="markdown",
-  maxChars=20000  # Adjust based on need
+  maxChars=20000
 )
 ```
 
 **Extraction strategy:**
-1. **Read headers first** — Understand structure, main sections
-2. **Extract key insights** — 1-3 sentences per section
-3. **Note supporting details** — Numbers, names, dates, versions
-4. **Skip filler** — Introduction fluff, generic advice
-5. **Capture sources cited** — Link back to original content
-
-**Example extraction:**
-```
-## Key Insights from Next.js 16.1.6 Release Notes
-
-**Source:** https://nextjs.org/blog/nextjs-16-1-6 (Fetched 2026-02-02)
-**Relevance:** Security fixes for v0.0.1 upgrade
-
-**Insights:**
-- Two critical security vulnerabilities addressed (CVE-2025-XXXX, CVE-2025-YYYY)
-- Breaking change: `app/` directory structure now requires absolute imports
-- New feature: React Compiler optimization reduces build time by 30%
-- Deprecated: `next/image` legacy component (use `next/image` v15+)
-
-**Supporting Details:**
-- CVE-2025-XXXX affects servers using Server Actions
-- Build time optimization applies to production builds only
-- Migration guide available at /docs/migration-guide
-```
+1. Read headers first — Understand structure, main sections
+2. Extract key insights — 1-3 sentences per section
+3. Note supporting details — Numbers, names, dates, versions
+4. Skip filler — Introduction fluff, generic advice
+5. Capture sources cited — Link back to original content
 
 ### Step 5: Synthesize Findings
 
 **Goal:** Answer the research question, not regurgitate content.
 
-**Structure:**
-
-```markdown
-## Research: [Topic/Question]
-
-**Research Date:** [YYYY-MM-DD]
-**Sources Consulted:** [number] sources
-
-### Summary
-[2-3 sentences answering the core question]
-
-### Key Findings
-- [Finding 1] — 1-2 sentences, specific
-- [Finding 2] — 1-2 sentences, specific
-- [Finding 3] — 1-2 sentences, specific
-
-### Supporting Details
-[Elaborate on key findings if needed, organized by subheading]
-
-### Sources
-1. **[Source Title]** — [URL]
-   - [What this source provided]
-   - [Key insight extracted]
-
-2. **[Source Title]** — [URL]
-   - [What this source provided]
-   - [Key insight extracted]
-
-### Open Questions / Notes
-- [Question 1]
-- [Question 2]
-- [Note about conflicting info or gaps]
-```
+**Synthesis template** — see `references/research-output-templates.md` for the full Research Synthesis format.
 
 **Synthesis principles:**
-- **Be specific** — Avoid "some say," "likely," "possibly"
-- **Attribute claims** — "According to [Source], X is true" not "X is true"
-- **Note contradictions** — "Source A claims X, but Source B says Y"
-- **Signal uncertainty** — "Could not verify" or "Limited evidence available"
+- Be specific — Avoid "some say," "likely," "possibly"
+- Attribute claims — "According to [Source], X is true" not "X is true"
+- Note contradictions — "Source A claims X, but Source B says Y"
+- Signal uncertainty — "Could not verify" or "Limited evidence available"
 
 ---
 
@@ -226,25 +168,7 @@ web_fetch(
 3. Cross-reference across sources
 4. Note consensus or conflict
 
-**Example:**
-- Claim: "Next.js 16.1.6 released January 2026"
-- Query: "Next.js 16.1.6 release date January 2026"
-- Check: Official blog, GitHub releases, npm registry
-- Result: Confirmed by 2/3 sources, 1 source shows February
-
-**Output format:**
-```
-## Verification: [Claim]
-
-**Claim:** [The claim being verified]
-
-**Verdict:** ✅ Confirmed / ❌ False / ⚠️ Partially Confirmed / ❓ Could Not Verify
-
-**Evidence:**
-- [Source 1]: [URL] — [What it says]
-- [Source 2]: [URL] — [What it says]
-- [Source 3]: [URL] — [What it says]
-```
+**Output:** Verification document with Verdict (Confirmed / False / Partially Confirmed / Could Not Verify), Evidence section listing each source's position — see `references/research-output-templates.md`
 
 ---
 
@@ -259,35 +183,7 @@ web_fetch(
 4. Fetch and read 2-3 sources per subtopic
 5. Synthesize into structured overview
 
-**Example:**
-- Topic: "AI agent memory management"
-- Subtopics: Compression techniques, retrieval systems, context windows, lineage tracking
-- Query subtopics individually, then synthesize
-
-**Output format:**
-```
-## Deep Dive: [Topic]
-
-**Scope:** [What this covers]
-**Subtopics Covered:**
-- [Subtopic 1]
-- [Subtopic 2]
-- [Subtopic 3]
-
-### [Subtopic 1]: [Name]
-**Key Insights:**
-- [Insight 1]
-- [Insight 2]
-
-**Sources:**
-- [Source 1]: [URL]
-- [Source 2]: [URL]
-
-[Repeat for each subtopic]
-
-### Synthesis
-[How subtopics relate, patterns observed, unanswered questions]
-```
+**Output:** Deep Dive document organized by subtopics with cross-subtopic synthesis — see `references/research-output-templates.md`
 
 ---
 
@@ -301,36 +197,7 @@ web_fetch(
 3. Extract patterns and themes
 4. Create opportunity or comparison matrix
 
-**Example:**
-- Topic: "AI agent collaboration tools"
-- Queries: "AI agent collaboration," "agent workspace," "multi-agent systems," "agent communication protocols," "lineage tracking AI"
-- Extract: Common features, architectures, challenges
-
-**Output format:**
-```
-## Landscape Scan: [Broad Topic]
-
-**Queries Explored:**
-1. "[Query 1]" — [number results]
-2. "[Query 2]" — [number results]
-...
-
-### Themes Identified
-- **Theme 1:** [Description]
-  - [Pattern observed across sources]
-- **Theme 2:** [Description]
-  - [Pattern observed across sources]
-
-### Key Players / Solutions
-| Name | Type | Key Features | Notes |
-|------|------|---------------|-------|
-| [Solution 1] | [Category] | [Feature] | [Obs] |
-| [Solution 2] | [Category] | [Feature] | [Obs] |
-
-### Gaps / Opportunities
-- [Gap 1]
-- [Gap 2]
-```
+**Output:** Landscape Scan document with themes, key players table, and gaps list — see `references/research-output-templates.md`
 
 ---
 
@@ -360,12 +227,12 @@ Before concluding web research, verify:
 
 ## Common Pitfalls to Avoid
 
-❌ **Single-source confirmation** — Finding one source that confirms belief → ✅ Cross-reference across 2-3 sources  
-❌ **Over-fetching** — Reading 50 pages for one query → ✅ Focus on 2-5 relevant sources  
-❌ **Generic queries** — "AI tools" returns 10M results → ✅ Specific queries with context  
-❌ **No attribution** — "Studies show X" → ✅ "According to [Source], X"  
-❌ **Outdated data** — Using 2019 info for 2026 decision → ✅ Use `freshness` filter  
-❌ **Content dumping** — Copying entire articles → ✅ Extract key insights (1-3 sentences per section)
+- **Single-source confirmation** — Finding one source that confirms belief — cross-reference across 2-3 sources
+- **Over-fetching** — Reading 50 pages for one query — focus on 2-5 relevant sources
+- **Generic queries** — "AI tools" returns 10M results — use specific queries with context
+- **No attribution** — "Studies show X" — attribute: "According to [Source], X"
+- **Outdated data** — Using 2019 info for a 2026 decision — use `freshness` filter
+- **Content dumping** — Copying entire articles — extract key insights (1-3 sentences per section)
 
 ---
 
@@ -379,67 +246,54 @@ Before concluding web research, verify:
 
 **Pattern:**
 ```
-web_search() → web_fetch() → Extract insights → 
+web_search() -> web_fetch() -> Extract insights ->
   research-modes(structure) OR specification-writer(draft) OR seed-extraction(capture)
 ```
 
 ---
 
-## Example Usage
+## Output
 
-**Scenario:** Verify Next.js 16.1.6 security updates
-
-```bash
-# Step 1: Search
-web_search(query="Next.js 16.1.6 security vulnerabilities CVE 2026", count=5, freshness="pm")
-
-# Step 2: Select sources
-# Results show:
-# 1. Next.js official blog (nextjs.org) - Release notes
-# 2. GitHub Security Advisories - CVE list
-# 3. npm security advisory - Package alerts
-# 4. Hacker News discussion
-# 5. Reddit r/nextjs
-
-# Step 3: Fetch credible sources
-web_fetch(url="https://nextjs.org/blog/nextjs-16-1-6", extractMode="markdown", maxChars=20000)
-web_fetch(url="https://github.com/advisories/nextjs", extractMode="markdown", maxChars=10000)
-
-# Step 4: Extract key insights
-# CVE-2025-XXXX: Server Actions SSR bypass
-# CVE-2025-YYYY: Image optimization RCE
-# Upgrade to 16.1.6+ required
-
-# Step 5: Synthesize
-## Verification: Next.js 16.1.6 Security Updates
-
-**Claim:** Next.js 16.1.6 addresses critical security vulnerabilities
-
-**Verdict:** ✅ Confirmed
-
-**Evidence:**
-- Next.js Blog (nextjs.org): Documents CVE-2025-XXXX and CVE-2025-YYYY fixes
-- GitHub Advisories: Confirms CVE IDs and severity (Critical, High)
-- npm security advisory: Lists affected packages and versions
-
-**Action Required:** Upgrade to Next.js 16.1.6 or later
-```
+- A Research Summary markdown document answering the research question
+- Saved to the project's `docs/research/` or `scouts/` directory
+- Named: `[date]_[topic]_web_research.md`
+- Includes: summary, key findings, supporting details, cited sources with URLs, open questions
 
 ---
 
-## Skill Metadata
+## Examples
 
-**Token Efficiency:** ~5,000-15,000 tokens per research task (targeted queries, surgical extraction, attribution only)  
-**Quality Impact:** Ensures web research is credible, specific, and traceable  
-**Maintenance:** Update when new search tools or patterns emerge
+**Scenario 1:** "Find current information about WebSocket performance benchmarks for Go" → Verification/Deep Dive document with 3-5 authoritative sources, specific numbers, attribution per claim, and open questions flagged
+
+**Scenario 2:** "Search for what the field says about AI agent orchestration patterns" → Landscape Scan document with theme clusters, key tool/framework table, and identified gaps across 8-10 sources
+
+---
+
+## Edge Cases
+
+- **Paywalled content:** Note the source in the synthesis as "paywalled, snippet only" and extract what is available from the search snippet; do not fabricate full content
+- **Contradictory authoritative sources:** Surface the contradiction explicitly; do not pick one silently — present both and note the disagreement
+- **Topic with no recent sources (>2 years old):** Label findings as potentially outdated; recommend confirming with a domain expert or official changelog
+- **Query returns zero relevant results:** Reformulate with 2-3 alternative phrasings before concluding the topic is unresearchable
+
+---
+
+## Anti-Patterns
+
+- Fetching the full text of 10+ pages when 2-3 targeted extractions answer the question — token cost with no quality gain
+- Summarizing sources in the order they were found rather than organizing findings by theme — produces a list, not a synthesis
+- Accepting a source as authoritative because its domain sounds credible without checking the actual author or date
+- Using web research for questions that can be answered from the existing codebase or memory — always check local context first
+
+---
 
 **Related Skills:**
-- `research-modes` - Deep vs. wide research structuring
-- `specification-writer` - Research → spec conversion
-- `seed-extraction` - Pattern extraction from research findings
+- `research-modes` — Deep vs. wide research structuring
+- `specification-writer` — Research to spec conversion
+- `seed-extraction` — Pattern extraction from research findings
 
 ---
 
-**Last Updated:** 2026-02-02  
-**Maintained By:** Cipher 🧭  
-**Status:** Active — Self-taught, ready for use
+**Last Updated:** 2026-04-08
+**Maintained By:** Cipher
+**Status:** Active

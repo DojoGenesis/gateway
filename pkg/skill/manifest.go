@@ -60,6 +60,10 @@ type PortDefinition struct {
 
 	// Enum constrains string values to a fixed set.
 	Enum []string `json:"enum,omitempty"`
+
+	// Format provides additional type constraints.
+	// For ref-typed ports, this must be "cas-ref".
+	Format string `json:"format,omitempty"`
 }
 
 // PluginManifest extends SkillManifest for Era 3 distributable packages.
@@ -98,6 +102,9 @@ type ContentEntry struct {
 
 // PluginArtifactType is the OCI artifact type for plugin packages.
 const PluginArtifactType = "application/vnd.dojo.plugin.v1"
+
+// WorkflowArtifactType is the OCI artifact type for persisted workflow definitions.
+const WorkflowArtifactType = "application/vnd.dojo.workflow.v1"
 
 // OCI media types for skill artifacts.
 const (

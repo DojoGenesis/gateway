@@ -1,24 +1,22 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: planning-with-files
-description: Plan development work using file-based specifications and tracking
-triggers:
-  - "plan with specification files"
-  - "create file-based plan"
-  - "organize work in files"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - implementation-agent
+model: sonnet
+description: "Produces a routing decision and delegated output by analyzing uploaded files and user intent, then dispatching to the correct specialized skill (context-ingestion, research-synthesis, or release-specification). Use when: 'create a plan from these files', 'synthesize these papers', 'what should I do with these uploads', 'not sure which skill to use but I have files'."
+category: specification-driven-development
+
+inputs:
+  - name: uploaded_files
+    type: string[]
+    description: Paths to uploaded files (specs, research, requirements) to plan from
+    required: true
+  - name: intent
+    type: string
+    description: User intent — plan, synthesize, or specify
+    required: false
+outputs:
+  - name: plan_or_synthesis
+    type: string
+    description: Routing decision and delegated output dispatched to context-ingestion, research-synthesis, or release-specification
 ---
 
 # Planning with Files (Meta-Skill)
@@ -139,3 +137,26 @@ This is a 3-step workflow for routing and executing file-based planning tasks.
 - **research-synthesis** — Target for multi-paper synthesis
 - **release-specification** — Target when files indicate a spec-writing workflow
 - **frontend-from-backend** — Target when backend architecture docs are present with frontend intent
+
+## Output
+
+- A routing decision with a one-sentence explanation of why that mode was selected
+- The full output of the selected specialized skill (phased plan, synthesized insights, or specification document)
+- A feedback prompt asking whether the mode was correct, to support routing improvement
+
+## Examples
+
+**Scenario 1:** User uploads two files (a backend architecture doc and a product brief) and says "help me plan the frontend for this." → Router selects frontend-from-backend based on the backend architecture doc signal, produces a frontend specification grounded in the actual API endpoints and data models from the upload.
+
+**Scenario 2:** User uploads four research PDFs and says "synthesize these papers into insights." → Router selects research-synthesis, produces a structured synthesis document grouping themes, tensions, and actionable patterns across all four papers.
+
+## Edge Cases
+
+- When the user uploads a mix of file types with conflicting signals (spec + research papers + code), ask one clarifying question: "Are you trying to write a spec, synthesize research, or create an action plan?" — do not attempt to route without a signal.
+- When the uploaded file is a previously written specification and the request is "commission this," route directly to implementation-prompt rather than context-ingestion.
+
+## Anti-Patterns
+
+- Routing to context-ingestion by default without reading the files first — the file content is the primary routing signal, not the fallback.
+- Skipping the routing explanation — if the mode was wrong, the user cannot course-correct without knowing which mode was chosen.
+- Invoking multiple modes sequentially without telling the user — running context-ingestion and then research-synthesis on the same files produces redundant output and wastes tokens; pick one.

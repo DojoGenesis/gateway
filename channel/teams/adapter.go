@@ -3,11 +3,13 @@ package teams
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -18,41 +20,62 @@ import (
 const (
 	platform         = "teams"
 	maxMessageLength = 28000
+
+	// botFrameworkIssuer is the only accepted issuer for Bot Framework v3
+	// tokens sent to bots. AAD-backed issuers (sts.windows.net,
+	// login.microsoftonline.com) are not used by the Bot Connector itself.
+	botFrameworkIssuer = "https://api.botframework.com"
+
+	// maxTokenBytes bounds memory allocated before we even begin parsing.
+	// A legitimate Bot Framework JWT is well under 2 KiB.
+	maxTokenBytes = 8192
 )
 
 // TeamsAdapter implements channel.WebhookAdapter for Microsoft Teams via the
-// Bot Framework v3 Bot Connector REST API. It verifies JWT Bearer tokens,
-// normalizes Bot Framework Activity JSON into ChannelMessage envelopes, and
-// delivers outbound messages by POSTing Activity objects back to the
-// serviceUrl provided in the inbound Activity.
-//
-// Phase 0 note: full JWKS verification is intentionally deferred. The adapter
-// validates JWT structure (three base64-decodable parts) and logs a warning.
-// See ADR-018 for the rationale.
+// Bot Framework v3 Bot Connector REST API. It verifies JWT Bearer tokens
+// against Microsoft's public JWKS endpoint, normalizes Bot Framework Activity
+// JSON into ChannelMessage envelopes, and delivers outbound messages by
+// POSTing Activity objects back to the serviceUrl provided in the inbound
+// Activity.
 //
 // Construction: use NewTeamsAdapter — do not create the struct directly.
 type TeamsAdapter struct {
 	// botToken is the Bearer token used for outbound API calls.
 	botToken string
 
-	// httpClient is used for all outbound API calls.
+	// appID is the Microsoft App ID of this bot. It is checked against the
+	// aud claim of every inbound JWT.
+	appID string
+
+	// httpClient is used for all outbound API calls and JWKS fetches.
 	httpClient *http.Client
+
+	// jwks caches Microsoft's public signing keys.
+	jwks *jwksCache
 }
 
-// NewTeamsAdapter returns a TeamsAdapter configured with the given bot token.
-func NewTeamsAdapter(botToken string) *TeamsAdapter {
-	return &TeamsAdapter{
-		botToken:   botToken,
-		httpClient: http.DefaultClient,
-	}
+// NewTeamsAdapter returns a TeamsAdapter configured with the given bot token
+// and Microsoft App ID. The App ID is validated against the aud claim of
+// every inbound JWT.
+func NewTeamsAdapter(botToken, appID string) *TeamsAdapter {
+	return newTeamsAdapterInternal(botToken, appID, defaultJWKSURL, http.DefaultClient)
 }
 
 // NewTeamsAdapterWithClient returns a TeamsAdapter that uses the provided
-// http.Client for outbound API calls. Intended for unit testing.
-func NewTeamsAdapterWithClient(botToken string, client *http.Client) *TeamsAdapter {
+// http.Client for outbound API calls and JWKS fetches. Intended for unit
+// testing.
+func NewTeamsAdapterWithClient(botToken, appID string, client *http.Client) *TeamsAdapter {
+	return newTeamsAdapterInternal(botToken, appID, defaultJWKSURL, client)
+}
+
+// newTeamsAdapterInternal is the canonical constructor. jwksURL is exposed
+// so tests can point to a mock JWKS server.
+func newTeamsAdapterInternal(botToken, appID, jwksURL string, client *http.Client) *TeamsAdapter {
 	return &TeamsAdapter{
 		botToken:   botToken,
+		appID:      appID,
 		httpClient: client,
+		jwks:       newJWKSCache(jwksURL),
 	}
 }
 
@@ -72,9 +95,14 @@ func (a *TeamsAdapter) Capabilities() channel.AdapterCapabilities {
 	}
 }
 
-// VerifySignature validates the JWT Bearer token in the Authorization header.
-// Phase 0: validates token structure (3 parts, each base64-decodable) but
-// skips full JWKS verification. Logs a warning when skipping JWKS check.
+// VerifySignature validates the JWT Bearer token in the Authorization header
+// against Microsoft's Bot Framework JWKS endpoint. It enforces:
+//   - RS256 algorithm
+//   - Signature valid against a current Microsoft public key
+//   - iss == "https://api.botframework.com"
+//   - aud == the configured bot App ID
+//   - Token is not expired (with 5-minute clock-skew tolerance)
+//   - Token is past its nbf (with 5-minute clock-skew tolerance)
 func (a *TeamsAdapter) VerifySignature(r *http.Request) error {
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
@@ -86,14 +114,7 @@ func (a *TeamsAdapter) VerifySignature(r *http.Request) error {
 		return fmt.Errorf("teams: Authorization header must use Bearer scheme")
 	}
 
-	token := parts[1]
-	if err := validateJWTStructure(token); err != nil {
-		return fmt.Errorf("teams: invalid JWT: %w", err)
-	}
-
-	// Phase 0: full JWKS verification deferred.
-	log.Println("teams: WARNING: JWKS signature verification not yet implemented (Phase 0). Token structure validated only.")
-	return nil
+	return a.verifyJWT(r.Context(), parts[1])
 }
 
 // HandleWebhook processes an inbound Teams Bot Framework Activity POST. It
@@ -220,19 +241,97 @@ func (a *TeamsAdapter) Send(ctx context.Context, msg *channel.ChannelMessage) er
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-// validateJWTStructure checks that the token consists of exactly three
-// dot-separated parts, each of which is base64url-decodable. This is the
-// Phase 0 structural check — full JWKS verification is deferred.
-func validateJWTStructure(token string) error {
+// verifyJWT validates a raw JWT string. Order follows RFC 7519 §7.2:
+// structure and algorithm first, then signature (the gate that authenticates
+// the sender), then claim validation (exp, nbf, iss, aud).
+func (a *TeamsAdapter) verifyJWT(ctx context.Context, token string) error {
+	if len(token) > maxTokenBytes {
+		return fmt.Errorf("teams: jwt: token length %d exceeds %d-byte limit", len(token), maxTokenBytes)
+	}
+
+	// --- Structure ---
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return fmt.Errorf("expected 3 parts, got %d", len(parts))
+		return fmt.Errorf("teams: jwt: expected 3 parts, got %d", len(parts))
 	}
-	for i, part := range parts {
-		if _, err := base64.RawURLEncoding.DecodeString(part); err != nil {
-			return fmt.Errorf("part %d is not valid base64url: %w", i, err)
+
+	// --- Parse header ---
+	headerJSON, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return fmt.Errorf("teams: jwt: invalid header encoding: %w", err)
+	}
+	var header struct {
+		Alg string `json:"alg"`
+		Kid string `json:"kid"`
+	}
+	if err := json.Unmarshal(headerJSON, &header); err != nil {
+		return fmt.Errorf("teams: jwt: invalid header JSON: %w", err)
+	}
+	if header.Alg != "RS256" {
+		return fmt.Errorf("teams: jwt: unsupported algorithm %q, expected RS256", header.Alg)
+	}
+	if header.Kid == "" {
+		return fmt.Errorf("teams: jwt: missing kid in header")
+	}
+
+	// --- Decode signature bytes ---
+	sigBytes, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return fmt.Errorf("teams: jwt: invalid signature encoding: %w", err)
+	}
+
+	// --- Fetch public key and verify signature ---
+	// Do this before trusting any payload claim values.
+	pub, err := a.jwks.getOrRefresh(ctx, a.httpClient, header.Kid)
+	if err != nil {
+		return err
+	}
+	signingInput := parts[0] + "." + parts[1]
+	digest := sha256.Sum256([]byte(signingInput))
+	if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, digest[:], sigBytes); err != nil {
+		return fmt.Errorf("teams: jwt: signature verification failed: %w", err)
+	}
+
+	// --- Parse payload (claims are now authenticated) ---
+	payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return fmt.Errorf("teams: jwt: invalid payload encoding: %w", err)
+	}
+	var claims struct {
+		Iss string  `json:"iss"`
+		Aud string  `json:"aud"`
+		Exp float64 `json:"exp"`
+		Nbf float64 `json:"nbf"`
+	}
+	if err := json.Unmarshal(payloadJSON, &claims); err != nil {
+		return fmt.Errorf("teams: jwt: invalid payload JSON: %w", err)
+	}
+
+	// --- Validate claims ---
+	now := time.Now()
+
+	if claims.Exp == 0 {
+		return fmt.Errorf("teams: jwt: missing exp claim")
+	}
+	expiry := time.Unix(int64(claims.Exp), 0)
+	if now.After(expiry.Add(clockSkewTolerance)) {
+		return fmt.Errorf("teams: jwt: token expired at %s", expiry.UTC().Format(time.RFC3339))
+	}
+
+	if claims.Nbf != 0 {
+		notBefore := time.Unix(int64(claims.Nbf), 0)
+		if now.Before(notBefore.Add(-clockSkewTolerance)) {
+			return fmt.Errorf("teams: jwt: token not yet valid until %s", notBefore.UTC().Format(time.RFC3339))
 		}
 	}
+
+	if claims.Iss != botFrameworkIssuer {
+		return fmt.Errorf("teams: jwt: unexpected issuer %q", claims.Iss)
+	}
+	if claims.Aud != a.appID {
+		return fmt.Errorf("teams: jwt: unexpected audience %q", claims.Aud)
+	}
+
 	return nil
 }
 

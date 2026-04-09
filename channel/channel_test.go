@@ -456,6 +456,97 @@ func TestStubAdapterCapabilities(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// 11. TestNewSlackLimiter — Slack-specific rate limiter defaults
+// ---------------------------------------------------------------------------
+
+func TestNewSlackLimiter(t *testing.T) {
+	limiter := NewSlackLimiter()
+	ctx := context.Background()
+
+	// Slack allows 1 msg/sec/channel with burst 1.
+	ok, err := limiter.Allow(ctx, "channel-1")
+	if err != nil || !ok {
+		t.Fatal("first request should be allowed")
+	}
+	ok, _ = limiter.Allow(ctx, "channel-1")
+	if ok {
+		t.Error("second request in same tick should be denied (burst 1)")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 12. TestNewDiscordLimiter — Discord-specific rate limiter defaults
+// ---------------------------------------------------------------------------
+
+func TestNewDiscordLimiter(t *testing.T) {
+	limiter := NewDiscordLimiter()
+	ctx := context.Background()
+
+	// Discord allows burst 5.
+	for i := 0; i < 5; i++ {
+		ok, err := limiter.Allow(ctx, "guild-1")
+		if err != nil || !ok {
+			t.Fatalf("request %d should be allowed (burst 5)", i+1)
+		}
+	}
+	ok, _ := limiter.Allow(ctx, "guild-1")
+	if ok {
+		t.Error("6th request should be denied (burst 5)")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 13. TestNewTelegramLimiter — Telegram dual-mode rate limiter
+// ---------------------------------------------------------------------------
+
+func TestNewTelegramLimiter(t *testing.T) {
+	limiter := NewTelegramLimiter()
+	ctx := context.Background()
+
+	// DM: 1 msg/sec burst 1
+	ok, err := limiter.Allow(ctx, "dm:12345")
+	if err != nil || !ok {
+		t.Fatal("DM first request should be allowed")
+	}
+	ok, _ = limiter.Allow(ctx, "dm:12345")
+	if ok {
+		t.Error("DM second request should be denied (burst 1)")
+	}
+
+	// Group: 30 msg/sec burst 30
+	for i := 0; i < 30; i++ {
+		ok, err := limiter.Allow(ctx, "group:67890")
+		if err != nil || !ok {
+			t.Fatalf("group request %d should be allowed (burst 30)", i+1)
+		}
+	}
+	ok, _ = limiter.Allow(ctx, "group:67890")
+	if ok {
+		t.Error("group 31st request should be denied (burst 30)")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 14. TestTelegramDualLimiter_Wait — verifies Wait uses correct limiter
+// ---------------------------------------------------------------------------
+
+func TestTelegramDualLimiter_Wait(t *testing.T) {
+	limiter := NewTelegramLimiter()
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	// DM wait should succeed (first call, token available).
+	if err := limiter.Wait(ctx, "dm:999"); err != nil {
+		t.Fatalf("DM wait: %v", err)
+	}
+
+	// Group wait should succeed (first call).
+	if err := limiter.Wait(ctx, "group:999"); err != nil {
+		t.Fatalf("group wait: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 

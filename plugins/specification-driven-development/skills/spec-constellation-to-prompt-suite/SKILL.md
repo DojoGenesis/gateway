@@ -1,25 +1,19 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: spec-constellation-to-prompt-suite
-description: Transform specification constellations into executable prompt suites
-triggers:
-  - "convert specs to prompts"
-  - "create prompt suite"
-  - "generate implementation prompts"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - script_execution
-    - file_system
-    - bash
-  portable: true
-  tier: 2
-  agents:
-    - implementation-agent
+model: sonnet
+description: Produces a suite of coordinated, self-contained implementation prompts and a master integration contract table from a set of interconnected specs. Use when 'convert specs to prompts', 'ready to commission these specs', or 'coordinate these parallel tracks into executable prompts'.
+category: specification-driven-development
+
+inputs:
+  - name: spec_files
+    type: string[]
+    description: Paths to interconnected specification files to convert into prompts
+    required: true
+outputs:
+  - name: prompt_suite
+    type: ref
+    format: cas-ref
+    description: Suite of coordinated, self-contained implementation prompts and master integration contract table
 ---
 
 ## I. The Philosophy
@@ -175,3 +169,29 @@ Summarize all tracks, dependencies, and integration points:
 - [ ] Master implementation plan ties all tracks together (Step 6)
 - [ ] Success criteria span tracks, not just per-track (Step 6)
 - [ ] Risk mitigation plan addresses integration dependencies
+
+---
+
+## Output
+
+- One implementation prompt file per track (markdown), each self-contained and executable by an autonomous agent without reading sibling prompts
+- A master implementation plan document listing all tracks in dependency order, the Integration Contract Table, and aggregate success criteria
+- An Integration Contract Table naming every shared type, API, and design token along with producer track, consumer track, shape, and verification method
+
+## Examples
+
+**Scenario 1:** "We have four specs covering scaffold, backend, frontend, and dock. Turn them into prompts." → Four prompt files written in dependency order (scaffold first), with a shared DojoEntity type definition appearing identically in every prompt that references it, plus a master plan tying the execution sequence together.
+
+**Scenario 2:** "The tracks shipped but didn't integrate cleanly — types were different." → Run this skill before commissioning: the cross-validation step (Step 5) would have caught the type mismatch between Track B's response shape and Track C's expected input before any agent wrote a line of code.
+
+## Edge Cases
+
+- When a spec feeds more than one track, explicitly list the mapping in Step 1 rather than assigning it to one track and hoping the other tracks infer the overlap
+- When shared types evolve mid-commission (one track refines a shape), update the Integration Contract Table and re-issue all prompts that reference the changed type before other agents reach that section
+- When only one spec exists, use `implementation-prompt` instead — this skill's value is coordination across multiple interconnected specs
+
+## Anti-Patterns
+
+- Writing all prompts simultaneously before defining integration contracts — prompts written without contracts will define contracts independently and produce incompatible interfaces
+- Treating the spec-to-prompt mapping as 1:1 — one spec often feeds multiple tracks; skipping Step 1's matrix causes gaps and duplicate work
+- Embedding cross-track context inline in each prompt instead of referencing contracts — inline duplication drifts; the contract table is the single source of truth

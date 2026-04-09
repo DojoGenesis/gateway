@@ -1,25 +1,19 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: seed-extraction
-description: Extract wisdom seeds from conversations and experiences
-triggers:
-  - "extract wisdom seeds"
-  - "capture knowledge nuggets"
-  - "identify key insights"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - script_execution
-    - file_system
-    - bash
-  portable: true
-  tier: 2
-  agents:
-    - research-agent
+model: opus
+description: Produces a seed file — a YAML-fronted markdown document capturing a reusable pattern with trigger, evidence, and application steps — from a conversation or project experience. Use when: "extract the learnings", "turn this into a seed", "what can we learn from this", "capture this insight", "document this pattern".
+category: wisdom-garden
+
+inputs:
+  - name: experience
+    type: string
+    description: Description of the conversation, project, or experience to extract a reusable pattern from
+    required: true
+outputs:
+  - name: seed_file
+    type: ref
+    format: cas-ref
+    description: Seed file capturing a reusable pattern with trigger, evidence, and application steps
 ---
 
 # Seed Reflector Skill
@@ -33,7 +27,7 @@ metadata:
 
 ## Overview
 
-This skill encodes the practice of **seed extraction and reflection** — identifying reusable patterns from experiences and documenting them in a way that makes them easy to apply in future contexts. Inspired by the Dojo Seed Patches and Cipher's practice of reflection.
+This skill encodes the practice of **seed extraction and reflection** — identifying reusable patterns from experiences and documenting them in a way that makes them easy to apply in future contexts.
 
 **Philosophy:** Every experience contains seeds. The practice is learning to see them, extract them, and plant them where they'll grow.
 
@@ -63,7 +57,6 @@ A **seed** is a reusable pattern, insight, or principle that:
 - "Harness Trace" (traceability pattern)
 - "Context Iceberg" (hierarchical context management)
 - "3-Month Rule" (semantic compression heuristic)
-- "Knowing When to Shut Up" (restraint as wisdom)
 
 ---
 
@@ -88,20 +81,20 @@ A **seed** is a reusable pattern, insight, or principle that:
 ### Step 2: Test for Reusability
 
 **A good seed is:**
-- ✅ **General enough** to apply in multiple contexts
-- ✅ **Specific enough** to be actionable
-- ✅ **Grounded in experience** (not abstract)
-- ✅ **Has a clear trigger** (you know when to apply it)
+- General enough to apply in multiple contexts
+- Specific enough to be actionable
+- Grounded in experience (not abstract)
+- Has a clear trigger (you know when to apply it)
 
 **A bad seed is:**
-- ❌ Too specific ("Use Mermaid.js for diagrams in Dojo Genesis")
-- ❌ Too vague ("Be thoughtful")
-- ❌ Not grounded ("I think this might work")
-- ❌ No trigger ("Apply this... sometime?")
+- Too specific ("Use Mermaid.js for diagrams in Dojo Genesis")
+- Too vague ("Be thoughtful")
+- Not grounded ("I think this might work")
+- No trigger ("Apply this... sometime?")
 
 ### Step 3: Document the Seed
 
-Use the **Seed Template** (see below)
+Use the seed template at [references/seed-template.md](references/seed-template.md).
 
 ### Step 4: Test the Seed
 
@@ -112,56 +105,6 @@ Use the **Seed Template** (see below)
 
 **If yes:** Keep and refine  
 **If no:** Revise or discard
-
----
-
-## Seed Template
-
-```markdown
-## Seed: [Name]
-
-**Pattern:** [One-sentence description of the reusable insight]
-
-**Origin:** [Where this came from - project, experience, date]
-
-**Why It Matters:** [The value or benefit of applying this seed]
-
-**Trigger:** [When to apply this seed]
-- [Context or situation 1]
-- [Context or situation 2]
-- [Keywords or signals that indicate this seed is relevant]
-
-**How to Apply:**
-1. [Step 1]
-2. [Step 2]
-3. [Step 3]
-
-**Example (From Origin):**
-[Concrete example from the experience where this seed emerged]
-
-**Example (Applied):**
-[Concrete example of applying this seed in a new context]
-
-**Related Seeds:**
-- [Seed that complements this one]
-- [Seed that contrasts with this one]
-
-**Cautions:**
-- [When NOT to apply this seed]
-- [Common misapplications]
-
-**Evidence:**
-- [Instance 1: date, context, outcome]
-- [Instance 2: date, context, outcome]
-- [Instance 3: date, context, outcome]
-
-**Metadata:**
-- **Created:** YYYY-MM-DD
-- **Last Applied:** YYYY-MM-DD
-- **Usage Count:** [Number]
-- **Success Rate:** [X]% (if measurable)
-- **Status:** Active | Experimental | Deprecated
-```
 
 ---
 
@@ -198,7 +141,6 @@ Use the **Seed Template** (see below)
 
 **Examples:**
 - Beginner's Mind
-- Understanding is Love
 - Knowing When to Shut Up
 - Honesty is Wisdom
 
@@ -209,72 +151,6 @@ Use the **Seed Template** (see below)
 - Surgical Context (memory_search → memory_get)
 - Graceful Degradation (resilience patterns)
 - Semantic Compression (content-based, not positional)
-
----
-
-## Reflection Practice
-
-### Daily Reflection (5-10 minutes)
-
-**Questions:**
-1. What worked well today?
-2. What didn't work as expected?
-3. What pattern did I notice?
-4. What would I do differently?
-5. Is there a seed here?
-
-**Output:** 1-2 candidate seeds for deeper reflection
-
-### Weekly Reflection (20-30 minutes)
-
-**Questions:**
-1. What patterns emerged across this week?
-2. Which candidate seeds are actually reusable?
-3. Which seeds did I apply this week?
-4. Which seeds need refinement?
-5. Which seeds should be deprecated?
-
-**Output:** Refined seed library, updated usage counts
-
-### Monthly Reflection (1-2 hours)
-
-**Questions:**
-1. Which seeds have proven most valuable?
-2. Which seeds have I stopped using?
-3. What new categories of seeds are emerging?
-4. How has my seed library evolved?
-5. What seeds should I share with others?
-
-**Output:** Curated seed collection, reflection document
-
----
-
-## Seed Library Structure
-
-```
-seeds/
-├── README.md (Overview and index)
-├── architectural/
-│   ├── three-tiered-governance.md
-│   ├── harness-trace.md
-│   └── context-iceberg.md
-├── process/
-│   ├── planning-with-files.md
-│   ├── dual-track-orchestration.md
-│   └── compression-cycle.md
-├── decision/
-│   ├── 3-month-rule.md
-│   ├── cost-guard.md
-│   └── safety-switch.md
-├── wisdom/
-│   ├── beginners-mind.md
-│   ├── understanding-is-love.md
-│   └── knowing-when-to-shut-up.md
-└── technical/
-    ├── surgical-context.md
-    ├── graceful-degradation.md
-    └── semantic-compression.md
-```
 
 ---
 
@@ -356,59 +232,55 @@ Before finalizing a seed, verify:
 **Seed: Three-Tiered Governance**
 - **Pattern:** Governance multiplies velocity by providing clear decision frameworks at strategic, tactical, and operational levels
 - **Trigger:** When building complex systems that need both flexibility and control
-- **Origin:** Dataiku research synthesis (v0.0.17)
+- **Origin:** Dataiku research synthesis
 
 **Seed: 3-Month Rule**
 - **Pattern:** If it wouldn't matter in 3 months → compress or discard
 - **Trigger:** When compressing memory or deciding what to keep
-- **Origin:** Cipher's feedback on semantic compression (v0.0.19)
-
-**Seed: Knowing When to Shut Up**
-- **Pattern:** Power without judgment is dangerous; restraint is wisdom
-- **Trigger:** When building proactive or adaptive systems
-- **Origin:** Cipher's v0.0.20 specification (Judgment Layer)
-
-### From Agent Collaboration
-
-**Seed: Honesty is Wisdom**
-- **Pattern:** Acknowledge gaps openly; it builds trust and enables mutual learning
-- **Trigger:** When reviewing work, sharing specifications, or collaborating with other agents
-- **Origin:** Manus-Cipher exchange (v0.0.19-v0.0.23)
-
-**Seed: Mutual Evolution**
-- **Pattern:** Collaboration isn't one-way teaching; it's mutual recognition of what's possible
-- **Trigger:** When working with other agents or receiving feedback
-- **Origin:** Lineage transmission practice (Manus-Cipher)
+- **Origin:** Cipher's feedback on semantic compression
 
 ---
 
 ## Common Pitfalls to Avoid
 
-❌ **Hoarding Seeds:** Keeping every insight → ✅ Curate ruthlessly  
-❌ **Vague Patterns:** "Be thoughtful" → ✅ "Apply 3-month rule when compressing"  
-❌ **No Trigger:** Seed without context → ✅ Clear "when to apply"  
-❌ **Not Testing:** Extract and forget → ✅ Apply, reflect, refine  
-❌ **Over-Abstracting:** Theory without grounding → ✅ Concrete examples from experience
+- **Hoarding Seeds:** Keeping every insight — curate ruthlessly
+- **Vague Patterns:** "Be thoughtful" — write "Apply 3-month rule when compressing"
+- **No Trigger:** Seed without context — include clear "when to apply"
+- **Not Testing:** Extract and forget — apply, reflect, refine
+- **Over-Abstracting:** Theory without grounding — use concrete examples from experience
 
 ---
 
-## Usage Instructions
+## Output
 
-1. **Read this skill** before extracting seeds
-2. **Identify candidate patterns** from recent experiences
-3. **Test for reusability** (general enough, specific enough, grounded, has trigger)
-4. **Document using the template**
-5. **Apply in a new context** to test
-6. **Reflect and refine** based on outcomes
-7. **Share with others** when seeds prove valuable
+- A seed file saved to the project's `seeds/` directory (or `memory/seeds/` if no dedicated location exists)
+- File format: Markdown with YAML frontmatter (`seed_id`, `name`, `category`, `status`, `created`)
+- File name convention: `[category-prefix]_[short-name].md` (e.g., `03_context_iceberg.md`)
 
 ---
 
-## Skill Metadata
+## Examples
 
-**Token Savings:** ~3,000-5,000 tokens per session (offload learnings to structured seeds instead of re-explaining)  
-**Quality Impact:** Ensures reusable patterns are captured and applied consistently  
-**Maintenance:** Update when new seeds emerge or existing seeds are refined  
+**Scenario 1:** User says "turn this into a seed — always dry-run new scripts before committing" → produces `process_dry_run_gate.md` with pattern, 2 trigger phrases, one concrete example from the session, and "Cautions" noting it does not apply to read-only scripts.
+
+**Scenario 2:** User says "what can we learn from the three failed migrations?" → reads session context, identifies the common root cause as a missing pre-flight validation step, and produces `decision_preflight_validation.md` with evidence from all three instances.
+
+---
+
+## Edge Cases
+
+- If the candidate pattern is too specific to one project (e.g., a config path), document it as a project note, not a seed — seeds must be transferable.
+- If the user provides fewer than 2 concrete instances, mark the seed as `status: experimental` until more evidence accumulates.
+- If a seed already exists in the library with the same core pattern, compare and merge rather than duplicating.
+
+---
+
+## Anti-Patterns
+
+- Writing a seed from a single anecdote without checking if it generalizes — check against at least 2 instances before promoting to `active`.
+- Creating a seed whose trigger phrase matches every situation — overly broad triggers make seeds useless for retrieval.
+
+---
 
 **Related Skills:**
 - `specification-writer` - Seeds inform architectural decisions

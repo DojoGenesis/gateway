@@ -1,62 +1,44 @@
 ---
 name: strategic-scout
-description: >
-  A structured process for exploring strategic tensions, scouting multiple routes,
-  and aligning on a clear vision before committing to a plan. Use when facing a
-  significant strategic decision, when a project feels stuck, when there are competing
-  priorities, or at the beginning of a new project or major release. Produces a
-  strategic decision document with tension statement, routes, synthesis, and next steps.
-triggers:
-  - "scout the strategic landscape for this decision"
-  - "explore routes before we commit to a plan"
-  - "we are stuck, run a strategic scout"
-metadata:
-  version: "1.0"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - strategic-agent
+model: opus
+description: Produces a scout document containing a stated tension, 3-5 distinct routes with tradeoffs, and a recommended direction with rationale — the first artifact in a four-step pipeline (scout → spec → prompts → commission). Use when: "we don't know which direction to take", "scout our options before we commit", "what are the tradeoffs here", "we're stuck between competing priorities", "I need routes before writing a spec".
+category: strategic-thinking
+
+inputs:
+  - name: tension
+    type: string
+    description: The strategic tension or decision point to scout routes for
+    required: true
+outputs:
+  - name: scout_document
+    type: ref
+    format: cas-ref
+    description: Scout document with stated tension, 3-5 distinct routes with tradeoffs, and recommended direction with rationale
 ---
 
 # Strategic Scout Skill
 
-**Version:** 1.0
-**Purpose:** To provide a structured, repeatable process for navigating strategic uncertainty, exploring multiple possible futures, and aligning on a clear, actionable direction.
+**Version:** 2.1
+**Created:** 2026-02-07
+**Author:** Manus AI
+**Purpose:** To provide a structured, repeatable process for navigating strategic uncertainty, exploring multiple possible futures, and aligning on a clear, actionable plan.
 
 ---
 
 ## I. The Philosophy: From Problem to Possibility
 
-Strategic thinking is not about finding the right answer to a problem; it is about exploring the landscape of possibility that a tension reveals.
+Strategic thinking is not about finding the right answer to a problem; it is about exploring the landscape of possibility that a tension reveals. This skill transforms the act of planning from a linear process of problem-solving to a creative process of possibility-seeking.
 
-Three principles guide this skill:
-
-1. **Begin with a tension, not a solution.** The quality of your strategic thinking is determined by the quality of your questions. A tension held open reveals more than a problem quickly solved.
-
-2. **Scouting is an act of humility.** The first idea is rarely the best idea. By generating multiple routes, you resist premature commitment and let the landscape teach you what's possible.
-
-3. **Synthesis is a creative act.** The best solutions often come from combining existing ideas in new ways. Routes are raw material for synthesis, not a menu to pick from.
-
-4. **Alignment is an ongoing process.** Don't assume you understand the user's vision. Continuously check for alignment. The goal is a shared understanding, not a delivered answer.
+By beginning with a tension, scouting multiple routes, and continuously aligning on a shared vision, we can navigate uncertainty with clarity and confidence, and arrive at solutions that are both innovative and robust.
 
 ---
 
 ## II. When to Use This Skill
 
-- At the beginning of a new project or major release
-- When facing a significant strategic decision with no clear answer
-- When a project feels stuck or lacks a clear direction
-- When there are multiple competing priorities or stakeholder interests
-- When a binary decision feels limiting (pair with `product-positioning`)
-- When moving from "what should we build?" to exploring options before committing
-
-**When NOT to use:**
-- When the decision is purely tactical and well-understood
-- When the user has already committed to a direction and needs execution help
-- When the question can be answered with a quick lookup or factual analysis
+-   **At the beginning of a new project or major release.**
+-   **When facing a significant strategic decision with no clear answer.**
+-   **When a project feels stuck or lacks a clear direction.**
+-   **When there are multiple competing priorities or stakeholder interests.**
 
 ---
 
@@ -66,179 +48,131 @@ This is a 4-step workflow for strategic scouting and decision-making.
 
 ### Step 1: Identify the Tension
 
-**Goal:** Frame the strategic challenge as a tension to be held, not a problem to be solved.
+**Goal:** To frame the strategic challenge as a tension to be held, not a problem to be solved.
 
-**Actions:**
-1. Ask the user to describe the tension. Accept any form: a binary decision ("should we X or Y?"), a strategic question ("how should we approach Z?"), or a feeling of being stuck ("something isn't right about our Q direction").
-2. Help articulate the tension as a clean statement: "The tension is between [A] and [B]."
-3. Hold the question open. Resist the urge to immediately choose a side or propose a solution.
-
-**Output:** A clearly articulated tension statement.
-
-**Key insight:** The way you frame the tension determines the quality of the routes you'll discover. Spend time here.
+1.  **Articulate the Tension:** Clearly state the core strategic challenge as a tension between two competing ideas (e.g., "feature lab vs. focused product").
+2.  **Hold the Question Open:** Resist the urge to immediately choose a side or find a solution. The goal is to create a space for exploration.
 
 ### Step 2: Scout Multiple Routes
 
-**Goal:** Map the landscape of possibility by exploring multiple distinct paths forward.
+**Goal:** To map the landscape of possibility by exploring multiple distinct paths forward.
 
-**Actions:**
-1. Generate 3-5 distinct routes. Each route is a complete strategic direction, not a variation on the same theme.
-2. For each route, define:
-   - **Name:** A memorable, descriptive title
-   - **Thesis:** One sentence explaining the core idea
-   - **Tradeoffs:** Risk profile, potential impact, estimated duration
-   - **Optimizes for:** What this route prioritizes
-   - **Sacrifices:** What this route gives up
-3. Present routes as a table. Do NOT recommend one. Ask the user which routes resonate and which feel wrong.
-
-**Output:** A route table with 3-5 distinct options and their tradeoffs.
-
-**Key insight:** Routes should be genuinely different directions, not minor variations. If routes feel too similar, you haven't explored far enough.
+1.  **Generate 3-5 Routes:** Use Scout mode to generate a diverse set of potential routes.
+2.  **Define Tradeoffs:** For each route, clearly articulate the risk profile, potential impact, and estimated duration.
+3.  **Present the Options:** Present the routes and their tradeoffs to the user for review and discussion.
 
 ### Step 3: Synthesize and Refine
 
-**Goal:** Create a hybrid approach that combines the best aspects of what resonated.
+**Goal:** To create a hybrid approach that combines the best aspects of multiple routes.
 
-**Actions:**
-1. Gather user feedback on the routes. Listen for:
-   - Which routes resonate and why
-   - Which routes feel wrong and why
-   - Whether any route sparked a new idea or reframe
-2. Look for connections between routes that resonated. Where do they overlap? What do they share?
-3. Propose a synthesized direction that incorporates the user's feedback. Name the reframe -- give the new direction a clear identity.
-
-**Output:** A synthesized direction with a name, rationale, and clear differentiation from the original routes.
-
-**Key insight:** The synthesis is often better than any individual route. The reframe that emerges from the conversation is the real prize.
+1.  **Gather Feedback:** Actively listen to the user's feedback on the scouted routes.
+2.  **Look for Connections:** Identify opportunities to combine elements from different routes into a more robust solution.
+3.  **Propose a Hybrid Plan:** Present a new, synthesized plan that incorporates the user's feedback and the best aspects of the scouted routes.
 
 ### Step 4: Align on Vision
 
-**Goal:** Ensure the synthesized direction is fully aligned with the user's true strategic vision.
+**Goal:** To ensure that the plan is fully aligned with the user's true strategic vision.
 
-**Actions:**
-1. Present the synthesized direction and check for alignment. Ask: "Does this capture what you're really after?"
-2. Be prepared to reframe. If the user's feedback reveals a deeper or different vision, return to Step 2 with the new lens.
-3. Confirm the vision. Before moving to execution, get explicit confirmation.
-4. Produce a strategic decision document with:
-   - Tension Statement
-   - Routes Explored (table)
-   - What We Heard (user feedback summary)
-   - Synthesized Direction
-   - Next Steps
-   - Open Questions
-
-**Output:** A strategic decision document saved as `[date]_strategic_scout_[topic].md`.
+1.  **Check for Alignment:** Continuously ask clarifying questions to ensure that the plan is meeting the user's underlying goals.
+2.  **Be Prepared to Reframe:** If the user's feedback reveals a deeper or different vision, be prepared to reframe the entire plan.
+3.  **Confirm the Vision:** Before moving to execution, get explicit confirmation from the user that the plan is fully aligned with their vision.
 
 ---
 
 ## IV. Best Practices
 
-### 1. Begin with Tension, Not Solution
-
-**Why:** The most powerful strategic moves come from holding the tension open long enough for better answers to emerge.
-
-**How:** When a user says "we should do X," ask "what tension is X trying to resolve?" to open the space.
-
-### 2. Scout for Provocation, Not Consensus
-
-**Why:** The goal of scouting is not to find an answer everyone agrees with. It's to generate routes provocative enough to elicit a deeper conversation.
-
-**How:** Include at least one route that challenges conventional thinking. If all routes feel "safe," push further.
-
-### 3. Listen for the Question Behind the Question
-
-**Why:** The user's feedback often reveals a deeper, more important question than the one initially asked.
-
-**How:** Pay attention not just to which routes the user picks, but how they frame their reactions. The framing often contains the reframe.
-
-### 4. Name the Reframe
-
-**Why:** Unnamed reframes get lost. Named reframes become decision anchors that teams can rally around.
-
-**How:** When a synthesis emerges, give it a memorable name. "The Two-Speed Strategy" or "Complement, Don't Compete" -- something that captures the essence.
-
-### 5. Never Recommend a Single Route
-
-**Why:** The scout's job is to present the landscape, not to choose the path. Premature recommendation short-circuits the conversation.
-
-**How:** Present all routes equally. Ask which resonate. Let the user's reaction drive synthesis.
+-   **Begin with a Tension, Not a Solution:** The quality of your strategic thinking is determined by the quality of your questions.
+-   **Scouting is an Act of Humility:** The first idea is rarely the best idea. Be patient and explore multiple possibilities.
+-   **Synthesis is a Creative Act:** The best solutions often come from combining existing ideas in new ways.
+-   **Alignment is an Ongoing Process:** Don't assume you understand the user's vision. Continuously check for alignment.
 
 ---
 
-## V. Quality Checklist
+## VII. The Full Pipeline: Scout → Spec → Prompts → Commission
 
-Before delivering, verify:
+The strategic scout is not standalone — it is phase 1 of a 4-step workflow. Each step produces a persistent artifact:
 
-- [ ] Have you clearly articulated the core strategic tension?
-- [ ] Have you scouted at least 3 distinct routes (never fewer)?
-- [ ] Does each route have a name, thesis, tradeoffs, and what it optimizes/sacrifices?
-- [ ] Have you presented routes without recommending one?
-- [ ] Have you gathered user feedback before synthesizing?
-- [ ] Have you looked for opportunities to synthesize the best aspects of multiple routes?
-- [ ] Have you named the reframe or synthesized direction?
-- [ ] Have you gotten explicit confirmation that the direction is aligned with the user's vision?
-- [ ] Is the output saved as a dated markdown file?
+### Phase 1: Scout (this skill)
+- **Output:** A scout document with tension, 3-5 routes, tradeoffs, and selected direction with rationale
+- **Artifact:** `thinking/[topic]_strategic_scout.md`
 
----
+### Phase 2: Specify
+- **Input:** Scout decisions + codebase audit
+- **Tool:** `release-specification` skill
+- **Output:** A production-ready specification grounded in scout decisions AND measured codebase state
+- **Artifact:** `docs/vX.X.X/[release]_specification.md`
 
-## VI. Common Pitfalls
+### Phase 3: Prompts
+- **Input:** Specification sections
+- **Tool:** `implementation-prompt` or `zenflow-prompt-writer` skill
+- **Output:** Self-contained implementation prompts, one per parallel track
+- **Artifact:** `docs/vX.X.X/prompts/track_[N]_prompt.md`
 
-### Pitfall 1: Jumping to Solutions
+### Phase 4: Commission
+- **Input:** Implementation prompts + actual codebase
+- **Tool:** `pre-implementation-checklist` skill (with Track 0)
+- **Output:** Verified prompts with Track 0 remediation complete, then parallel execution
+- **Gate:** Track 0 must pass before parallel tracks begin
 
-**Problem:** Skipping the tension identification and going straight to "here are some options."
+The scout is the "why." The spec is the "what." The prompts are the "how." Track 0 is the "verify."
 
-**Solution:** Always start by naming the tension. If the user presents a solution, ask what tension it resolves.
-
-### Pitfall 2: Routes That Are Too Similar
-
-**Problem:** Generating 5 routes that are minor variations on the same theme.
-
-**Solution:** Force diversity. Include at least one route that's a radical departure, one that's the status quo, and one that reframes the question entirely.
-
-### Pitfall 3: Recommending a Favorite
-
-**Problem:** Subtly or explicitly pushing the user toward one route before gathering feedback.
-
-**Solution:** Present all routes with equal weight. Use a table format. Let the user react first.
-
-### Pitfall 4: Skipping Synthesis
-
-**Problem:** The user picks a route and you move straight to execution without synthesizing.
-
-**Solution:** Even when a user has a clear preference, check whether elements from other routes could strengthen the chosen direction.
-
-### Pitfall 5: One-Shot Scouting
-
-**Problem:** Treating scouting as a single pass instead of an iterative conversation.
-
-**Solution:** Plan for at least two rounds. The first scout reveals the real question; the second scout answers it. See `iterative-scouting` skill.
+**Key triggers:** "scout to spec", "spec pipeline", "full workflow from tension to implementation"
 
 ---
 
-## VII. Example: Six-Route Navigation Architecture
+## VI. Quality Checklist
 
-**Tension:** "Should all six routes be visible from day one, or should they unlock progressively?"
+Before moving to execution, ensure you can answer "yes" to all of the following questions:
 
-**Routes Scouted:**
-| Route | Thesis | Optimizes For | Sacrifices |
-|-------|--------|--------------|------------|
-| A: Horizon Bar | All routes visible, ambient suggestions | Discovery, completeness | Beginner simplicity |
-| B: The River | No nav bar, content-edge transitions | Calm UX, user agency | Route discovery |
-| C: Constellation | Fullscreen map, spatial navigation | Visual memory, exploration | Small screens, simplicity |
-| D: Companion | AI opens routes during conversation | Beginner onboarding | Power user control |
-| E: Thresholds | Three open, three closed, ritual unlock | Progressive disclosure, pedagogy | Immediate access |
-
-**User Feedback:** Routes B and E resonated most. The calm, content-edge transitions of B combined with E's progressive revelation felt right. Route A's persistent bar was useful but needed simplification. Routes C and D felt too heavy.
-
-**Synthesis -- "Show All, Open Three":** Three routes open and navigable for beginners. Three deep routes visible but distant (misty mountain shapes). Content-edge transitions instead of drag-and-drop. A home state landscape for returning users. Entities visible from routes (lenses), not contained by them.
-
-**Outcome:** Transformed a binary unlock question into a hybrid navigation philosophy that preserved calm UX while enabling progressive discovery.
+-   [ ] Have you clearly articulated the core strategic tension?
+-   [ ] Have you scouted at least 3-5 distinct routes with clear tradeoffs?
+-   [ ] Have you looked for opportunities to synthesize the best aspects of multiple routes?
+-   [ ] Have you gotten explicit confirmation from the user that the plan is fully aligned with their vision?
 
 ---
 
-## VIII. Related Skills
+## VIII. Perspectives from Past Scouting Sessions
 
-- **`product-positioning`** -- Use before scouting when the tension is a binary product decision
-- **`iterative-scouting`** -- Use to formalize the scout-feedback-reframe loop across multiple rounds
-- **`multi-surface-strategy`** -- Use when the tension involves product surfaces or platforms
-- **`strategic-to-tactical-workflow`** -- Use to move from scouting to specification and implementation
+### Perspective 1: The Great Simplification (v0.0.31)
+
+-   **Tension:** Additive complexity vs. subtractive simplification.
+-   **Insight:** A lean, focused product is often more powerful than a feature-rich but bloated one.
+-   **Lesson:** Don't be afraid to pivot and start fresh if the current path is leading to complexity.
+
+### Perspective 2: Orchestration Visibility (v0.0.31)
+
+-   **Tension:** Backend power vs. frontend visibility.
+-   **Insight:** A powerful feature is useless if the user can't see it or understand it.
+-   **Lesson:** Make the invisible visible. The user experience of a feature is as important as the feature itself.
+
+### Perspective 3: Parallel Tracks (v0.0.30)
+
+-   **Tension:** Speed vs. quality.
+-   **Insight:** With clear specifications and separation of concerns, you can have both.
+-   **Lesson:** Good governance multiplies velocity. Invest in planning and specification to enable parallel execution.
+
+---
+
+## Output
+
+- Scout document saved to `thinking/[topic]_strategic_scout.md` containing: tension statement, 3-5 routes (each with approach, risks, estimated impact, and duration), and a recommended direction with explicit rationale
+- If the user is proceeding to Phase 2, a handoff note naming the spec artifact and the relevant skill to invoke next
+
+## Examples
+
+**Scenario 1:** "Should we build a mobile app or focus on improving the desktop experience?" → Scout document with routes including (1) mobile-first PWA, (2) desktop-only deepening, (3) parallel mobile + desktop, (4) web-responsive as mobile substitute — each with risk profile and timeline, plus a recommendation with stated tradeoffs.
+
+**Scenario 2:** "We need to decide whether to open-source our core library." → Scout document exploring (1) full open-source with community model, (2) open-core (free tier + paid extensions), (3) source-available license, (4) stay closed — with business model implications and competitive risk for each. Recommended direction identifies which option fits the current revenue stage.
+
+## Edge Cases
+
+- If the user already knows their direction and just wants help specifying it, skip scouting and route directly to `release-specification` or `implementation-prompt` — running a full scout on a decided question wastes time and can introduce unnecessary doubt.
+- If the tension involves a third-party constraint (regulatory requirement, contractual obligation, hard deadline), surface that constraint upfront and remove any routes that violate it before presenting options.
+- If the tension is primarily interpersonal or organizational (e.g., disagreement between two team members), note that this skill addresses the strategic dimension only and flag that alignment work is a separate step.
+
+## Anti-Patterns
+
+- Presenting routes that are not genuinely distinct — if Routes 2 and 3 differ only in implementation detail rather than strategic approach, collapse them into one route.
+- Recommending a direction before presenting all routes — the recommendation must come after the options are on the table, not before, to avoid anchoring the user prematurely.
+- Scouting without naming the tension explicitly — a scout that jumps straight to routes without a stated tension gives users no way to evaluate whether the routes actually address their situation.
+- Treating scout output as final — the scout document is a starting point for conversation, not a decision. Always check for reframes before moving to Phase 2.

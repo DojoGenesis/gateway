@@ -1,27 +1,27 @@
 ---
 name: frontend-from-backend
-description: Write production-ready frontend specifications deeply grounded in existing backend architecture. Prevents integration issues by starting with backend reality, not frontend imagination.
-triggers:
-  - "write a frontend spec grounded in the backend"
-  - "derive the frontend from existing backend APIs"
-  - "spec the UI based on what the backend actually provides"
-metadata:
-  version: "1.0"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - implementation-agent
-    - strategic-agent
+model: opus
+description: Produces a backend-grounded frontend specification document covering API contracts, integration guide, auth flows, and updated track prompts. Use when 'spec the frontend for this API', 'write frontend spec from backend', or 'ground the UI in this existing backend'.
+category: specification-driven-development
+
+inputs:
+  - name: backend_spec
+    type: string
+    description: Path or content of the backend API specification or code to derive from
+    required: true
+outputs:
+  - name: frontend_spec
+    type: ref
+    format: cas-ref
+    description: Backend-grounded frontend specification document covering API contracts, integration guide, auth flows, and track prompts
 ---
 
-# Frontend From Backend Skill
+# Write Frontend Spec From Backend Skill
 
 **Version:** 1.0
-**Author:** Tres Pies Design
-**Purpose:** Write high-quality frontend specifications that are deeply integrated with an existing backend, ensuring seamless development and preventing integration friction.
+**Created:** 2026-02-07
+**Author:** Manus AI
+**Purpose:** To provide a structured, repeatable process for writing high-quality frontend specifications that are deeply integrated with an existing backend, ensuring seamless development and reducing integration friction.
 
 ---
 
@@ -29,139 +29,123 @@ metadata:
 
 Frontend development in a full-stack application does not happen in a vacuum. The most common source of bugs, delays, and rework is a disconnect between the frontend implementation and the backend reality. This skill is built on a simple but powerful principle: **grounding before building**.
 
-By deeply understanding the existing backend architecture, APIs, and data models *before* writing a single line of frontend specification, we prevent entire classes of integration problems. What we design is not just beautiful, but buildable.
+By deeply understanding the existing backend architecture, APIs, and data models *before* writing a single line of frontend specification, we can prevent entire classes of integration problems. This process transforms specification writing from a creative exercise into a disciplined engineering practice, ensuring that what we design is not just beautiful, but buildable.
 
 ---
 
 ## II. When to Use This Skill
 
-- When planning a new frontend feature that interacts with an existing backend
-- When writing specifications for a UI redesign with a backend component
-- When commissioning frontend work to an autonomous implementation agent
-- When you feel a disconnect between the frontend vision and the backend reality
-- At the beginning of any major frontend development cycle
+-   **When planning a new frontend feature** that will interact with an existing backend.
+-   **When writing specifications for a UI redesign** of a feature that has a backend component.
+-   **When commissioning frontend work to an autonomous agent** like Claude Code, Zenflow, or other implementation agents.
+-   **When you feel a disconnect** between the frontend vision and the backend reality.
+-   **At the beginning of any major frontend development cycle**.
 
 ---
 
-## III. The 5-Step Workflow
+## III. The Workflow
+
+This workflow is a 5-step process that takes you from a high-level feature idea to a production-ready, backend-grounded specification.
 
 ### Step 1: Deep Backend Analysis
 
-**Goal:** Achieve comprehensive understanding of the existing backend architecture.
+**Goal:** Achieve a comprehensive understanding of the existing backend architecture.
 
-1. **Read key backend files:** Entry point, route registration, handlers, middleware
-2. **Document APIs:** Map all relevant endpoints with methods, auth requirements, request bodies, success/error responses
-3. **Identify data models:** Understand the shapes of data the backend returns
-4. **Map integration points:** For each frontend feature area, identify the specific backend endpoint it will consume
-
-**Output:** A Backend Integration Map (table format).
-
-**Backend Integration Map Template:**
-
-| Feature Area | Endpoint | Method | Auth | Request Body | Success Response | Error Response |
-|-------------|----------|--------|------|-------------|-----------------|----------------|
-| User List | `/api/v1/users` | GET | Bearer | - | `{ users: User[] }` | `{ error: string }` |
-| Create User | `/api/v1/users` | POST | Bearer | `{ name: string }` | `{ id: string }` | `{ error: string, code: number }` |
+1.  **Run `/repo-context-sync`:** Generate a comprehensive context map of the repository.
+2.  **Read Key Backend Files:**
+    -   `main.go` (or equivalent): Understand route registration and server setup.
+    -   `handlers/`: Read the handlers for the relevant feature areas.
+    -   `middleware/`: Understand the authentication and request lifecycle.
+3.  **Document APIs:** Map all relevant API endpoints, including methods, authentication requirements, request bodies, and success/error responses.
+4.  **Identify Integration Points:** For each part of the new frontend feature, identify the specific backend endpoint it will interact with.
 
 ### Step 2: Comprehensive Feature Specification
 
-**Goal:** Write a production-ready specification grounded in backend reality.
+**Goal:** Write a production-ready specification for the new feature that leverages the existing backend.
 
-1. **Executive summary** and problem statement
-2. **Goals, non-goals, and user stories**
-3. **Technical architecture** — How frontend and backend will interact
-4. **UI/UX interaction flows** — With specific API calls mapped to each interaction
-5. **API contracts** — Request/response examples for every call
-6. **Security considerations** — Auth flow, token handling, CORS
+1.  **Write a Full Feature Spec:** Create a detailed document covering:
+    -   Executive summary and problem statement
+    -   Goals, non-goals, and user stories
+    -   Technical architecture (how frontend and backend will interact)
+    -   UI/UX wireframes and interaction flows
+    -   API contracts with request/response examples
+    -   Implementation plan (if multi-phased)
+    -   Security considerations
+2.  **Leverage Existing Backend:** Design the feature to use existing backend infrastructure wherever possible. Avoid proposing new backend features unless absolutely necessary.
 
-### Step 3: Component Architecture
+### Step 3: Integration Guide Creation
 
-**Goal:** Design the component tree with state shapes derived from backend data models.
+**Goal:** Create a practical guide for developers on how to wire the new frontend to the backend.
 
-For each component:
-- **Purpose** — What it renders and why
-- **Props interface** — TypeScript interface
-- **Internal state** — TypeScript interface, derived from backend response types
-- **API calls** — Which endpoints it consumes
-- **Loading state** — What renders during fetch
-- **Error state** — What renders on failure
-- **Empty state** — What renders when data is empty
+1.  **Create a Track-by-Track Guide:** If the feature is being built in parallel tracks, create a guide for each track.
+2.  **Document Authentication Flow:** Explain how the frontend should handle authentication (guest mode, API key mode, cloud sync).
+3.  **Explain Streaming Architecture:** If the feature uses streaming, document the SSE or WebSocket connection and event handling.
+4.  **Provide Code Examples:** Include frontend code snippets for making API calls.
+5.  **Document Error Handling:** Specify how the frontend should handle different backend error codes.
 
-**State Shape Derivation:**
+### Step 4: Track Prompt Enhancement
 
-```typescript
-// Backend returns:
-interface ApiUserResponse {
-  id: string;
-  name: string;
-  email: string;
-  created_at: string;
-}
+**Goal:** Update all development prompts (e.g., for implementation agents like Zenflow or Claude Code) with backend grounding.
 
-// Frontend state derived from backend:
-interface UserState {
-  users: ApiUserResponse[];
-  loading: boolean;
-  error: string | null;
-}
-```
-
-### Step 4: Integration Guide
-
-**Goal:** Create a practical guide for wiring frontend to backend.
-
-1. **Authentication flow** — How the frontend handles auth (token storage, refresh, logout)
-2. **API client setup** — Base URL, headers, interceptors
-3. **Streaming architecture** — SSE/WebSocket connections if applicable
-4. **Error handling patterns** — How different HTTP status codes map to UI states
-5. **Code examples** — Actual fetch/axios calls with error handling
+1.  **Add a "Backend Grounding" Section:** In each prompt, add a dedicated section that explains the backend context.
+2.  **Document Specific Endpoints:** For each part of the implementation, specify the exact API endpoint to use.
+3.  **Reference the Integration Guide:** Link to the full integration guide for more details.
+4.  **Ensure Prompts Use Existing Patterns:** Explicitly instruct the development agent to follow existing backend patterns.
 
 ### Step 5: Audit and Deliver
 
-**Goal:** Verify completeness and save.
+**Goal:** Ensure all documentation is complete, consistent, and ready for commissioning.
 
-1. **Verify every frontend API call** references a real backend endpoint
-2. **Flag Backend Prerequisites** — If the frontend needs an endpoint that doesn't exist, mark it explicitly
-3. **Check state shapes** match backend response types
-4. **Save** as `[version]_frontend_spec_[feature].md`
-
----
-
-## IV. The "Backend Prerequisite" Pattern
-
-When the frontend needs functionality the backend doesn't yet provide:
-
-```markdown
-### Backend Prerequisite: [Feature Name]
-
-**Needed by:** [Component/Feature that needs it]
-**Proposed endpoint:** `[METHOD] /api/v1/[resource]`
-**Request:** `{ field: type }`
-**Response:** `{ field: type }`
-**Reason:** [Why the frontend needs this and why it doesn't exist yet]
-**Priority:** [Blocking | Nice-to-have]
-```
-
-This makes the gap explicit. Never silently invent backend endpoints in a frontend spec.
+1.  **Run a Final Audit:** Review all documents for gaps, inconsistencies, or missing information.
+2.  **Write Missing Documentation:** If any gaps are found (e.g., design system, API contracts), write the missing documents.
+3.  **Push to Repository:** Commit all documentation to a dedicated directory (e.g., `docs/vX.X.X/`).
+4.  **Confirm Readiness:** Announce that the specifications are complete and ready for commissioning.
 
 ---
 
-## V. Best Practices
+## IV. Best Practices
 
-- **The backend is the source of truth.** If there is a discrepancy between the frontend design and the backend API, the frontend design must adapt.
-- **No backend changes is the ideal.** Design the frontend to work with the existing backend. Only propose backend changes as a last resort.
-- **Over-document the integration.** Too much detail on frontend-backend wiring is always better than too little.
-- **Derive state from data models.** Frontend state shapes should be direct derivations of backend response types, not independent inventions.
-- **Complete this process before writing code.** This is a pre-development activity.
+-   **No Backend Changes is the Goal:** The primary goal of this process is to build a frontend that works with the *existing* backend. Only propose backend changes as a last resort.
+-   **The Backend is the Source of Truth:** If there is a discrepancy between the frontend design and the backend API, the backend API is correct. The frontend design must adapt.
+-   **Over-Document the Integration:** It is better to provide too much detail on how the frontend and backend should connect than too little.
+-   **Use this Skill Before Writing Code:** This process should be completed *before* any significant frontend development begins.
 
 ---
 
-## VI. Quality Checklist
+## V. Quality Checklist
 
-- [ ] Have you read the backend entry point and relevant handlers?
-- [ ] Have you documented every API endpoint the frontend will consume?
-- [ ] Does every frontend component document its loading, error, and empty states?
-- [ ] Are all TypeScript interfaces derived from actual backend response types?
-- [ ] Are Backend Prerequisites explicitly flagged (not silently invented)?
-- [ ] Does the spec include an authentication flow description?
-- [ ] Does the spec include error handling patterns for all HTTP status codes?
+Before commissioning the work, ensure you can answer "yes" to all of the following questions:
+
+-   [ ] Have you read the main entrypoint of the backend application?
+-   [ ] Have you read the handlers for all relevant API endpoints?
+-   [ ] Have you written a comprehensive feature specification that includes API contracts?
+-   [ ] Have you created a backend integration guide with code examples?
+-   [ ] Have all development prompts been updated with a "Backend Grounding" section?
+-   [ ] Have you audited all documentation for completeness and pushed it to the repository?
+
+---
+
+## Output
+
+- A frontend feature specification document grounded in actual backend endpoints and data models (saved to `docs/vX.X.X/frontend_spec.md`)
+- A backend integration guide with code examples for each API call the frontend makes
+- Updated implementation prompts for all affected tracks, each containing a "Backend Grounding" section
+- An audit summary confirming no new backend routes are required
+
+## Examples
+
+**Scenario 1:** "We have a working Go API and need to spec the settings page for it." → A feature spec mapping each settings field to the exact backend endpoint, with TypeScript fetch examples and error-handling patterns drawn from the actual handler code.
+
+**Scenario 2:** "The agent keeps building frontend that doesn't match the API." → A backend integration guide extracted from `handlers/` and `middleware/`, then injected into each track prompt so agents reference real endpoint signatures instead of assumptions.
+
+## Edge Cases
+
+- When the backend has not been built yet, this skill should not be invoked — use `specification-writer` to design both layers together instead
+- When backend APIs are behind an authentication layer, document the full auth handshake in the integration guide before speccing any authenticated endpoints
+- When the backend uses streaming (SSE or WebSocket), add a dedicated "Streaming Architecture" section; generic fetch patterns are not sufficient
+
+## Anti-Patterns
+
+- Proposing new backend endpoints inside a frontend spec — the goal is to build a frontend against the existing backend; backend changes belong in a separate release spec
+- Writing frontend specs from API documentation instead of reading actual handler code — docs drift; the handler is ground truth
+- Skipping the integration guide and embedding API details only in the track prompt — the guide is the canonical reference; prompts should link to it, not duplicate it inline

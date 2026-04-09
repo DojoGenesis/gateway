@@ -7,8 +7,7 @@
 		addEdge,
 		type Node,
 		type Edge,
-		type Connection,
-		type OnConnectStartParams
+		type Connection
 	} from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 
@@ -17,26 +16,57 @@
 	import SkillNode from '$lib/components/SkillNode.svelte';
 
 	import { applyDagreLayout } from '$lib/layout';
-	import { listWorkflows, getWorkflow, saveCanvas, getCanvas, executeWorkflow, subscribeExecution } from '$lib/api';
-	import type { WorkflowDefinition, SkillInfo, SkillNodeData, Step, StepStatus } from '$lib/types';
-	import { execution, startExecution, updateStep, finishExecution } from '$lib/stores/execution.svelte.js';
+	import {
+		validateConnection,
+		wouldCreateCycle,
+		encodeHandleId
+	} from '$lib/validation.svelte.js';
+	import {
+		pushSnapshot,
+		undo as historyUndo,
+		redo as historyRedo,
+		clearHistory
+	} from '$lib/stores/history.svelte.js';
+	import {
+		listWorkflows,
+		getWorkflow,
+		saveCanvas,
+		getCanvas,
+		executeWorkflow,
+		subscribeExecution
+	} from '$lib/api';
+	import type {
+		WorkflowDefinition,
+		SkillInfo,
+		SkillNodeData,
+		CanvasState,
+		Step,
+		StepStatus
+	} from '$lib/types';
+	import {
+		execution,
+		startExecution,
+		updateStep,
+		finishExecution
+	} from '$lib/stores/execution.svelte.js';
 
 	// -------------------------------------------------------------------------
 	// Node types registry for Svelte Flow
 	// -------------------------------------------------------------------------
-	const nodeTypes = { skill: SkillNode };
+	const nodeTypes = { skill: SkillNode } as Record<string, typeof SkillNode>;
 
 	// -------------------------------------------------------------------------
-	// Reactive state — Svelte 5 runes
+	// Reactive state -- Svelte 5 runes
 	// -------------------------------------------------------------------------
 	let nodes = $state<Node<SkillNodeData>[]>([]);
 	let edges = $state<Edge[]>([]);
 	let workflowName = $state('');
 	let nodeIdCounter = $state(0);
 
-	// Undo/redo history (snapshot-based per ADR-019 §7)
-	let history = $state<Array<{ nodes: Node<SkillNodeData>[]; edges: Edge[] }>>([]);
-	let historyIndex = $state(-1);
+	// Connection validation feedback
+	let connectionError = $state<string | null>(null);
+	let connectionErrorTimeout: ReturnType<typeof setTimeout> | undefined;
+	let flashNodeId = $state<string | null>(null);
 
 	// Load workflow modal state
 	let showLoadModal = $state(false);
@@ -44,35 +74,26 @@
 	let loadingWorkflows = $state(false);
 
 	// -------------------------------------------------------------------------
-	// History helpers
+	// History helpers (delegate to store)
 	// -------------------------------------------------------------------------
-	function pushHistory() {
-		// Drop any redo future
-		const newHistory = history.slice(0, historyIndex + 1);
-		newHistory.push({
-			nodes: JSON.parse(JSON.stringify(nodes)) as Node<SkillNodeData>[],
-			edges: JSON.parse(JSON.stringify(edges)) as Edge[]
-		});
-		// Cap at 50 snapshots
-		if (newHistory.length > 50) newHistory.shift();
-		history = newHistory;
-		historyIndex = history.length - 1;
+	function recordSnapshot() {
+		pushSnapshot(nodes, edges);
 	}
 
-	function undo() {
-		if (historyIndex <= 0) return;
-		historyIndex--;
-		const snap = history[historyIndex];
-		nodes = snap.nodes;
-		edges = snap.edges;
+	function handleUndo() {
+		const snap = historyUndo();
+		if (snap) {
+			nodes = snap.nodes;
+			edges = snap.edges;
+		}
 	}
 
-	function redo() {
-		if (historyIndex >= history.length - 1) return;
-		historyIndex++;
-		const snap = history[historyIndex];
-		nodes = snap.nodes;
-		edges = snap.edges;
+	function handleRedo() {
+		const snap = historyRedo();
+		if (snap) {
+			nodes = snap.nodes;
+			edges = snap.edges;
+		}
 	}
 
 	// -------------------------------------------------------------------------
@@ -82,12 +103,26 @@
 		const mod = e.metaKey || e.ctrlKey;
 		if (mod && e.key === 'z' && !e.shiftKey) {
 			e.preventDefault();
-			undo();
+			handleUndo();
 		}
 		if ((mod && e.shiftKey && e.key === 'z') || (mod && e.key === 'y')) {
 			e.preventDefault();
-			redo();
+			handleRedo();
 		}
+	}
+
+	// -------------------------------------------------------------------------
+	// Connection error flash
+	// -------------------------------------------------------------------------
+	function showConnectionError(msg: string, targetNodeId?: string) {
+		connectionError = msg;
+		if (targetNodeId) flashNodeId = targetNodeId;
+
+		if (connectionErrorTimeout) clearTimeout(connectionErrorTimeout);
+		connectionErrorTimeout = setTimeout(() => {
+			connectionError = null;
+			flashNodeId = null;
+		}, 3000);
 	}
 
 	// -------------------------------------------------------------------------
@@ -113,8 +148,6 @@
 		}
 
 		// Compute drop position relative to the canvas element.
-		// SvelteFlow handles panning/zoom internally; we pass screen-space
-		// coordinates here for simplicity.
 		const rect = canvasEl?.getBoundingClientRect();
 		const x = rect ? e.clientX - rect.left - 100 : e.clientX - 100;
 		const y = rect ? e.clientY - rect.top - 50 : e.clientY - 50;
@@ -134,46 +167,37 @@
 		};
 
 		nodes = [...nodes, newNode];
-		pushHistory();
+		recordSnapshot();
 	}
 
 	// -------------------------------------------------------------------------
-	// Edge connection handler
+	// Edge connection handler with type validation + cycle detection
 	// -------------------------------------------------------------------------
 	function handleConnect(connection: Connection) {
-		// Cycle detection: check if adding this edge would create a cycle.
-		if (wouldCreateCycle(connection.source!, connection.target!, edges)) {
-			// Svelte Flow doesn't support blocking connections natively;
-			// we skip the add and flash an error.
-			console.warn('Workflow: cycle detected — connection rejected');
+		const sourceId = connection.source;
+		const targetId = connection.target;
+
+		if (!sourceId || !targetId) return;
+
+		// 1. Cycle detection
+		if (wouldCreateCycle(sourceId, targetId, nodes, edges)) {
+			showConnectionError('Cycle detected -- connection rejected', targetId);
 			return;
 		}
+
+		// 2. Type compatibility check
+		const typeError = validateConnection(
+			connection.sourceHandle,
+			connection.targetHandle
+		);
+		if (typeError) {
+			showConnectionError(typeError, targetId);
+			return;
+		}
+
+		// Valid connection -- add the edge
 		edges = addEdge(connection, edges);
-		pushHistory();
-	}
-
-	function wouldCreateCycle(source: string, target: string, existingEdges: Edge[]): boolean {
-		// Build adjacency from existing edges + proposed new edge.
-		const adj = new Map<string, string[]>();
-		const allNodes = nodes.map((n) => n.id);
-		for (const id of allNodes) adj.set(id, []);
-		for (const e of existingEdges) {
-			adj.get(e.source)?.push(e.target);
-		}
-		adj.get(source)?.push(target);
-
-		// DFS from target: if we can reach source, adding source→target is a cycle.
-		const visited = new Set<string>();
-		function dfs(node: string): boolean {
-			if (node === source) return true;
-			if (visited.has(node)) return false;
-			visited.add(node);
-			for (const neighbor of adj.get(node) ?? []) {
-				if (dfs(neighbor)) return true;
-			}
-			return false;
-		}
-		return dfs(target);
+		recordSnapshot();
 	}
 
 	// -------------------------------------------------------------------------
@@ -186,10 +210,27 @@
 				.filter((e) => e.target === node.id)
 				.map((e) => e.source);
 
+			// Build inputs map from edge connections (port-level bindings)
+			const inputBindings: Record<string, string> = {};
+			for (const edge of edges) {
+				if (edge.target !== node.id) continue;
+				if (edge.sourceHandle && edge.targetHandle) {
+					// Extract port names from encoded handles
+					const sourceParts = edge.sourceHandle.split(':');
+					const targetParts = edge.targetHandle.split(':');
+					if (sourceParts.length >= 2 && targetParts.length >= 2) {
+						const sourceStepId = edge.source;
+						const sourcePortName = sourceParts[1];
+						const targetPortName = targetParts[1];
+						inputBindings[targetPortName] = `{{ steps.${sourceStepId}.outputs.${sourcePortName} }}`;
+					}
+				}
+			}
+
 			return {
 				id: node.id,
 				skill: node.data.skill,
-				inputs: {},
+				inputs: inputBindings,
 				depends_on: [...new Set(dependsOn)]
 			};
 		});
@@ -203,12 +244,27 @@
 	}
 
 	// -------------------------------------------------------------------------
+	// Build CanvasState for persistence
+	// -------------------------------------------------------------------------
+	function buildCanvasState(): CanvasState {
+		const positions: Record<string, { x: number; y: number }> = {};
+		for (const n of nodes) {
+			positions[n.id] = { x: n.position.x, y: n.position.y };
+		}
+		return {
+			workflow_ref: '',
+			viewport: { x: 0, y: 0, zoom: 1 },
+			node_positions: positions
+		};
+	}
+
+	// -------------------------------------------------------------------------
 	// Auto-layout via dagre
 	// -------------------------------------------------------------------------
 	function handleAutoLayout() {
 		if (nodes.length === 0) return;
 		nodes = applyDagreLayout(nodes, edges, 'LR') as Node<SkillNodeData>[];
-		pushHistory();
+		recordSnapshot();
 	}
 
 	// -------------------------------------------------------------------------
@@ -237,7 +293,7 @@
 			let x = 80;
 			const newNodes: Node<SkillNodeData>[] = def.steps.map((step, i) => ({
 				id: step.id,
-				type: 'skill',
+				type: 'skill' as const,
 				position: { x: x + i * 220, y: 200 },
 				data: {
 					label: step.skill,
@@ -272,11 +328,12 @@
 					return pos ? { ...n, position: { x: pos.x, y: pos.y } } : n;
 				});
 			} catch {
-				// Canvas not found — use auto-layout positions.
+				// Canvas not found -- use auto-layout.
 				nodes = applyDagreLayout(nodes, edges, 'LR') as Node<SkillNodeData>[];
 			}
 
-			pushHistory();
+			clearHistory();
+			recordSnapshot();
 		} catch (e) {
 			console.error('Failed to load workflow:', e);
 		}
@@ -287,23 +344,15 @@
 	// -------------------------------------------------------------------------
 	async function persistCanvas() {
 		if (!workflowName) return;
-		const positions: Record<string, { x: number; y: number }> = {};
-		for (const n of nodes) {
-			positions[n.id] = { x: n.position.x, y: n.position.y };
-		}
 		try {
-			await saveCanvas(workflowName, {
-				workflow_ref: '',
-				viewport: { x: 0, y: 0, zoom: 1 },
-				node_positions: positions
-			});
+			await saveCanvas(workflowName, buildCanvasState());
 		} catch {
-			// Non-critical — canvas save failure doesn't block workflow save.
+			// Non-critical -- canvas save failure doesn't block workflow save.
 		}
 	}
 
 	// -------------------------------------------------------------------------
-	// Execution: POST → run_id → SSE → node status updates
+	// Execution: POST -> run_id -> SSE -> node status updates
 	// -------------------------------------------------------------------------
 	let cleanupExecution = $state<(() => void) | null>(null);
 
@@ -315,7 +364,7 @@
 			const { createWorkflow } = await import('$lib/api');
 			await createWorkflow(buildDefinition());
 		} catch {
-			// Non-blocking — proceed even if save fails (workflow may already exist).
+			// Non-blocking -- proceed even if save fails (workflow may already exist).
 		}
 
 		let result: { run_id: string; workflow: string };
@@ -327,7 +376,10 @@
 		}
 
 		// Reset all node statuses to pending.
-		nodes = nodes.map((n) => ({ ...n, data: { ...n.data, status: 'pending' as StepStatus } }));
+		nodes = nodes.map((n) => ({
+			...n,
+			data: { ...n.data, status: 'pending' as StepStatus }
+		}));
 		startExecution(result.run_id);
 
 		// Subscribe to the SSE stream.
@@ -338,7 +390,9 @@
 				updateStep(stepId, status as StepStatus);
 				// Mirror status into the Svelte Flow nodes array so SkillNode re-renders.
 				nodes = nodes.map((n) =>
-					n.id === stepId ? { ...n, data: { ...n.data, status: status as StepStatus } } : n
+					n.id === stepId
+						? { ...n, data: { ...n.data, status: status as StepStatus } }
+						: n
 				);
 			},
 			() => {
@@ -351,7 +405,10 @@
 	// Initialize history on first load
 	// -------------------------------------------------------------------------
 	$effect(() => {
-		if (history.length === 0) pushHistory();
+		if (nodes !== undefined && edges !== undefined) {
+			// Only push initial snapshot once
+			recordSnapshot();
+		}
 	});
 </script>
 
@@ -362,9 +419,12 @@
 		{workflowName}
 		onWorkflowNameChange={(name) => (workflowName = name)}
 		getDefinition={buildDefinition}
+		getCanvasState={buildCanvasState}
 		onAutoLayout={handleAutoLayout}
 		onLoadWorkflow={openLoadModal}
 		onRunWorkflow={handleRunWorkflow}
+		onUndo={handleUndo}
+		onRedo={handleRedo}
 		isRunning={execution.running}
 	/>
 
@@ -395,8 +455,20 @@
 
 			{#if nodes.length === 0}
 				<div class="canvas-empty">
-					<p class="canvas-empty__title">Drag skills from the palette to build your workflow</p>
-					<p class="canvas-empty__hint">Connect nodes by dragging from output (right) handles to input (left) handles</p>
+					<p class="canvas-empty__title">
+						Drag skills from the palette to build your workflow
+					</p>
+					<p class="canvas-empty__hint">
+						Connect nodes by dragging from output (right) handles to input (left) handles
+					</p>
+				</div>
+			{/if}
+
+			<!-- Connection validation error toast -->
+			{#if connectionError}
+				<div class="connection-error-toast" role="alert">
+					<span class="connection-error-toast__icon">✗</span>
+					<span>{connectionError}</span>
 				</div>
 			{/if}
 		</div>
@@ -408,21 +480,37 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="modal-overlay" onclick={() => (showLoadModal = false)}>
-		<div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Load workflow" tabindex="-1">
+		<div
+			class="modal"
+			onclick={(e) => e.stopPropagation()}
+			role="dialog"
+			aria-modal="true"
+			aria-label="Load workflow"
+			tabindex="-1"
+		>
 			<div class="modal__header">
 				<h2 class="modal__title">Load Workflow</h2>
-				<button class="modal__close" onclick={() => (showLoadModal = false)} aria-label="Close">✕</button>
+				<button
+					class="modal__close"
+					onclick={() => (showLoadModal = false)}
+					aria-label="Close"
+				>
+					✕
+				</button>
 			</div>
 			<div class="modal__body">
 				{#if loadingWorkflows}
-					<p class="modal__loading">Loading…</p>
+					<p class="modal__loading">Loading...</p>
 				{:else if availableWorkflows.length === 0}
 					<p class="modal__empty">No workflows found. Save a workflow first.</p>
 				{:else}
 					<ul class="modal__list">
 						{#each availableWorkflows as wf (wf.name + '@' + wf.version)}
 							<li>
-								<button class="modal__workflow-btn" onclick={() => loadWorkflow(wf.name)}>
+								<button
+									class="modal__workflow-btn"
+									onclick={() => loadWorkflow(wf.name)}
+								>
 									<span class="modal__wf-name">{wf.name}</span>
 									<span class="modal__wf-version">v{wf.version}</span>
 								</button>
@@ -487,6 +575,43 @@
 		font-size: 13px;
 		color: #cbd5e1;
 		margin: 0;
+	}
+
+	/* Connection validation error toast */
+	.connection-error-toast {
+		position: absolute;
+		bottom: 24px;
+		left: 50%;
+		transform: translateX(-50%);
+		background: #7f1d1d;
+		border: 1px solid #ef4444;
+		color: #fca5a5;
+		padding: 8px 16px;
+		border-radius: 8px;
+		font-size: 13px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		z-index: 100;
+		box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+		animation: toast-in 0.2s ease-out;
+	}
+
+	.connection-error-toast__icon {
+		font-weight: 700;
+		font-size: 14px;
+		color: #ef4444;
+	}
+
+	@keyframes toast-in {
+		from {
+			opacity: 0;
+			transform: translateX(-50%) translateY(10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(-50%) translateY(0);
+		}
 	}
 
 	/* Modal overlay */
@@ -592,5 +717,30 @@
 		color: #475569;
 		font-size: 11px;
 		font-family: 'JetBrains Mono', 'Fira Code', monospace;
+	}
+
+	/* Red flash on invalid edge target nodes */
+	:global(.svelte-flow__node.flash-invalid) {
+		animation: flash-red 0.4s ease-out;
+	}
+
+	@keyframes flash-red {
+		0% {
+			box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.6);
+		}
+		100% {
+			box-shadow: none;
+		}
+	}
+
+	/* Invalid edge styling (applied via class) */
+	:global(.svelte-flow__edge.edge-invalid .svelte-flow__edge-path) {
+		stroke: #ef4444 !important;
+		stroke-dasharray: 5 3;
+	}
+
+	:global(.svelte-flow__edge.edge-cycle .svelte-flow__edge-path) {
+		stroke: #f59e0b !important;
+		stroke-dasharray: 8 4;
 	}
 </style>

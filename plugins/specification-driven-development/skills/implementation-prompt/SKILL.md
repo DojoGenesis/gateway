@@ -1,24 +1,23 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: implementation-prompt
-description: Generate focused implementation prompts from specifications
-triggers:
-  - "create implementation prompt"
-  - "generate coding prompt"
-  - "write implementation guide"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - implementation-agent
+model: sonnet
+description: Produces a self-contained implementation prompt document with objective, context grounding, numbered requirements, file manifest, binary success criteria, constraints, and backend grounding — ready for autonomous agent execution. Use when 'write an implementation prompt', 'commission this spec', or 'convert spec to prompt'.
+category: specification-driven-development
+
+inputs:
+  - name: spec
+    type: string
+    description: The specification or feature description to convert into an implementation prompt
+    required: true
+  - name: file_manifest
+    type: string[]
+    description: List of files the implementation agent is authorized to touch
+    required: false
+outputs:
+  - name: implementation_prompt
+    type: ref
+    format: cas-ref
+    description: Self-contained implementation prompt with objective, context grounding, requirements, file manifest, and binary success criteria
 ---
 
 # Transform Spec to Implementation Prompt Skill
@@ -329,6 +328,32 @@ Before commissioning the prompt, ensure you can answer "yes" to all of the follo
 
 ---
 
+## Output
+
+- A single implementation prompt file (markdown) saved to `docs/vX.X.X/track_N_implementation_prompt.md`
+- The prompt contains six sections: Objective, Context & Grounding, Detailed Requirements, File Manifest, Success Criteria, and Constraints & Non-Goals
+- If the spec is multi-track, one prompt file per track, each independently executable
+
+## Examples
+
+**Scenario 1:** "We have a spec for the desktop shell. Write the Track 1 implementation prompt." → A prompt with a one-sentence objective, links to pattern files in `frontend/src/app/layout.tsx`, numbered step-by-step requirements for installing React Router and creating DesktopShell, a file manifest listing two new files and three modified files, and five binary success criteria.
+
+**Scenario 2:** "Convert this backend spec section into a prompt for Claude Code." → A prompt grounding the agent in existing Go handler patterns, specifying exact API endpoint shapes, and listing `DO NOT implement authentication` as an explicit constraint to prevent scope creep into adjacent tracks.
+
+## Edge Cases
+
+- When the specification has not passed the pre-implementation checklist, stop and run `pre-implementation-checklist` before writing the prompt — a prompt written from an incomplete spec will produce an incomplete implementation
+- When commissioning a consuming track whose producer track is not yet complete, stub the integration contract in the prompt with explicit placeholders rather than guessing the shape
+- When a single spec covers more than one track, write separate prompts per track and use this skill iteratively, not once for the whole spec
+
+## Anti-Patterns
+
+- Writing requirements as high-level goals instead of step-by-step instructions — "add authentication" is not a requirement; "add JWT validation middleware to the `/api/v1/entities` handler in `handlers/entities.go`" is
+- Omitting the File Manifest and letting the agent decide which files to create or modify — unexpected files created outside the manifest cause merge conflicts in parallel tracks
+- Setting success criteria that require subjective judgment ("the UI should feel responsive") — every criterion must be answerable yes or no without the agent asking a follow-up question
+
+---
+
 ## VII. Related Skills
 
 - **`write-implementation-prompt`:** Foundational skill for writing implementation prompts (this skill builds on it)
@@ -351,5 +376,3 @@ This skill is designed to create **autonomous execution**. When an implementatio
 6. Integrate cleanly (backend grounding)
 
 The result is high-quality implementation with minimal back-and-forth, enabling parallel work and compounding velocity.
-
-🪷

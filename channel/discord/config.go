@@ -17,4 +17,18 @@ type DiscordConfig struct {
 
 	// AppID is the Discord application/client ID.
 	AppID string
+
+	// GuildID is the Discord guild (server) ID for per-guild resume state.
+	// When empty, resume state is stored with the key "discord.resume.default".
+	GuildID string
+}
+
+// ResumeStateKey returns the NATS KV key for Opcode 6 resume state.
+// Format: discord.resume.{guild_id}. TTL managed by the KV bucket (7d).
+func (c DiscordConfig) ResumeStateKey() string {
+	gid := c.GuildID
+	if gid == "" {
+		gid = "default"
+	}
+	return "discord.resume." + gid
 }

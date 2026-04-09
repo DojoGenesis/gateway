@@ -1,54 +1,23 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: skill-maintenance
-description: Update existing skills to maintain quality standards and relevance
-triggers:
-  - "update skill documentation"
-  - "maintain skill quality"
-  - "refresh skill content"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - implementation-agent
+model: sonnet
+description: Produces a maintained skills directory with updated names, unified terminology, repaired cross-references, and a git commit documenting every change and what was preserved. Use when: "update these skill names", "refactor the skills directory", "clean up skill references", "rename this skill", "audit the skills ecosystem", "deprecate this skill", "add version history to a skill".
+category: skill-forge
+
+inputs:
+  - name: skills_directory
+    type: string
+    description: Path to the skills directory to maintain and audit
+    required: true
+outputs:
+  - name: maintenance_report
+    type: string
+    description: Maintained skills directory with updated names, unified terminology, repaired cross-references, and git commit documentation
 ---
 
 # Skill Maintenance Ritual
 
----
-
-## I. The Philosophy: Maintenance is Not Just Fixing—It's Keeping What Works Working Well
-
-A skills directory is a living knowledge base. As the project evolves, skill names may become unclear, terminology may need updating, and cross-references may drift out of sync. Without systematic maintenance, the knowledge base degrades: skills become hard to find, references break, and terminology becomes inconsistent.
-
-This skill transforms maintenance from a reactive chore into a proactive ritual. By following a structured process (read, propose, execute, verify, document), we ensure the skills directory remains clear, consistent, and valuable.
-
-**Core Insight:** Good maintenance prevents future problems. A well-maintained knowledge base is easier to search, easier to understand, and easier to extend.
-
----
-
-## II. When to Use This Skill
-
-Use this skill when:
-
-- **Skill names become unclear or outdated** - Names no longer describe what the skill does
-- **Terminology needs updating** - Tool-specific language should be generalized (e.g., "zenflow" → "implementation")
-- **Adding new skills** - New skills reference existing skills and need validation
-- **Deprecating or merging skills** - Old skills need to be removed or consolidated
-- **Conducting periodic audits** - Regular health checks of the skills directory
-- **Onboarding new contributors** - Ensuring the knowledge base is accessible and consistent
-
----
-
-## III. The Workflow
+## I. The Workflow
 
 This is a 9-step workflow for maintaining the skills directory.
 
@@ -285,131 +254,30 @@ Kept <term> only when:
 
 **Key Insight:** Document the process immediately after completing it. Details fade quickly from memory.
 
----
+## Output
 
-## IV. Best Practices
+- Renamed skill directories with updated `name` field and H1 heading in each SKILL.md
+- All cross-references updated to the new names or terminology
+- Zero stale references remaining (verified by grep)
+- A git commit with a structured message: what changed, why, what was preserved
+- Optional: a summary document delivered to the user if the scope was large
 
-### **Pause and Clarify Scope**
+## Examples
 
-Before any large refactor, pause and clarify with the user:
-- What exactly needs to change?
-- What should stay the same?
-- What's the scope (skills directory only, or entire repository)?
+**Scenario 1:** "Rename `zenflow-prompt` to `implementation-prompt` and update all references" → Read the skill, propose the rename following verb-object pattern, execute directory mv + metadata update, grep for all cross-references, batch-edit and verify, commit with per-file replacement counts.
 
-### **Read Before Proposing**
+**Scenario 2:** "Deprecate `old-pipeline` skill — it's been replaced by `batch-normalize-and-package`" → Add a `deprecated: true` field to frontmatter, add a deprecation notice at the top of the body pointing to the replacement, update any skills that link to it, commit.
 
-Never suggest changes without reading the actual content. Understanding reality prevents proposing changes that don't make sense.
+## Edge Cases
 
-### **Use Systematic Search**
+- User requests a rename but the new name is already taken by another skill — surface the conflict, propose a resolution, and get confirmation before executing
+- Terminology refactor touches historical documents (retrospectives, plans) outside the skills directory — catalog them but do not change them unless the user explicitly expands the scope
+- A skill has no cross-references in the rest of the directory — rename is safe; note this in the commit message
+- User wants to "clean up" a skill without changing its name — treat as in-place refactoring: read, propose specific changes, get confirmation, then edit
 
-Don't rely on memory to find all references. Use `grep` to systematically search and catalog all instances.
+## Anti-Patterns
 
-### **Preserve Contextually Appropriate References**
-
-Not all references should be changed. Preserve tool-specific mentions when they're contextually appropriate (e.g., when listing multiple tools).
-
-### **Batch Edits for Efficiency**
-
-Use the `file` tool's multiple edits feature with `all: true` to replace all occurrences in a single operation.
-
-### **Comprehensive Commit Messages**
-
-Write commit messages that explain:
-- **What** changed (file-by-file breakdown)
-- **Why** it changed (rationale)
-- **What** was preserved (and why)
-
-### **Document Immediately**
-
-Create summary documents right after completing the maintenance. Details fade quickly, and future maintainers will thank you.
-
----
-
-## V. Quality Checklist
-
-Before considering the maintenance complete, ensure you can answer "yes" to all of the following:
-
-- [ ] Have you clarified the scope with the user?
-- [ ] Have you read all affected skills to understand their purpose?
-- [ ] Have you proposed changes and received user confirmation?
-- [ ] Have you renamed directories and updated internal metadata?
-- [ ] Have you cataloged all references that need updating?
-- [ ] Have you determined a refactoring strategy (what changes, what stays)?
-- [ ] Have you executed the refactor with batch edits?
-- [ ] Have you verified no unintended references remain?
-- [ ] Have you committed with a comprehensive commit message?
-- [ ] Have you pushed changes to the remote repository?
-- [ ] Have you created summary documentation?
-
----
-
-## VI. Common Pitfalls to Avoid
-
-❌ **Over-refactoring:** Changing references that should stay (e.g., historical docs, tool-specific mentions)  
-✅ **Scope appropriately:** Only change what needs changing
-
-❌ **Proposing without reading:** Suggesting changes based on assumptions  
-✅ **Read first:** Understand reality before proposing
-
-❌ **Missing references:** Relying on memory instead of systematic search  
-✅ **Use grep:** Catalog all references systematically
-
-❌ **Vague commit messages:** "Updated skills" without explanation  
-✅ **Be comprehensive:** Explain what, why, and what was preserved
-
-❌ **No documentation:** Completing maintenance without recording the process  
-✅ **Document immediately:** Create summary docs while details are fresh
-
----
-
-## VII. Example: Skill Rename and Terminology Refactor (Feb 7, 2026)
-
-**Context:** After creating 5 new skills, we needed to rename 4 existing skills and refactor "zenflow" to "implementation" across 32 references.
-
-**Process:**
-1. User requested renames: "let's rename our specification and prompt skills to simply describe what they do"
-2. Read all 4 skills to understand their purpose
-3. Proposed renames following "verb-object" pattern
-4. User refined names (e.g., "write-zenflow-prompt" → "write-implementation-prompt")
-5. Renamed directories and updated metadata
-6. User requested terminology refactor: "complete this knowledge refactor to rename everything else with zenflow in it to implementation"
-7. Searched and found 530 total "zenflow" references
-8. User scoped down: "skills directory only" (32 references)
-9. Read context and determined strategy (what to change, what to preserve)
-10. Executed refactor with batch edits (22 + 7 + 2 + 1 replacements)
-11. Verified and committed with comprehensive message
-12. Created summary documentation
-
-**Outcome:**
-- 4 skills renamed with clear, descriptive names
-- 32 references updated to generic "implementation" terminology
-- 6 tool-specific "Zenflow" references preserved
-- All cross-references updated
-- Comprehensive documentation created
-
-**Time:** ~2 hours total
-
----
-
-## VIII. Related Skills
-
-- **`compression-ritual`** - For preserving insights before large refactors
-- **`process-extraction`** - For creating new skills from maintenance processes
-- **`health-audit`** - For comprehensive repository health audits
-- **`documentation-audit`** - For identifying documentation drift
-
----
-
-## IX. Maintenance Schedule Recommendation
-
-**Suggested frequency:**
-- **Quarterly:** Full audit of skills directory
-- **After major additions:** When 5+ new skills are added
-- **On user request:** When terminology or naming issues are identified
-- **Before major releases:** Ensure consistency before public releases
-
----
-
-**Last Updated:** 2026-02-07  
-**Maintained By:** Manus AI  
-**Status:** Active
+- **Over-refactoring:** Changing references that are contextually appropriate (e.g., tool-specific mentions in routing docs) because they happen to match the search term — always read the surrounding context before replacing
+- **Proposing without reading:** Suggesting renames based on the directory name alone without reading what the skill actually does — names should reflect reality, not assumptions
+- **Relying on memory for references:** Skipping grep and trusting recall to find all instances — always catalog systematically before refactoring
+- **Vague commit messages:** Writing "updated skills" without a per-file breakdown — commit messages are the only audit trail for future maintainers

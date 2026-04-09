@@ -1,24 +1,19 @@
-# Copyright 2024 Tres Pies Design
-# Licensed under the Apache License, Version 2.0
-
 ---
 name: status-template
-description: Provide templates for consistent status reporting across projects
-triggers:
-  - "create status template"
-  - "generate report template"
-  - "format status update"
-metadata:
-  version: "1.0"
-  created: "2026-02-04"
-  author: "Tres Pies Design"
-  tool_dependencies:
-    - file_system
-    - bash
-  portable: true
-  tier: 1
-  agents:
-    - health-agent
+model: sonnet
+description: Produces a comprehensive `.status.md` file using a 10-section schema that bridges heartbeat (current state), anatomy (directory structure), and checkup (health assessment) perspectives into one document. Use when: "write a status report", "give me the lay of the land", "where are we right now", "prepare a handoff document", "document the current codebase state".
+category: system-health
+
+inputs:
+  - name: repo_path
+    type: string
+    description: Path to the repository or project to write status for
+    required: true
+outputs:
+  - name: status_file
+    type: ref
+    format: cas-ref
+    description: Comprehensive .status.md using a 10-section schema bridging heartbeat, anatomy, and checkup perspectives
 ---
 
 # Status Template Skill
@@ -211,3 +206,19 @@ Before delivering the `.status.md`, confirm:
 - [ ] Statistics are programmatically verified (not guessed)
 - [ ] The document reads coherently top-to-bottom
 - [ ] The document is dated with `Last Updated`
+
+## Output
+- `.status.md` at the project root with all applicable sections from the 10-section schema. Section count adapts to project size (small projects use 6 sections; large projects use all 10).
+- The file complements but does not replace a lightweight `STATUS.md` — `.status.md` is the comprehensive agent-facing audit; `STATUS.md` is the human-facing dashboard.
+
+## Examples
+**Scenario 1:** "Create a project overview before a strategy session" → `.status.md` produced with all 10 sections. Vision and Purpose anchors everything. Current State table reveals 2 blocked areas. Health assessment honestly flags no CI/CD and 8% test coverage as sustainability concerns.
+**Scenario 2:** "Prepare a handoff doc for the incoming agent" → `.status.md` covers a 120-file project. Sections 4 (Semantic Clusters) and 5 (File Importance Ranking) included. Incoming agent reads the document instead of spending 30 minutes on discovery.
+
+## Edge Cases
+- For projects under 50 files, skip Sections 4 and 5 (clusters and importance ranking) — they add little value at small scale, and the overhead of generating them exceeds the benefit.
+- For monorepos, use all 10 sections with sub-sections per package or service under each primary section.
+
+## Anti-Patterns
+- Treating the Current State table as aspirational — the emoji indicators must reflect actual verified state, not what the team wishes were true.
+- Generating statistics from memory or rough estimates — run `find` and `wc -l` to get real numbers; within 10% is accurate enough, but guessing is not.
