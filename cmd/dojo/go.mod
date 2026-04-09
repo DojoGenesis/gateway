@@ -3,7 +3,7 @@ module github.com/DojoGenesis/gateway/cmd/dojo
 go 1.25.6
 
 require (
-	github.com/DojoGenesis/gateway/channel v0.0.0
+	github.com/DojoGenesis/gateway v0.0.0
 	github.com/DojoGenesis/gateway/runtime/cas v0.0.0
 	github.com/DojoGenesis/gateway/runtime/event v0.0.0
 )
@@ -22,7 +22,7 @@ require (
 )
 
 replace (
-	github.com/DojoGenesis/gateway/channel => ../../channel
+	github.com/DojoGenesis/gateway => ../..
 	github.com/DojoGenesis/gateway/runtime/cas => ../../runtime/cas
 	github.com/DojoGenesis/gateway/runtime/event => ../../runtime/event
 )
