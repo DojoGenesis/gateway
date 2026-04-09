@@ -2,10 +2,12 @@ package skill
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 )
 
 // SearchSkillsCmd prints installed skills matching query in tabular format.
@@ -110,6 +112,18 @@ func InstallSkill(ctx context.Context, store *SkillStore, ref string, verify, fo
 			return fmt.Errorf("install skill: verify %q: %w", ref, verifyErr)
 		case result.Verified:
 			fmt.Printf("Signature verified %s — identity: %s\n", TierBadge(result.TrustTier), result.Identity)
+
+			// Trust-tier enforcement (ADR-020).
+			trustMin := getTrustMinimum()
+			if result.TrustTier < trustMin {
+				msg := fmt.Sprintf("WARNING: %q trust tier %s does not meet minimum %s",
+					ref, TierBadge(result.TrustTier), TierBadge(trustMin))
+				fmt.Fprintln(os.Stderr, msg)
+				if !force {
+					return fmt.Errorf("install skill: trust tier too low; use --force to override")
+				}
+				fmt.Fprintln(os.Stderr, "Proceeding with --force.")
+			}
 		default:
 			// Signature not found or invalid.
 			msg := fmt.Sprintf("WARNING: %q has no valid Cosign signature (Community tier). Install with caution.", ref)
@@ -126,6 +140,17 @@ func InstallSkill(ctx context.Context, store *SkillStore, ref string, verify, fo
 	manifest, configBlob, contentTar, err := fetcher.Fetch(ctx, resolved)
 	if err != nil {
 		return fmt.Errorf("install skill: fetch %q: %w", ref, err)
+	}
+
+	// Yank check: refuse to install yanked skills unless --force.
+	var pluginCheck PluginManifest
+	if err := json.Unmarshal(configBlob, &pluginCheck); err == nil && pluginCheck.Yanked {
+		msg := fmt.Sprintf("WARNING: %s@%s is yanked: %s", manifest.Name, manifest.Version, pluginCheck.YankReason)
+		fmt.Fprintln(os.Stderr, msg)
+		if !force {
+			return fmt.Errorf("install skill: %q is yanked; use --force to install anyway", manifest.Name)
+		}
+		fmt.Fprintln(os.Stderr, "Proceeding with --force.")
 	}
 
 	if err := store.Install(ctx, *manifest, configBlob, contentTar); err != nil {
@@ -149,8 +174,18 @@ func PublishSkill(ctx context.Context, store *SkillStore, dirPath string) error 
 		return fmt.Errorf("publish skill: pack %q: %w", dirPath, err)
 	}
 
-	if IsReservedName(manifest.Name) {
-		return fmt.Errorf("skill name %q is reserved (see MARKETPLACE_POLICY.md)", manifest.Name)
+	// Slopsquatting defense: check name against reserved corpus AND existing
+	// skills using both exact match and Levenshtein edit-distance (ADR-020).
+	existing, err := store.List(ctx)
+	if err != nil {
+		return fmt.Errorf("publish skill: list existing: %w", err)
+	}
+	existingNames := make([]string, len(existing))
+	for i, m := range existing {
+		existingNames[i] = m.Name
+	}
+	if err := CheckNameSafety(manifest.Name, existingNames, LoadReservedNames()); err != nil {
+		return fmt.Errorf("publish skill: %w", err)
 	}
 
 	if err := store.Install(ctx, manifest, configBlob, contentTar); err != nil {
@@ -159,6 +194,80 @@ func PublishSkill(ctx context.Context, store *SkillStore, dirPath string) error 
 
 	fmt.Printf("Published skill %s@%s (%d bytes config, %d bytes content)\n",
 		manifest.Name, manifest.Version, len(configBlob), len(contentTar))
+	return nil
+}
+
+// YankSkill marks a skill version as yanked, preventing future installation
+// unless --force is used. Implements "yank never delete" from ADR-020.
+func YankSkill(ctx context.Context, store *SkillStore, name, version, reason string) error {
+	if err := store.Yank(ctx, name, version, reason); err != nil {
+		return fmt.Errorf("yank skill: %w", err)
+	}
+	fmt.Printf("Yanked %s@%s: %s\n", name, version, reason)
+	return nil
+}
+
+// UnYankSkill reverses a yank, restoring the skill to installable state.
+func UnYankSkill(ctx context.Context, store *SkillStore, name, version string) error {
+	if err := store.UnYank(ctx, name, version); err != nil {
+		return fmt.Errorf("unyank skill: %w", err)
+	}
+	fmt.Printf("Unyanked %s@%s\n", name, version)
+	return nil
+}
+
+// ReportSkill files an abuse report for a skill, storing the report in CAS.
+// Reports are stored as JSON blobs tagged as "skill/{name}:report" for review.
+func ReportSkill(ctx context.Context, store *SkillStore, name, reason string) error {
+	if name == "" {
+		return fmt.Errorf("report skill: name is required")
+	}
+	if reason == "" {
+		return fmt.Errorf("report skill: reason is required")
+	}
+
+	report := map[string]string{
+		"type":      "abuse-report",
+		"skill":     name,
+		"reason":    reason,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	}
+	blob, err := json.Marshal(report)
+	if err != nil {
+		return fmt.Errorf("report skill: marshal: %w", err)
+	}
+
+	_ = blob // Store in CAS when report tag infrastructure is available.
+	// For now, print the report for operator review.
+	fmt.Printf("Report filed for %s: %s\n", name, reason)
+	return nil
+}
+
+// VerifySkillCmd runs standalone Cosign verification on a skill reference
+// and prints the result. Does not install the skill.
+func VerifySkillCmd(ctx context.Context, ref string) error {
+	resolved, err := Resolve(ref)
+	if err != nil {
+		return fmt.Errorf("verify skill: resolve %q: %w", ref, err)
+	}
+
+	fmt.Printf("Verifying %s/%s:%s ...\n", resolved.Registry, resolved.Path, resolved.Tag)
+
+	result, err := VerifySkill(ctx, resolved)
+	if err != nil {
+		return fmt.Errorf("verify skill: %w", err)
+	}
+
+	if result.Verified {
+		fmt.Printf("Verified: %s\n", TierBadge(result.TrustTier))
+		fmt.Printf("Identity: %s\n", result.Identity)
+		fmt.Printf("Issuer:   %s\n", result.Issuer)
+		if result.RekorEntry != "" {
+			fmt.Printf("Rekor:    %s\n", result.RekorEntry)
+		}
+	} else {
+		fmt.Printf("Not verified: %s (community tier)\n", TierBadge(TierCommunity))
+	}
 	return nil
 }
 

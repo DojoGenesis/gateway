@@ -55,7 +55,7 @@ func main() {
 			os.Exit(1)
 		}
 	case "version":
-		fmt.Println("dojo v3.1.0-era3")
+		fmt.Println("dojo v3.2.0-era3")
 	case "help", "-h", "--help":
 		printUsage()
 	default:
@@ -124,6 +124,60 @@ func runSkillCommand(action string, args []string) error {
 		}
 		_, err := skill.SkillInfo(ctx, store, name, version)
 		return err
+
+	case "yank":
+		if len(args) < 1 {
+			return fmt.Errorf("usage: dojo skill yank <name> [version] --reason <reason>")
+		}
+		name := args[0]
+		version := "1.0.0"
+		reason := ""
+		for i := 1; i < len(args); i++ {
+			if args[i] == "--reason" && i+1 < len(args) {
+				reason = args[i+1]
+				i++
+			} else if version == "1.0.0" && !strings.HasPrefix(args[i], "--") {
+				version = args[i]
+			}
+		}
+		if reason == "" {
+			return fmt.Errorf("usage: dojo skill yank <name> [version] --reason <reason>")
+		}
+		return skill.YankSkill(ctx, store, name, version, reason)
+
+	case "unyank":
+		if len(args) < 1 {
+			return fmt.Errorf("usage: dojo skill unyank <name> [version]")
+		}
+		name := args[0]
+		version := "1.0.0"
+		if len(args) > 1 && !strings.HasPrefix(args[1], "--") {
+			version = args[1]
+		}
+		return skill.UnYankSkill(ctx, store, name, version)
+
+	case "report":
+		if len(args) < 1 {
+			return fmt.Errorf("usage: dojo skill report <name> --reason <reason>")
+		}
+		name := args[0]
+		reason := ""
+		for i := 1; i < len(args); i++ {
+			if args[i] == "--reason" && i+1 < len(args) {
+				reason = args[i+1]
+				break
+			}
+		}
+		if reason == "" {
+			return fmt.Errorf("usage: dojo skill report <name> --reason <reason>")
+		}
+		return skill.ReportSkill(ctx, store, name, reason)
+
+	case "verify":
+		if len(args) < 1 {
+			return fmt.Errorf("usage: dojo skill verify <ref>")
+		}
+		return skill.VerifySkillCmd(ctx, args[0])
 
 	case "package-all":
 		if len(args) < 1 {
@@ -211,6 +265,10 @@ Skill Actions:
   install <ref> --force         Install even if verification fails
   publish <dir>                 Package and publish a skill
   info <name> [version]         Show skill metadata
+  yank <name> [ver] --reason R  Mark a skill version as yanked
+  unyank <name> [version]       Reverse a yank
+  report <name> --reason R      File an abuse report
+  verify <ref>                  Verify Cosign signature
   package-all <plugins-dir>     Batch-package all skills
 
 Tunnel:
@@ -238,6 +296,10 @@ Actions:
   install <ref> --force         Install even if verification fails
   publish <dir>                 Package and publish a skill
   info <name> [version]         Show skill metadata
+  yank <name> [ver] --reason R  Mark a skill version as yanked
+  unyank <name> [version]       Reverse a yank
+  report <name> --reason R      File an abuse report
+  verify <ref>                  Verify Cosign signature
   package-all <plugins-dir>     Batch-package all skills
 
 References:
