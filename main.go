@@ -42,7 +42,7 @@ import (
 func main() {
 	// ─── Health Check Mode (for Docker HEALTHCHECK in distroless) ────
 	if len(os.Args) > 1 && os.Args[1] == "--health-check" {
-		port := getEnv("PORT", "8080")
+		port := getEnv("PORT", "7340")
 		resp, err := http.Get(fmt.Sprintf("http://localhost:%s/health", port))
 		if err != nil {
 			os.Exit(1)

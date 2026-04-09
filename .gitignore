@@ -47,3 +47,4 @@ Thumbs.db
 # Test artifacts
 .test_*
 dojo
+gateway
