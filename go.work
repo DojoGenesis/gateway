@@ -6,6 +6,7 @@ use (
 	./channel
 	./cmd/dojo
 	./disposition
+	./integration
 	./mcp
 	./memory
 	./orchestration

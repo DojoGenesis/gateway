@@ -133,6 +133,8 @@ func parseTunnelURL(line string) string {
 }
 
 // generateWebhookURLs returns a map of platform name to webhook URL.
+// All 8 supported platforms are included; operators only need to configure
+// platforms they intend to use.
 func generateWebhookURLs(tunnelURL string) map[string]string {
 	base := strings.TrimRight(tunnelURL, "/")
 	return map[string]string{
@@ -140,6 +142,10 @@ func generateWebhookURLs(tunnelURL string) map[string]string {
 		"Discord":  base + "/webhooks/discord",
 		"Telegram": base + "/webhooks/telegram",
 		"Email":    base + "/webhooks/email",
+		"SMS":      base + "/webhooks/sms",
+		"WhatsApp": base + "/webhooks/whatsapp",
+		"Teams":    base + "/webhooks/teams",
+		"WebChat":  base + "/webhooks/webchat",
 	}
 }
 
@@ -157,6 +163,10 @@ Webhook URLs:
   Discord:  %s
   Telegram: %s
   Email:    %s
+  SMS:      %s
+  WhatsApp: %s
+  Teams:    %s
+  WebChat:  %s
 
 Press Ctrl+C to stop
 `, tunnelURL, localURL,
@@ -164,6 +174,10 @@ Press Ctrl+C to stop
 		webhooks["Discord"],
 		webhooks["Telegram"],
 		webhooks["Email"],
+		webhooks["SMS"],
+		webhooks["WhatsApp"],
+		webhooks["Teams"],
+		webhooks["WebChat"],
 	)
 }
 

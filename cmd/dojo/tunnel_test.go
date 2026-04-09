@@ -54,16 +54,22 @@ func TestParseTunnelURL(t *testing.T) {
 	}
 }
 
-// TestGenerateWebhookURLs verifies that all four platform webhook paths are produced.
+// TestGenerateWebhookURLs verifies that all eight platform webhook paths are produced.
 func TestGenerateWebhookURLs(t *testing.T) {
 	tunnelURL := "https://abc-def-ghi.trycloudflare.com"
 	webhooks := generateWebhookURLs(tunnelURL)
 
+	// All 8 platforms (Phase 1: Slack, Discord, Telegram, Email;
+	// Phase 2: SMS, WhatsApp, Teams, WebChat) must be present.
 	expected := map[string]string{
 		"Slack":    tunnelURL + "/webhooks/slack",
 		"Discord":  tunnelURL + "/webhooks/discord",
 		"Telegram": tunnelURL + "/webhooks/telegram",
 		"Email":    tunnelURL + "/webhooks/email",
+		"SMS":      tunnelURL + "/webhooks/sms",
+		"WhatsApp": tunnelURL + "/webhooks/whatsapp",
+		"Teams":    tunnelURL + "/webhooks/teams",
+		"WebChat":  tunnelURL + "/webhooks/webchat",
 	}
 
 	for platform, want := range expected {
