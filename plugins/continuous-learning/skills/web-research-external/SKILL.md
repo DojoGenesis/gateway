@@ -1,8 +1,20 @@
 ---
 name: web-research-external
 model: sonnet
-description: Produces structured research documents or implementation handoffs by searching external sources — library docs, web, APIs — for a given topic. Use when: "research how to use [library]", "find best practices for [topic]", "compare [options]", "look up [API/framework] documentation". NOT for codebase exploration (use project-exploration for that).
+description: "Produces structured research documents or implementation handoffs by searching external sources — library docs, web, APIs — for a given topic. Use when: 'research how to use a library', 'find best practices for a topic', 'compare options', 'look up API or framework documentation'. NOT for codebase exploration (use project-exploration for that)."
 category: continuous-learning
+triggers:
+  - "research how to use a library"
+  - "find best practices for"
+  - "compare options"
+  - "look up API documentation"
+  - "look up framework documentation"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "web_tools"
+  - "file_system"
 
 inputs:
   - name: topic

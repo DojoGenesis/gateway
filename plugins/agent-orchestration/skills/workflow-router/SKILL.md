@@ -1,8 +1,19 @@
 ---
 name: workflow-router
 model: sonnet
-description: Routes user goals to the appropriate specialist agent workflow with resource allocation confirmation. Use when: the user wants to start a task but hasn't specified a workflow, asks "how should I approach this?", or needs orchestration across research → plan → build → fix stages.
+description: "Routes user goals to the appropriate specialist agent workflow with resource allocation confirmation. Use when: the user wants to start a task but has not specified a workflow, asks 'how should I approach this?', or needs orchestration across research → plan → build → fix stages."
 category: agent-orchestration
+triggers:
+  - "how should I approach this"
+  - "route this to the right workflow"
+  - "orchestrate across research plan build fix"
+  - "start a task but not sure which workflow"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "meta_skill"
+  - "file_system"
 
 inputs:
   - name: goal

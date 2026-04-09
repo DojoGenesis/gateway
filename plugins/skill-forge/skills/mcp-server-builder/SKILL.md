@@ -1,8 +1,19 @@
 ---
 name: mcp-server-builder
 model: sonnet
-description: Scaffolds production-ready MCP servers from OpenAPI specs with schema validation, named tool definitions, and versioning strategy. Use when: "build MCP server from API", "create tool server from OpenAPI", "expose REST API to LLM agent", "scaffold MCP from spec", "convert API contract to tools".
+description: "Scaffolds production-ready MCP servers from OpenAPI specs with schema validation, named tool definitions, and versioning strategy. Use when: 'build MCP server from API', 'create tool server from OpenAPI', 'expose REST API to LLM agent', 'scaffold MCP from spec', 'convert API contract to tools'."
 category: skill-forge
+triggers:
+  - "build MCP server from API"
+  - "create tool server from OpenAPI"
+  - "expose REST API to LLM agent"
+  - "scaffold MCP from spec"
+  - "convert API contract to tools"
+tier: 1
+agents:
+  - "primary"
+tool_dependencies:
+  - "file_system"
 
 inputs:
   - name: openapi_spec
