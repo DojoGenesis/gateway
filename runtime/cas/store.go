@@ -36,6 +36,9 @@ type Store interface {
 	// Resolve looks up a tag to its content reference.
 	Resolve(ctx context.Context, name string, version string) (Ref, error)
 
+	// Untag removes a tag by name and version.
+	Untag(ctx context.Context, name string, version string) error
+
 	// List returns all tags matching a prefix.
 	List(ctx context.Context, prefix string) ([]TagEntry, error)
 
@@ -190,6 +193,23 @@ func (s *sqliteStore) Tag(ctx context.Context, name string, version string, ref 
 	)
 	if err != nil {
 		return fmt.Errorf("cas: tag: %w", err)
+	}
+	return nil
+}
+
+func (s *sqliteStore) Untag(ctx context.Context, name string, version string) error {
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM tags WHERE name = ? AND version = ?`, name, version,
+	)
+	if err != nil {
+		return fmt.Errorf("cas: untag: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("cas: untag rows: %w", err)
+	}
+	if n == 0 {
+		return ErrNotFound
 	}
 	return nil
 }

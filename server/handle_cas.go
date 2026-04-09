@@ -191,35 +191,27 @@ func (s *Server) handleCASCreateTag(c *gin.Context) {
 	})
 }
 
-// handleCASDeleteTag removes a tag. Note: the CAS Store interface does not
-// expose an Untag method. This handler performs the untag via a direct SQL
-// delete on the underlying SQLite database.
-//
+// handleCASDeleteTag removes a tag by name and version.
 // DELETE /api/cas/tags/:name/:version
-//
-// PREREQUISITE: A proper Untag(ctx, name, version) method should be added
-// to the cas.Store interface. This implementation uses a workaround for now
-// by attempting to resolve and verify the tag exists, then returning
-// 501 Not Implemented since the Store interface lacks an Untag method.
 func (s *Server) handleCASDeleteTag(c *gin.Context) {
 	name := c.Param("name")
 	version := c.Param("version")
 
-	// Verify the tag exists before attempting delete
-	_, err := s.workflowCAS.Resolve(c.Request.Context(), name, version)
+	err := s.workflowCAS.Untag(c.Request.Context(), name, version)
 	if err != nil {
 		if errors.Is(err, cas.ErrNotFound) {
 			s.errorResponse(c, http.StatusNotFound, "not_found", fmt.Sprintf("Tag not found: %s@%s", name, version))
 			return
 		}
-		s.errorResponse(c, http.StatusInternalServerError, "cas_error", fmt.Sprintf("Failed to resolve tag: %v", err))
+		s.errorResponse(c, http.StatusInternalServerError, "cas_error", fmt.Sprintf("Failed to delete tag: %v", err))
 		return
 	}
 
-	// The cas.Store interface does not currently expose an Untag method.
-	// This requires adding Untag(ctx, name, version) to the Store interface.
-	s.errorResponse(c, http.StatusNotImplemented, "not_implemented",
-		"Tag deletion requires cas.Store.Untag() method — not yet implemented in the Store interface")
+	c.JSON(http.StatusOK, gin.H{
+		"name":    name,
+		"version": version,
+		"deleted": true,
+	})
 }
 
 // handleCASGarbageCollect triggers garbage collection on unreferenced content.

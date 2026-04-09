@@ -2,7 +2,12 @@ module github.com/DojoGenesis/gateway/runtime/cas
 
 go 1.25.6
 
-require modernc.org/sqlite v1.48.1
+require (
+	github.com/DojoGenesis/gateway/runtime/d1client v0.0.0
+	modernc.org/sqlite v1.48.1
+)
+
+replace github.com/DojoGenesis/gateway/runtime/d1client => ../d1client
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect

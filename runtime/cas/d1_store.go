@@ -142,6 +142,19 @@ func (s *d1Store) Tag(ctx context.Context, name string, version string, ref Ref)
 	return nil
 }
 
+func (s *d1Store) Untag(ctx context.Context, name string, version string) error {
+	n, err := s.client.Exec(ctx,
+		`DELETE FROM tags WHERE name = ? AND version = ?`, name, version,
+	)
+	if err != nil {
+		return fmt.Errorf("cas/d1: untag: %w", err)
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *d1Store) Resolve(ctx context.Context, name string, version string) (Ref, error) {
 	rows, err := s.client.Query(ctx,
 		`SELECT ref FROM tags WHERE name = ? AND version = ?`, name, version,
