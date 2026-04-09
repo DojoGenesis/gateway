@@ -1,8 +1,8 @@
 # Project Status: AgenticGatewayByDojoGenesis
 
-**Last Updated:** 2026-02-14
-**Version:** v1.0.0
-**Status:** ✅ PRODUCTION-READY
+**Last Updated:** 2026-04-09
+**Version:** v3.2.0
+**Status:** PRODUCTION-READY
 
 ---
 
@@ -368,11 +368,49 @@ AgenticGatewayByDojoGenesis/
 
 ---
 
+## Era Deliverables
+
+### Era 1: Foundation — COMPLETE
+- CAS Store, Audit Trail, NATS messaging, WASM Sandbox, Actor Supervision, MCP Server
+
+### Era 2: Intelligence — COMPLETE
+- DIP x Actors, DIP x WASM+Events, DIP x CAS+MCP, Skill Marketplace CLI, HTMLCraft Studio integration
+
+### Era 3: Ecosystem — COMPLETE
+
+**Phase 0: Channel Bridge Flywheel**
+- ChannelAdapter → EventBus → TriggerSpec → WorkflowExecutor → SkillRunner pipeline
+- Unified channel abstraction enabling all downstream platform adapters
+
+**Phase 1: NATS Graduation + Channel Suite (Wave 1)**
+- NATS messaging graduated to production; Slack, Discord, and Telegram adapters shipped
+- 76 skills with typed ports (explicit input/output contracts)
+- Workflow Builder canvas with undo/redo and CAS save
+- Integration gate: 20 passing tests, 0 data races
+
+**Phase 2: Extended Channel Suite + Bridge HTTP Server**
+- Email, SMS, WhatsApp, Teams, and WebChat adapters shipped
+- Bridge HTTP server on :8090 (configurable via `DOJO_BRIDGE_PORT`)
+- `dojo tunnel` command displaying 8-platform webhook banner
+
+**Phase 3: Marketplace Integrity Layer**
+- Levenshtein slopsquatting defense (`MaxNameDistance=2`) blocking lookalike skill names
+- Yank semantics: config blob mutable, content immutable (prevents silent corruption)
+- Trust-tier enforcement via `DOJO_TRUST_MINIMUM` env var
+- 4 CLI commands: `yank`, `unyank`, `report`, `verify`
+
+### Era 4: Scale — PLANNED
+- Edge deployment (Cloudflare Workers / Durable Objects)
+- Local-to-D1 CAS sync for persistent federated state
+- Federated agent mesh across nodes
+
+---
+
 ## Active Workstreams
 
-### Completed (v1.0.0)
+### Completed (v3.2.0 / Era 3)
 - ✅ Orchestration extraction to standalone module
-- ✅ 44-skill port (Tiers 0-3) across 7 plugin directories
+- ✅ 76-skill port with typed ports (Tiers 0-3) across 7 plugin directories
 - ✅ Meta-skill invocation with ExecuteAsSubtask
 - ✅ Call depth tracking (max=3) and budget propagation
 - ✅ Backend integration sweep (agent chat, DAG, trace endpoints)
@@ -383,8 +421,15 @@ AgenticGatewayByDojoGenesis/
 - ✅ Pre-v1 TODO hardening — hard dependency validation, execution tracking, user tier lookup, E2E CI
 - ✅ Multi-arch Docker — amd64 + arm64 via Goreleaser, distroless runtime, manifest lists
 - ✅ Cloud adapter intentionally deferred (v1 is local-first, SQLite-only)
+- ✅ Era 3 Phase 0: Channel bridge flywheel (ChannelAdapter → EventBus → TriggerSpec → WorkflowExecutor → SkillRunner)
+- ✅ Era 3 Phase 1: NATS graduation, Slack/Discord/Telegram adapters, 76 typed-port skills, Workflow Builder canvas, integration gate (20 tests, 0 races)
+- ✅ Era 3 Phase 2: Email/SMS/WhatsApp/Teams/WebChat adapters, bridge HTTP server on :8090 (DOJO_BRIDGE_PORT), dojo tunnel 8-platform webhook banner
+- ✅ Era 3 Phase 3: Levenshtein slopsquatting defense (MaxNameDistance=2), yank semantics (config blob mutation, content immutable), trust-tier enforcement (DOJO_TRUST_MINIMUM), 4 CLI commands (yank/unyank/report/verify)
 
-### Planned (Post-v1.0.0)
+### Planned (Era 4)
+- [ ] Edge deployment (Cloudflare Workers / Durable Objects)
+- [ ] Local-to-D1 CAS sync for persistent federated state
+- [ ] Federated agent mesh
 - [ ] Config hot-reload (requires service restart currently)
 - [ ] Cloud adapter (Supabase integration for multi-user deployment)
 - [ ] Coverage increase target
@@ -420,7 +465,7 @@ AgenticGatewayByDojoGenesis/
 | **Modules** | 10 (shared, events, provider, tools, memory, mcp, orchestration, disposition, skill, server) |
 | **API Endpoints** | 45 (OpenAI-compatible + Gateway + Admin) |
 | **Registered Tools** | 33 |
-| **Registered Skills** | 44 |
+| **Registered Skills** | 76 |
 | **Supported Providers** | 8 (Anthropic, OpenAI, Google, Groq, Mistral, Kimi, DeepSeek, Ollama) |
 | **MCP Transports** | 3 (stdio, SSE, streamable_http) |
 | **MCP Servers Connected** | 1 (MCPByDojoGenesis, 14 tools) |
@@ -480,6 +525,6 @@ curl http://localhost:8080/admin/metrics/prometheus
 
 ---
 
-**Status:** ✅ PRODUCTION-READY (v1.0.0)
-**Date:** 2026-02-14
-**Next Review:** Post-v1.0.0 deployment
+**Status:** PRODUCTION-READY (v3.2.0)
+**Date:** 2026-04-09
+**Next Review:** Era 4 scoping — edge deployment, D1 CAS sync, federated mesh
