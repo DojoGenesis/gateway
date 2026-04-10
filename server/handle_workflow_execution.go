@@ -156,7 +156,7 @@ func (s *Server) handleWorkflowExecute(c *gin.Context) {
 //
 // The stream terminates when the run completes or the client disconnects.
 func (s *Server) handleWorkflowExecutionStream(c *gin.Context) {
-	runID := c.Param("run_id")
+	runID := c.Param("name")
 	if runID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "run_id required"})
 		return

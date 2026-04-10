@@ -135,19 +135,24 @@ func (s *Server) setupRoutes() {
 	// CRUD: POST/GET /api/workflows, PUT/GET /api/workflows/:name/canvas,
 	// POST /api/workflows/:name/validate, GET /api/skills.
 	// Requires WorkflowCAS dep; omitted when nil.
+	// Note: explicit sub-routes instead of /*path wildcard to avoid conflict
+	// with the always-registered execution endpoints below.
 	if s.workflowCAS != nil {
 		wfHandler := wfapi.NewWorkflowHandler(s.workflowCAS)
 		mux := http.NewServeMux()
 		wfHandler.RegisterRoutes(mux)
 		ginMux := gin.WrapH(mux)
 		s.router.Any("/api/workflows", ginMux)
-		s.router.Any("/api/workflows/*path", ginMux)
+		s.router.GET("/api/workflows/:name", ginMux)
+		s.router.GET("/api/workflows/:name/canvas", ginMux)
+		s.router.PUT("/api/workflows/:name/canvas", ginMux)
+		s.router.POST("/api/workflows/:name/validate", ginMux)
 		s.router.GET("/api/skills", ginMux)
 	}
 
 	// Execution endpoints (always registered; handler returns 501 when CAS absent).
 	s.router.POST("/api/workflows/:name/execute", s.handleWorkflowExecute)
-	s.router.GET("/api/workflows/:run_id/execution", s.handleWorkflowExecutionStream)
+	s.router.GET("/api/workflows/:name/execution", s.handleWorkflowExecutionStream)
 
 	// ─── WebSocket: real-time workflow execution events (Era 3) ──────
 	s.router.GET("/api/ws/workflow", s.wsHub.HandleWS)

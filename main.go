@@ -21,6 +21,7 @@ import (
 	pkgdisposition "github.com/DojoGenesis/gateway/pkg/disposition"
 	"github.com/DojoGenesis/gateway/pkg/gateway"
 	"github.com/DojoGenesis/gateway/provider"
+	"github.com/DojoGenesis/gateway/runtime/cas"
 	"github.com/DojoGenesis/gateway/server/agent"
 	"github.com/DojoGenesis/gateway/server/config"
 	"github.com/DojoGenesis/gateway/server/logging"
@@ -388,6 +389,23 @@ func main() {
 		}
 	}
 
+	// ─── Initialize Workflow CAS ─────────────────────────────────────
+	// WorkflowCAS backs /api/skills and /api/workflows/*. Default path
+	// matches the dojo CLI default (DOJO_CAS_PATH env var or dojo-skills.db).
+	var workflowCAS cas.Store
+	{
+		casPath := getEnv("DOJO_CAS_PATH", "dojo-skills.db")
+		store, casErr := cas.NewSQLiteStore(casPath)
+		if casErr != nil {
+			slog.Warn("workflow CAS initialization failed — /api/skills and /api/workflows will be unavailable",
+				"error", casErr, "path", casPath)
+		} else {
+			workflowCAS = store
+			defer store.Close()
+			slog.Info("workflow CAS initialized", "path", casPath)
+		}
+	}
+
 	// ─── Create and Start Server ─────────────────────────────────────
 	// Guard against the Go interface nil trap: assigning a typed nil (*mcp.MCPHostManager)(nil)
 	// to MCPStatusProvider produces a non-nil interface, breaking the nil check inside the server.
@@ -425,6 +443,7 @@ func main() {
 		AppManager:          appManager,
 		AuthDB:              authDB,
 		SpecialistRouter:    specialistRouter,
+		WorkflowCAS:         workflowCAS,
 	})
 
 	if err := server.Start(); err != nil {
