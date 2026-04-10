@@ -256,7 +256,11 @@ func (h *ChatHandler) handleNonStreamingQuery(c *gin.Context, req *ChatRequest, 
 }
 
 func (h *ChatHandler) handleStreamingQuery(c *gin.Context, req *ChatRequest, decision agent.RoutingDecision) {
-	ctx := c.Request.Context()
+	// Detach from HTTP request context so client disconnect/response flush
+	// doesn't cancel in-flight LLM calls.
+	detachedCtx, agentCancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 5*time.Minute)
+	defer agentCancel()
+	ctx := detachedCtx
 
 	// Select provider based on routing decision, user status, and model preference
 	providerName, resolvedModel, err := h.selectProviderWithRouting(req.UserID, req.Model, decision)
