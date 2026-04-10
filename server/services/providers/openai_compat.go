@@ -28,6 +28,7 @@ type oaiRequest struct {
 	MaxTokens   int          `json:"max_tokens,omitempty"`
 	Stream      bool         `json:"stream"`
 	Tools       []oaiTool    `json:"tools,omitempty"`
+	ToolChoice  interface{}  `json:"tool_choice,omitempty"`
 }
 
 type oaiMessage struct {
@@ -112,6 +113,14 @@ func (p *openaiCompatibleProvider) GenerateCompletion(ctx context.Context, req *
 	}
 	if len(req.Tools) > 0 {
 		oReq.Tools = convertToOAITools(req.Tools)
+		switch req.ToolChoice {
+		case "required":
+			oReq.ToolChoice = "required"
+		case "none":
+			oReq.ToolChoice = "none"
+		default:
+			oReq.ToolChoice = "auto"
+		}
 	}
 
 	body, _ := json.Marshal(oReq)

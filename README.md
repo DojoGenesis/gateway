@@ -6,7 +6,7 @@ Building with AI agents today means choosing between renting from Big Tech (good
 
 Agentic Gateway is the fourth option: a production-ready Go framework for self-hosted agentic AI. Multi-provider LLM routing, DAG-based task orchestration, 44 built-in skills, MCP tool integration, and semantic memory — running on your infrastructure, not someone else's.
 
-**83,000+ lines of Go. 10 independently-versioned modules. Zero vendor lock-in.**
+**140,000+ lines of Go. 19 independently-versioned modules. Zero vendor lock-in.**
 
 ## Quick Start
 
@@ -31,58 +31,82 @@ The gateway is structured as a Go workspace with ten independently-versioned mod
 
 ```
 AgenticGatewayByDojoGenesis/
-├── go.work                 # Workspace root
-├── shared/                 # Cross-cutting types and error definitions
-├── events/                 # Structured streaming events (SSE)
-├── provider/               # Model provider plugin system (gRPC)
-├── tools/                  # Tool registry and execution engine
+├── go.work                 # Workspace root (19 modules)
+├── main.go                 # Entry point
+├── shared/                 # Cross-cutting types (package in root module)
+├── events/                 # SSE event catalog (package in root module)
+├── provider/               # Model provider plugin system (gRPC, 8 providers)
+├── tools/                  # Tool registry and execution engine (33 tools)
 ├── memory/                 # Conversation memory with semantic compression
-├── mcp/                    # MCP host integration (server lifecycle + tool bridge)
+├── mcp/                    # MCP host integration (stdio + SSE + streamable_http)
 ├── orchestration/          # DAG-based task planning and execution (standalone)
 ├── disposition/            # Agent personality and behavior config (ADA contract)
-├── skill/                  # Tiered skill executor (44 skills, Tiers 0-2)
+├── skill/                  # Tiered skill executor (84 skills, Tiers 0-3)
 ├── apps/                   # MCP Apps host infrastructure (resource serving, tool proxy)
-└── server/                 # HTTP server, agent logic, handlers
+├── workflow/               # Durable workflow execution engine
+├── integration/            # Integration testing harness
+├── runtime/
+│   ├── actor/              # Actor supervision tree
+│   ├── cas/                # Content-addressable storage
+│   ├── d1client/           # Cloudflare D1 client (edge sync)
+│   ├── event/              # Event bus and routing
+│   └── wasm/               # WASM sandbox execution
+├── wasm-modules/
+│   └── dip-scorer/         # DIP scoring compiled to WASM
+├── cmd/dojo/               # CLI integration module
+└── server/                 # HTTP API server, agent logic, handlers
 ```
 
 ### Module Dependency Graph
 
 ```
-shared          (stdlib only)
+root module     (shared + events packages — stdlib only)
   │
-events          (stdlib only)
+provider        (root, go-plugin, gRPC, protobuf — 8 providers)
   │
-provider        (shared, go-plugin, gRPC, protobuf)
+tools           (root, provider — 33 registered tools)
   │
-tools           (shared, provider)
+memory          (root, provider, sqlite3)
   │
-memory          (shared, provider, sqlite3)
+mcp             (root, tools — stdio + SSE + streamable_http)
   │
-mcp             (shared, tools)
+orchestration   (root, tools — standalone DAG engine)
   │
-orchestration   (shared, tools — standalone DAG engine)
+disposition     (root — ADA contract v1.0.0)
   │
-disposition     (shared — agent personality config)
+skill           (root, tools, orchestration — 84 skills, Tiers 0-3)
   │
-skill           (shared, tools, orchestration — tiered skill executor)
+workflow        (root, orchestration — durable workflow engine)
   │
-server          (all modules above + gin, cors, cron, etc.)
+runtime/*       (actor, cas, d1client, event, wasm — infrastructure layer)
+  │
+apps            (root, tools — MCP Apps host)
+  │
+server          (all modules above + gin, cors, cron, OTEL, Langfuse)
 ```
 
 ## Module Overview
 
 | Module | Description | Key Types |
 |--------|-------------|-----------|
-| `shared` | Cross-cutting currency types, standard errors | `Message`, `ToolCall`, `Usage`, `TaskStatus` |
-| `events` | Structured streaming events for SSE | `StreamEvent`, event constructors |
-| `provider` | Plugin-based model provider system via gRPC | `ModelProvider`, `PluginManager`, `CompletionRequest` |
-| `tools` | Tool registry, execution, and helper utilities | `ToolDefinition`, `RegisterTool`, `InvokeTool` |
+| `shared` | Cross-cutting currency types, standard errors (root package) | `Message`, `ToolCall`, `Usage`, `TaskStatus` |
+| `events` | SSE event catalog, 254-line schema (root package) | `StreamEvent`, event constructors |
+| `provider` | Plugin-based model provider system via gRPC (8 providers) | `ModelProvider`, `PluginManager`, `CompletionRequest` |
+| `tools` | Tool registry, execution, and helper utilities (33 tools) | `ToolDefinition`, `RegisterTool`, `InvokeTool` |
 | `memory` | Conversation memory with semantic compression | `MemoryManager`, `CompressionService`, `EmbeddingService` |
-| `mcp` | MCP host integration, server lifecycle, tool bridge | `MCPHostManager`, `MCPServerConnection`, `MCPToolBridge` |
+| `mcp` | MCP host integration — stdio, SSE, streamable_http | `MCPHostManager`, `MCPServerConnection`, `MCPToolBridge` |
 | `orchestration` | DAG-based task planning and execution (standalone) | `Planner`, `Engine`, `ExecutionContext` |
-| `disposition` | Agent personality and behavior config (ADA contract) | `Disposition`, `PersonalityTraits` |
-| `skill` | Tiered skill executor (44 skills, Tiers 0-2) | `SkillExecutor`, `SkillRegistry`, `SkillLoader` |
-| `apps` | MCP Apps host infrastructure (beta) | `AppManager`, `ResourceRegistry`, `ToolCallProxy` |
+| `disposition` | Agent personality and behavior config (ADA contract v1.0.0) | `Disposition`, `PersonalityTraits` |
+| `skill` | Tiered skill executor (84 skills, Tiers 0-3) | `SkillExecutor`, `SkillRegistry`, `SkillLoader` |
+| `apps` | MCP Apps host infrastructure | `AppManager`, `ResourceRegistry`, `ToolCallProxy` |
+| `workflow` | Durable workflow execution engine | `WorkflowEngine`, `WorkflowState`, `StepRunner` |
+| `integration` | Integration testing harness | `IntegrationSuite`, `GatewayHarness` |
+| `runtime/actor` | Actor supervision tree | `ActorSystem`, `Supervisor`, `Mailbox` |
+| `runtime/cas` | Content-addressable storage | `CASStore`, `ContentRef`, `BlobWriter` |
+| `runtime/d1client` | Cloudflare D1 client for edge sync | `D1Client`, `SyncManager` |
+| `runtime/event` | Event bus and routing | `EventBus`, `EventRouter`, `Subscription` |
+| `runtime/wasm` | WASM sandbox execution | `WASMRuntime`, `SandboxContext` |
+| `wasm-modules/dip-scorer` | DIP scoring compiled to WASM | `DIPScorer`, `ScoringResult` |
 | `server` | HTTP API server with agent logic | `PrimaryAgent`, handlers, middleware, config |
 
 ## Installation
@@ -124,8 +148,8 @@ docker compose up -d
 #### Build
 
 ```bash
-git clone https://github.com/dojogenesis/agentic-gateway.git
-cd agentic-gateway
+git clone https://github.com/DojoGenesis/gateway.git
+cd gateway
 make build
 ```
 

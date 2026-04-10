@@ -87,6 +87,104 @@ func isRetriableError(err error) bool {
 		strings.Contains(errStr, "connection reset")
 }
 
+// webSearchDuckDuckGo calls the DuckDuckGo Instant Answer API (no key required).
+// Results are derived from RelatedTopics rather than traditional organic results,
+// so they are useful for factual lookups but less comprehensive than SerpAPI.
+func webSearchDuckDuckGo(ctx context.Context, query string, maxResults int, params map[string]interface{}) (map[string]interface{}, error) {
+	ddgURL := fmt.Sprintf("https://api.duckduckgo.com/?q=%s&format=json&no_html=1&skip_disambig=1",
+		strings.ReplaceAll(query, " ", "+"))
+
+	timeout := GetDurationParam(params, "timeout", defaultTimeout)
+	client := newHTTPClient(timeout)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", ddgURL, nil)
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("failed to create DDG request: %v", err),
+		}, nil
+	}
+	req.Header.Set("User-Agent", defaultUserAgent)
+
+	resp, err := client.doRequestWithRetry(ctx, req, maxRetries)
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("DDG request failed: %v", err),
+		}, nil
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("failed to read DDG response: %v", err),
+		}, nil
+	}
+
+	var ddgResp struct {
+		AbstractText   string `json:"AbstractText"`
+		AbstractURL    string `json:"AbstractURL"`
+		RelatedTopics  []struct {
+			Text     string `json:"Text"`
+			FirstURL string `json:"FirstURL"`
+			Topics   []struct {
+				Text     string `json:"Text"`
+				FirstURL string `json:"FirstURL"`
+			} `json:"Topics"`
+		} `json:"RelatedTopics"`
+	}
+	if err := json.Unmarshal(body, &ddgResp); err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("failed to parse DDG response: %v", err),
+		}, nil
+	}
+
+	results := []map[string]interface{}{}
+	if ddgResp.AbstractText != "" {
+		results = append(results, map[string]interface{}{
+			"title":   query,
+			"link":    ddgResp.AbstractURL,
+			"snippet": ddgResp.AbstractText,
+		})
+	}
+	for _, topic := range ddgResp.RelatedTopics {
+		if len(results) >= maxResults {
+			break
+		}
+		if topic.Text != "" && topic.FirstURL != "" {
+			results = append(results, map[string]interface{}{
+				"title":   topic.Text,
+				"link":    topic.FirstURL,
+				"snippet": topic.Text,
+			})
+		}
+		// Flatten nested Topics groups
+		for _, sub := range topic.Topics {
+			if len(results) >= maxResults {
+				break
+			}
+			if sub.Text != "" && sub.FirstURL != "" {
+				results = append(results, map[string]interface{}{
+					"title":   sub.Text,
+					"link":    sub.FirstURL,
+					"snippet": sub.Text,
+				})
+			}
+		}
+	}
+
+	return map[string]interface{}{
+		"success": true,
+		"query":   query,
+		"engine":  "duckduckgo",
+		"results": results,
+		"count":   len(results),
+	}, nil
+}
+
 func WebSearch(ctx context.Context, params map[string]interface{}) (map[string]interface{}, error) {
 	query, ok := params["query"].(string)
 	if !ok || query == "" {
@@ -99,19 +197,12 @@ func WebSearch(ctx context.Context, params map[string]interface{}) (map[string]i
 	maxResults := GetIntParam(params, "max_results", 10)
 	searchEngine := GetStringParam(params, "search_engine", "serpapi")
 
-	if searchEngine != "serpapi" {
-		return map[string]interface{}{
-			"success": false,
-			"error":   fmt.Sprintf("unsupported search engine: %s", searchEngine),
-		}, nil
-	}
-
 	apiKey := os.Getenv("SERPAPI_KEY")
-	if apiKey == "" {
-		return map[string]interface{}{
-			"success": false,
-			"error":   "SERPAPI_KEY environment variable not set",
-		}, nil
+
+	// If no SerpAPI key is available (or a non-serpapi engine is requested),
+	// fall back to DuckDuckGo's free Instant Answer JSON API.
+	if apiKey == "" || (searchEngine != "serpapi" && searchEngine != "") {
+		return webSearchDuckDuckGo(ctx, query, maxResults, params)
 	}
 
 	url := fmt.Sprintf("https://serpapi.com/search?q=%s&num=%d&api_key=%s",

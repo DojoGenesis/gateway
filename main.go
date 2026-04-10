@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"database/sql"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -55,6 +57,11 @@ func main() {
 		}
 		os.Exit(0)
 	}
+
+	// ─── Load .env (if present) ─────────────────────────────────────
+	// Loads key=value pairs from .env into the environment before any
+	// config reads. Existing env vars take precedence (no override).
+	loadDotEnv(".env")
 
 	// ─── Load Configuration ──────────────────────────────────────────
 	cfg := config.Load()
@@ -503,4 +510,37 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// loadDotEnv reads key=value lines from path and calls os.Setenv for each.
+// Lines beginning with # and blank lines are ignored.
+// Existing environment variables are NOT overridden — shell env always wins.
+// Values may optionally be wrapped in single or double quotes.
+func loadDotEnv(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return // .env is optional — no error if absent
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		idx := strings.IndexByte(line, '=')
+		if idx <= 0 {
+			continue
+		}
+		key := strings.TrimSpace(line[:idx])
+		val := strings.TrimSpace(line[idx+1:])
+		// Strip surrounding quotes
+		if len(val) >= 2 && ((val[0] == '"' && val[len(val)-1] == '"') || (val[0] == '\'' && val[len(val)-1] == '\'')) {
+			val = val[1 : len(val)-1]
+		}
+		if os.Getenv(key) == "" {
+			os.Setenv(key, val)
+		}
+	}
 }

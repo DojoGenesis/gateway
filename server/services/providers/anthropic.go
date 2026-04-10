@@ -59,6 +59,7 @@ type anthropicRequest struct {
 	Stream      bool               `json:"stream,omitempty"`
 	Tools       []anthropicTool    `json:"tools,omitempty"`
 	System      string             `json:"system,omitempty"`
+	ToolChoice  interface{}        `json:"tool_choice,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -118,6 +119,15 @@ func (p *AnthropicProvider) GenerateCompletion(ctx context.Context, req *provide
 	}
 	if len(req.Tools) > 0 {
 		aReq.Tools = convertToAnthropicTools(req.Tools)
+		// Anthropic tool_choice: {"type": "any"} = model must call a tool;
+		// omit entirely for "auto" behaviour (Anthropic's default).
+		switch req.ToolChoice {
+		case "required":
+			aReq.ToolChoice = map[string]string{"type": "any"}
+		case "none":
+			aReq.ToolChoice = map[string]string{"type": "none"}
+		// "auto" or "" → omit (Anthropic defaults to auto when tools are present)
+		}
 	}
 
 	body, err := json.Marshal(aReq)

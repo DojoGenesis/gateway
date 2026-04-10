@@ -537,7 +537,14 @@ func (pa *PrimaryAgent) executeToolCalls(ctx context.Context, toolCalls []provid
 	return results
 }
 
+// toolResultMaxChars caps tool result content to this many characters before
+// injecting it into the message history. Long file reads or command outputs
+// grow the context window fast — at 4 chars/token this is ~1K tokens per result.
+const toolResultMaxChars = 4096
+
 // formatToolResults formats tool execution results as JSON strings for the model.
+// Results are truncated to toolResultMaxChars to prevent unbounded context growth
+// across multiple tool-calling iterations.
 func formatToolResults(results []ToolExecutionResult) []providerpkg.Message {
 	messages := make([]providerpkg.Message, len(results))
 
@@ -554,6 +561,11 @@ func formatToolResults(results []ToolExecutionResult) []providerpkg.Message {
 			}
 		}
 
+		// Truncate to prevent runaway context growth across iterations.
+		if len(content) > toolResultMaxChars {
+			content = content[:toolResultMaxChars] + `... [truncated]`
+		}
+
 		messages[i] = providerpkg.Message{
 			Role:       "tool",
 			Content:    content,
@@ -566,15 +578,16 @@ func formatToolResults(results []ToolExecutionResult) []providerpkg.Message {
 
 // QueryRequest represents a structured query request with all parameters.
 type QueryRequest struct {
-	Query        string
-	UserID       string
-	UserTier     string
-	ProviderName string
-	ModelID      string
-	Temperature  float64
-	MaxTokens    int
-	UseMemory    bool
-	ProjectID    string // v0.0.18: Project context for scoped tools and memory
+	Query         string
+	UserID        string
+	UserTier      string
+	ProviderName  string
+	ModelID       string
+	Temperature   float64
+	MaxTokens     int
+	UseMemory     bool
+	ProjectID     string // v0.0.18: Project context for scoped tools and memory
+	WorkspaceRoot string // Absolute path to the user's workspace; file tools resolve relative paths against this
 }
 
 // ConversationMemory represents a stored conversation turn.
@@ -846,6 +859,10 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 
 	// Step 5: Build messages with intent-based system prompt and conversation history
 	systemPrompt := pa.buildSystemPrompt(intent)
+	// Append workspace context so the model uses correct paths with file tools.
+	if req.WorkspaceRoot != "" {
+		systemPrompt += fmt.Sprintf("\n\nWorkspace root: %s\nWhen using file tools, use paths relative to this workspace root or absolute paths.", req.WorkspaceRoot)
+	}
 
 	var messages []providerpkg.Message
 
@@ -887,10 +904,18 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 	if req.ProjectID != "" {
 		ctxWithTimeout = tools.WithProjectID(ctxWithTimeout, req.ProjectID)
 	}
+	// Inject workspace root so file tools can resolve relative paths correctly.
+	// The CLI sends os.Getwd() from the user's session; without it the gateway
+	// would resolve relative paths against its own process CWD.
+	if req.WorkspaceRoot != "" {
+		ctxWithTimeout = tools.WithWorkspaceRoot(ctxWithTimeout, req.WorkspaceRoot)
+	}
 
-	// Step 6: Get available tools
-	// v0.0.18: All tools are available, including artifact and project tools
-	availableTools := tools.GetAllTools()
+	// Step 6: Get available tools filtered by intent.
+	// Sending only relevant tools reduces input token count per call, which is
+	// critical for staying under provider TPM rate limits. The full tool set (~33)
+	// is only sent when intent is unrecognised.
+	availableTools := tools.GetToolsForIntent(string(intent))
 	pluginTools := convertToolsToPluginFormat(availableTools)
 
 	// Set defaults for temperature and max tokens
@@ -909,6 +934,14 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 	var allToolResults []ToolExecutionResult
 
 	for iteration := 0; iteration < pa.maxToolIterations; iteration++ {
+		// On the first iteration, force a tool call so the model acts rather than
+		// just writing a plan. On subsequent iterations, let it decide — it may
+		// want to return a final text response once tool results are available.
+		toolChoice := "auto"
+		if iteration == 0 && len(pluginTools) > 0 {
+			toolChoice = "required"
+		}
+
 		completionReq := &providerpkg.CompletionRequest{
 			Model:       modelID,
 			Messages:    messages,
@@ -916,6 +949,7 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 			MaxTokens:   maxTokens,
 			Tools:       pluginTools,
 			Stream:      false,
+			ToolChoice:  toolChoice,
 		}
 
 		var response *providerpkg.CompletionResponse

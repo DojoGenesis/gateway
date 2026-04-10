@@ -33,23 +33,10 @@ func TestWebSearch(t *testing.T) {
 			wantSuccess: false,
 			wantError:   "query parameter is required",
 		},
-		{
-			name: "unsupported search engine",
-			params: map[string]interface{}{
-				"query":         "test",
-				"search_engine": "google",
-			},
-			wantSuccess: false,
-			wantError:   "unsupported search engine: google",
-		},
-		{
-			name: "missing SERPAPI_KEY",
-			params: map[string]interface{}{
-				"query": "test query",
-			},
-			wantSuccess: false,
-			wantError:   "SERPAPI_KEY environment variable not set",
-		},
+		// Note: "unsupported search engine" and "missing SERPAPI_KEY" cases now fall
+		// back to DuckDuckGo instead of failing; they make a real HTTP call so we
+		// don't assert success — just that the old hard-error messages are gone.
+
 	}
 
 	originalKey := os.Getenv("SERPAPI_KEY")

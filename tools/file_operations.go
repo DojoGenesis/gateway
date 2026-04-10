@@ -22,13 +22,7 @@ func ReadFile(ctx context.Context, params map[string]interface{}) (map[string]in
 	encoding := GetStringParam(params, "encoding", "utf-8")
 	maxBytes := GetIntParam(params, "max_bytes", 1024*1024)
 
-	absPath, err := filepath.Abs(filePath)
-	if err != nil {
-		return map[string]interface{}{
-			"success": false,
-			"error":   fmt.Sprintf("invalid file path: %v", err),
-		}, nil
-	}
+	absPath := resolveFilePath(ctx, filePath)
 
 	info, err := os.Stat(absPath)
 	if err != nil {
@@ -115,15 +109,9 @@ func WriteFile(ctx context.Context, params map[string]interface{}) (map[string]i
 	createDirs := GetBoolParam(params, "create_dirs", true)
 	overwrite := GetBoolParam(params, "overwrite", false)
 
-	absPath, err := filepath.Abs(filePath)
-	if err != nil {
-		return map[string]interface{}{
-			"success": false,
-			"error":   fmt.Sprintf("invalid file path: %v", err),
-		}, nil
-	}
+	absPath := resolveFilePath(ctx, filePath)
 
-	_, err = os.Stat(absPath)
+	_, err := os.Stat(absPath)
 	exists := err == nil
 
 	if exists && !overwrite {
@@ -180,13 +168,7 @@ func ListDirectory(ctx context.Context, params map[string]interface{}) (map[stri
 	includeHidden := GetBoolParam(params, "include_hidden", false)
 	fileTypes := GetStringSliceParam(params, "file_types", []string{})
 
-	absPath, err := filepath.Abs(directoryPath)
-	if err != nil {
-		return map[string]interface{}{
-			"success": false,
-			"error":   fmt.Sprintf("invalid directory path: %v", err),
-		}, nil
-	}
+	absPath := resolveFilePath(ctx, directoryPath)
 
 	info, err := os.Stat(absPath)
 	if err != nil {
@@ -290,13 +272,7 @@ func SearchFiles(ctx context.Context, params map[string]interface{}) (map[string
 	rootDirectory := GetStringParam(params, "root_directory", ".")
 	maxResults := GetIntParam(params, "max_results", 1000)
 
-	absPath, err := filepath.Abs(rootDirectory)
-	if err != nil {
-		return map[string]interface{}{
-			"success": false,
-			"error":   fmt.Sprintf("invalid root directory: %v", err),
-		}, nil
-	}
+	absPath := resolveFilePath(ctx, rootDirectory)
 
 	info, err := os.Stat(absPath)
 	if err != nil {

@@ -22,6 +22,12 @@ type CompletionRequest struct {
 	MaxTokens   int
 	Tools       []Tool
 	Stream      bool
+	// ToolChoice controls the model's tool-calling behaviour.
+	// "required" — model MUST call a tool (first iteration to force action).
+	// "auto"     — model decides (default for follow-up iterations).
+	// "none"     — model must NOT call any tools.
+	// Empty string is treated as "auto".
+	ToolChoice string
 }
 
 type CompletionResponse struct {

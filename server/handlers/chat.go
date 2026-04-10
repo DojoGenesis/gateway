@@ -62,13 +62,14 @@ func (h *ChatHandler) SetDB(db database.DatabaseAdapter) {
 }
 
 type ChatRequest struct {
-	Message   string `json:"message"`
-	Model     string `json:"model,omitempty"`
-	Provider  string `json:"provider,omitempty"`
-	Stream    bool   `json:"stream"`
-	SessionID string `json:"session_id"`
-	UserID    string `json:"user_id,omitempty"`
-	ProjectID string `json:"project_id,omitempty"`
+	Message       string `json:"message"`
+	Model         string `json:"model,omitempty"`
+	Provider      string `json:"provider,omitempty"`
+	Stream        bool   `json:"stream"`
+	SessionID     string `json:"session_id"`
+	UserID        string `json:"user_id,omitempty"`
+	ProjectID     string `json:"project_id,omitempty"`
+	WorkspaceRoot string `json:"workspace_root,omitempty"` // User's CWD; file tools resolve relative paths against this
 }
 
 type ChatResponse struct {
@@ -274,14 +275,16 @@ func (h *ChatHandler) handleStreamingQuery(c *gin.Context, req *ChatRequest, dec
 
 	// Build query request for streaming agent
 	queryReq := agent.QueryRequest{
-		Query:        req.Message,
-		ProviderName: providerName,
-		ModelID:      resolvedModel,
-		UserID:       req.UserID,
-		UserTier:     h.getUserTier(req.UserID),
-		UseMemory:    false,
-		Temperature:  agent.DefaultTemperature,
-		MaxTokens:    agent.DefaultMaxTokens,
+		Query:         req.Message,
+		ProviderName:  providerName,
+		ModelID:       resolvedModel,
+		UserID:        req.UserID,
+		UserTier:      h.getUserTier(req.UserID),
+		UseMemory:     false,
+		Temperature:   agent.DefaultTemperature,
+		MaxTokens:     agent.DefaultMaxTokens,
+		ProjectID:     req.ProjectID,
+		WorkspaceRoot: req.WorkspaceRoot,
 	}
 
 	// Use StreamingAgent with detailed events
