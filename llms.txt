@@ -1,0 +1,34 @@
+# DojoGenesis Gateway
+
+> Composable agentic AI runtime — multi-provider LLM routing, MCP server management, CAS skill storage, and SSE observability in a single Go binary.
+
+## What this is
+
+The Gateway is the infrastructure layer of the Dojo Genesis platform. It is a 100% Go-native agentic runtime with 19 modules and 140K+ lines of code. It routes LLM requests across multiple providers (Anthropic, OpenAI, and others), manages MCP server lifecycle, stores and serves skills via Content Addressable Storage (CAS), and streams agent events over SSE for real-time observability. The CLI (`dojo-cli`) connects to the Gateway as its backend.
+
+## Key capabilities
+
+- Multi-provider LLM routing with intent classification and explicit provider/model override
+- MCP server hot-registration: register, list, and check status of MCP servers at runtime
+- CAS (Content Addressable Storage) for skills — immutable, content-addressed skill distribution
+- SSE streaming on `/events` for real-time agent observability and tool-use monitoring
+- ADA disposition system — YAML-based agent personality and behavior presets
+- Actor supervision, DAG orchestration, and durable agent sessions
+- WASM sandbox for skill execution
+- Temporal workflow integration for long-running pipelines
+- Tool routing with context injection — per-request config threaded into nested tool functions
+- File tools, web search tools, and CLI-forwarded API key hot-registration
+
+## How to use with LLMs
+
+Point the Dojo CLI at a running Gateway instance (`DOJO_GATEWAY_URL=http://localhost:7340`). The Gateway exposes a chat endpoint that accepts provider/model overrides. For agent workflows, use `/agent dispatch` from the CLI or POST directly to the Gateway's agent API. Skills stored in CAS are retrieved by hash and injected into agent context. Use `/events` SSE stream to observe tool calls, agent state transitions, and skill invocations in real time.
+
+## Default port
+
+7340
+
+## Links
+
+- GitHub: https://github.com/DojoGenesis/gateway
+- Architecture: https://github.com/DojoGenesis/gateway/blob/main/ARCHITECTURE.md
+- Status: https://github.com/DojoGenesis/gateway/blob/main/STATUS.md
