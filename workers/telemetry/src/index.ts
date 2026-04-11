@@ -347,6 +347,68 @@ async function handleTools(url: URL, db: D1Database): Promise<Response> {
 }
 
 // ---------------------------------------------------------------------------
+// Route: GET /api/telemetry/spans
+// ---------------------------------------------------------------------------
+
+async function handleSpans(url: URL, db: D1Database): Promise<Response> {
+  const sessionId = url.searchParams.get("session_id");
+  const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "100", 10), 500);
+
+  let result;
+  if (sessionId) {
+    result = await db.prepare(
+      `SELECT span_id, trace_id, parent_id, session_id, name,
+              start_time, end_time, duration_ms, status, inputs, outputs, metadata
+       FROM spans WHERE session_id = ? ORDER BY start_time ASC LIMIT ?`
+    ).bind(sessionId, limit).all();
+  } else {
+    result = await db.prepare(
+      `SELECT span_id, trace_id, parent_id, session_id, name,
+              start_time, end_time, duration_ms, status, inputs, outputs, metadata
+       FROM spans ORDER BY start_time DESC LIMIT ?`
+    ).bind(limit).all();
+  }
+
+  return json({ spans: result.results });
+}
+
+// ---------------------------------------------------------------------------
+// Route: GET /api/telemetry/orchestration
+// ---------------------------------------------------------------------------
+
+async function handleOrchestration(url: URL, db: D1Database): Promise<Response> {
+  const range = url.searchParams.get("range") ?? "7d";
+  const since = Math.floor(Date.now() / 1000) - rangeToSeconds(range);
+  const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 200);
+
+  const result = await db.prepare(
+    `SELECT plan_id, task_id, session_id, node_count, estimated_cost,
+            total_nodes, status, created_at, completed_at,
+            success_nodes, failed_nodes, duration_ms
+     FROM orchestration_plans
+     WHERE created_at >= ?
+     ORDER BY created_at DESC
+     LIMIT ?`
+  ).bind(since, limit).all();
+
+  // Summary stats
+  const statsResult = await db.prepare(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+       ROUND(AVG(CASE WHEN duration_ms IS NOT NULL THEN duration_ms END), 0) AS avg_duration_ms
+     FROM orchestration_plans
+     WHERE created_at >= ?`
+  ).bind(since).first();
+
+  return json({
+    plans: result.results,
+    summary: statsResult,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -379,6 +441,16 @@ export default {
       // GET /api/telemetry/tools
       if (path === "/api/telemetry/tools" && request.method === "GET") {
         return handleTools(url, env.DB);
+      }
+
+      // GET /api/telemetry/spans
+      if (path === "/api/telemetry/spans" && request.method === "GET") {
+        return handleSpans(url, env.DB);
+      }
+
+      // GET /api/telemetry/orchestration
+      if (path === "/api/telemetry/orchestration" && request.method === "GET") {
+        return handleOrchestration(url, env.DB);
       }
 
       return error("Not found", 404);

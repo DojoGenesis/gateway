@@ -7,3 +7,4 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "dojo-telemetry"
 database_id = "d7b1f9d6-c9dc-4d55-87fe-f01163e3515a"
+migrations_dir = "migrations"

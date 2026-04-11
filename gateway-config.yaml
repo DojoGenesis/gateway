@@ -85,8 +85,7 @@ mcp:
       transport:
         type: "stdio"
         command: "node"
-        args: ["dist/index.js"]
-        working_directory: "${PRETEXT_PDF_ROOT:-/opt/mcp-servers/pretext-pdf}"
+        args: ["${PRETEXT_PDF_ROOT:-/Users/alfonsomorales/ZenflowProjects/PretextPDFByDojoGenesis}/dist/index.js"]
         env:
           NODE_ENV: "production"
       tools:
@@ -126,9 +125,10 @@ mcp:
     #                 to the Tauri resource extraction path at launch.
     #
     # Python engine configuration:
-    #   Set PYTHON_PATH to the venv python3 so MCP servers use the correct interpreter
-    #   regardless of the shell's PATH. The var is passed explicitly via each server's env:
-    #   block so it survives any context (new terminal, CI, Tauri sidecar).
+    #   PYTHON_PATH controls which python3 binary the MCP servers use.
+    #   Each server env block uses ${PYTHON_PATH:-python3} so it falls back to
+    #   the python3 on $PATH when PYTHON_PATH is not set (safe for dev machines).
+    #   Set PYTHON_PATH explicitly to pin a venv interpreter:
     #   Development:  export PYTHON_PATH=/path/to/zen-sci/.venv/bin/python3
     #   Production:   Tauri portal injects this before spawning the gateway sidecar.
 
@@ -140,10 +140,10 @@ mcp:
       transport:
         type: "stdio"
         command: "node"
-        args: ["${ZEN_SCI_SERVERS_ROOT}/latex-mcp/dist/index.bundle.js"]
+        args: ["${ZEN_SCI_SERVERS_ROOT:-/Users/alfonsomorales/ZenflowProjects/ZenithScience/zen-sci/servers}/latex-mcp/dist/index.bundle.js"]
         env:
           LOG_LEVEL: "info"
-          PYTHON_PATH: "${PYTHON_PATH}"
+          PYTHON_PATH: "${PYTHON_PATH:-python3}"
           PATH: "${PATH}"
 
       tools:
@@ -172,10 +172,10 @@ mcp:
       transport:
         type: "stdio"
         command: "node"
-        args: ["${ZEN_SCI_SERVERS_ROOT}/blog-mcp/dist/index.bundle.js"]
+        args: ["${ZEN_SCI_SERVERS_ROOT:-/Users/alfonsomorales/ZenflowProjects/ZenithScience/zen-sci/servers}/blog-mcp/dist/index.bundle.js"]
         env:
           LOG_LEVEL: "info"
-          PYTHON_PATH: "${PYTHON_PATH}"
+          PYTHON_PATH: "${PYTHON_PATH:-python3}"
           PATH: "${PATH}"
 
       tools:
@@ -204,10 +204,10 @@ mcp:
       transport:
         type: "stdio"
         command: "node"
-        args: ["${ZEN_SCI_SERVERS_ROOT}/slides-mcp/dist/index.bundle.js"]
+        args: ["${ZEN_SCI_SERVERS_ROOT:-/Users/alfonsomorales/ZenflowProjects/ZenithScience/zen-sci/servers}/slides-mcp/dist/index.bundle.js"]
         env:
           LOG_LEVEL: "info"
-          PYTHON_PATH: "${PYTHON_PATH}"
+          PYTHON_PATH: "${PYTHON_PATH:-python3}"
           PATH: "${PATH}"
 
       tools:
@@ -236,10 +236,10 @@ mcp:
       transport:
         type: "stdio"
         command: "node"
-        args: ["${ZEN_SCI_SERVERS_ROOT}/newsletter-mcp/dist/index.bundle.js"]
+        args: ["${ZEN_SCI_SERVERS_ROOT:-/Users/alfonsomorales/ZenflowProjects/ZenithScience/zen-sci/servers}/newsletter-mcp/dist/index.bundle.js"]
         env:
           LOG_LEVEL: "info"
-          PYTHON_PATH: "${PYTHON_PATH}"
+          PYTHON_PATH: "${PYTHON_PATH:-python3}"
           PATH: "${PATH}"
 
       tools:
@@ -268,10 +268,10 @@ mcp:
       transport:
         type: "stdio"
         command: "node"
-        args: ["${ZEN_SCI_SERVERS_ROOT}/grant-mcp/dist/index.bundle.js"]
+        args: ["${ZEN_SCI_SERVERS_ROOT:-/Users/alfonsomorales/ZenflowProjects/ZenithScience/zen-sci/servers}/grant-mcp/dist/index.bundle.js"]
         env:
           LOG_LEVEL: "info"
-          PYTHON_PATH: "${PYTHON_PATH}"
+          PYTHON_PATH: "${PYTHON_PATH:-python3}"
           PATH: "${PATH}"
 
       tools:
@@ -300,10 +300,10 @@ mcp:
       transport:
         type: "stdio"
         command: "node"
-        args: ["${ZEN_SCI_SERVERS_ROOT}/paper-mcp/dist/index.bundle.js"]
+        args: ["${ZEN_SCI_SERVERS_ROOT:-/Users/alfonsomorales/ZenflowProjects/ZenithScience/zen-sci/servers}/paper-mcp/dist/index.bundle.js"]
         env:
           LOG_LEVEL: "info"
-          PYTHON_PATH: "${PYTHON_PATH}"
+          PYTHON_PATH: "${PYTHON_PATH:-python3}"
           PATH: "${PATH}"
 
       tools:
