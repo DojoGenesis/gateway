@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -122,6 +123,10 @@ type Server struct {
 	// Provider latency tracking (Gap 13)
 	latencyTracker *services.ProviderLatencyTracker
 
+	// Telemetry tap: optional forwarder to Cloudflare Worker (Phase 1).
+	// Nil when DOJO_TELEMETRY_WORKER_URL is not set.
+	telemetryTap *services.TelemetryTap
+
 	// WebSocket hub for real-time workflow execution events (Era 3)
 	wsHub *WorkflowWSHub
 
@@ -192,6 +197,13 @@ func New(deps ServerDeps) *Server {
 
 	// Start WebSocket broadcast loop in background.
 	go s.wsHub.Run()
+
+	// Telemetry tap: forward SSE events to CF Worker if configured.
+	if url := os.Getenv("DOJO_TELEMETRY_WORKER_URL"); url != "" {
+		tap := services.NewTelemetryTap(url)
+		tap.Start()
+		s.telemetryTap = tap
+	}
 
 	s.setupMiddleware()
 	s.setupRoutes()

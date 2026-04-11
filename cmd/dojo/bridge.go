@@ -297,21 +297,48 @@ func envOr(key, fallback string) string {
 // resolveCredentialStore returns the appropriate CredentialStore based on
 // the DOJO_CREDENTIAL_BACKEND environment variable.
 // Supported values: "env" (default), "infisical".
+//
+// When DOJO_CREDENTIAL_BACKEND=infisical, the following env vars are required:
+//
+//	DOJO_INFISICAL_CLIENT_ID       — machine identity client ID
+//	DOJO_INFISICAL_CLIENT_SECRET   — machine identity client secret
+//	DOJO_INFISICAL_PROJECT_ID      — Infisical project ID
+//
+// Optional:
+//
+//	DOJO_INFISICAL_SITE_URL        — self-hosted URL (default: https://app.infisical.com)
+//	DOJO_INFISICAL_ENVIRONMENT     — environment slug (default: prod)
+//	DOJO_INFISICAL_SECRET_PATH     — path prefix (default: /channel)
 func resolveCredentialStore() channel.CredentialStore {
 	backend := os.Getenv("DOJO_CREDENTIAL_BACKEND")
 	switch backend {
 	case "infisical":
-		slog.Info("bridge: using Infisical credential store")
-		// In production, the Infisical go-sdk client would be created here
-		// with configuration from gateway-config.yaml. For now we return
-		// the env store as the Infisical SDK is not yet wired (requires
-		// github.com/Infisical/go-sdk dependency).
-		//
-		// When the SDK is added:
-		//   client := infisical.NewClient(...)
-		//   return channel.NewInfisicalCredentialStore(client, config)
-		slog.Warn("bridge: Infisical SDK not yet wired, falling back to env store")
-		return channel.NewEnvCredentialStore()
+		clientID := os.Getenv("DOJO_INFISICAL_CLIENT_ID")
+		clientSecret := os.Getenv("DOJO_INFISICAL_CLIENT_SECRET")
+		projectID := os.Getenv("DOJO_INFISICAL_PROJECT_ID")
+
+		if clientID == "" || clientSecret == "" || projectID == "" {
+			slog.Warn("bridge: DOJO_INFISICAL_CLIENT_ID / CLIENT_SECRET / PROJECT_ID not set, falling back to env store")
+			return channel.NewEnvCredentialStore()
+		}
+
+		cfg := channel.InfisicalConfig{
+			SiteURL:      envOr("DOJO_INFISICAL_SITE_URL", "https://app.infisical.com"),
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+			ProjectID:    projectID,
+			Environment:  envOr("DOJO_INFISICAL_ENVIRONMENT", "prod"),
+			SecretPath:   envOr("DOJO_INFISICAL_SECRET_PATH", "/channel"),
+		}
+
+		httpClient := channel.NewInfisicalHTTPClient(cfg.SiteURL, cfg.ClientID, cfg.ClientSecret, cfg.ProjectID)
+		slog.Info("bridge: using Infisical credential store",
+			"site", cfg.SiteURL,
+			"project", cfg.ProjectID,
+			"environment", cfg.Environment,
+			"secret_path", cfg.SecretPath,
+		)
+		return channel.NewInfisicalCredentialStore(httpClient, cfg)
 	default:
 		return channel.NewEnvCredentialStore()
 	}

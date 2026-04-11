@@ -1,11 +1,27 @@
 package providers
 
 import (
+	"context"
+
 	"github.com/DojoGenesis/gateway/provider"
 )
 
 type KimiProvider struct {
 	openaiCompatibleProvider
+}
+
+// GenerateCompletion forces temperature=1, which Kimi K2 models require.
+func (p *KimiProvider) GenerateCompletion(ctx context.Context, req *provider.CompletionRequest) (*provider.CompletionResponse, error) {
+	r := *req
+	r.Temperature = 1
+	return p.openaiCompatibleProvider.GenerateCompletion(ctx, &r)
+}
+
+// GenerateCompletionStream forces temperature=1, which Kimi K2 models require.
+func (p *KimiProvider) GenerateCompletionStream(ctx context.Context, req *provider.CompletionRequest) (<-chan *provider.CompletionChunk, error) {
+	r := *req
+	r.Temperature = 1
+	return p.openaiCompatibleProvider.GenerateCompletionStream(ctx, &r)
 }
 
 func NewKimiProvider(apiKey string) *KimiProvider {
@@ -23,7 +39,6 @@ func NewKimiProvider(apiKey string) *KimiProvider {
 				{ID: "kimi-k2.5", Name: "Kimi K2.5", Provider: "kimi", ContextSize: 256000, Cost: 1.0},
 				{ID: "kimi-k2", Name: "Kimi K2", Provider: "kimi", ContextSize: 256000, Cost: 0.8},
 				{ID: "kimi-k2-0905", Name: "Kimi K2 0905", Provider: "kimi", ContextSize: 256000, Cost: 0.8},
-				{ID: "kimi-latest", Name: "Kimi Latest", Provider: "kimi", ContextSize: 256000, Cost: 1.0},
 				{ID: "moonshot-v1-8k", Name: "Moonshot V1 8K", Provider: "kimi", ContextSize: 8000, Cost: 0.5},
 				{ID: "moonshot-v1-32k", Name: "Moonshot V1 32K", Provider: "kimi", ContextSize: 32000, Cost: 0.6},
 				{ID: "moonshot-v1-128k", Name: "Moonshot V1 128K", Provider: "kimi", ContextSize: 128000, Cost: 0.8},

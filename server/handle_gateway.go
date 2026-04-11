@@ -336,6 +336,9 @@ func (s *Server) writeSSEEvent(w http.ResponseWriter, flusher http.Flusher, evt 
 	data, _ := json.Marshal(evt)
 	fmt.Fprintf(w, "event: %s\ndata: %s\n\n", evt.Type, data)
 	flusher.Flush()
+	if s.telemetryTap != nil {
+		s.telemetryTap.Push(evt)
+	}
 }
 
 // handleGatewayAgentChatStream handles the SSE streaming variant of agent chat.

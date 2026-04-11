@@ -183,6 +183,7 @@ func (s *Server) setupRoutes() {
 			casGroup.HEAD("/refs/:ref", s.handleCASHeadRef)
 			casGroup.POST("/refs", s.handleCASStoreRef)
 			casGroup.GET("/export", s.handleCASExport)
+			casGroup.POST("/import", s.handleCASImport)
 		}
 	}
 

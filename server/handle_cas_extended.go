@@ -184,6 +184,29 @@ func (s *Server) handleCASExport(c *gin.Context) {
 	}
 }
 
+// handleCASImport imports content from a tar archive.
+// POST /api/cas/import
+//
+// Accepts a tar archive in the request body (Content-Type: application/x-tar).
+// Returns the list of refs that were imported.
+func (s *Server) handleCASImport(c *gin.Context) {
+	refs, err := s.workflowCAS.Import(c.Request.Context(), c.Request.Body)
+	if err != nil {
+		s.errorResponse(c, http.StatusBadRequest, "import_error", fmt.Sprintf("Failed to import archive: %v", err))
+		return
+	}
+
+	result := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		result = append(result, string(ref))
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"refs":  result,
+		"count": len(result),
+	})
+}
+
 // isNotFound checks if an error is a CAS not-found error.
 func isNotFound(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "not found")

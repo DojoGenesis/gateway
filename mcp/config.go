@@ -317,18 +317,25 @@ func (c *MCPConfig) ValidateExpansions() int {
 	return warnings
 }
 
-// expandEnvVars expands environment variables in the format ${VAR_NAME}.
-// If the variable is not set, it is replaced with an empty string.
+// expandEnvVars expands environment variables in the format ${VAR_NAME} or
+// ${VAR_NAME:-default}. If the variable is not set (or is empty), the default
+// value is used when provided; otherwise the empty string is substituted.
 func expandEnvVars(s string) string {
-	// Pattern to match ${VAR_NAME}
-	re := regexp.MustCompile(`\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
+	// Match ${VAR} or ${VAR:-default} where default may contain any non-} chars.
+	re := regexp.MustCompile(`\$\{([a-zA-Z_][a-zA-Z0-9_]*)(?::-([^}]*))?\}`)
 
 	return re.ReplaceAllStringFunc(s, func(match string) string {
-		// Extract variable name (remove ${ and })
-		varName := match[2 : len(match)-1]
+		sub := re.FindStringSubmatch(match)
+		if sub == nil {
+			return match
+		}
+		varName := sub[1]
+		defaultVal := sub[2] // empty string when no :- clause was present
 
-		// Return environment variable value, or empty string if not set
 		value := os.Getenv(varName)
+		if value == "" {
+			return defaultVal
+		}
 		return value
 	})
 }
