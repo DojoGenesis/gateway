@@ -26,6 +26,7 @@ import (
 	"github.com/DojoGenesis/gateway/pkg/validation"
 	"github.com/DojoGenesis/gateway/provider"
 	"github.com/DojoGenesis/gateway/runtime/cas"
+	"github.com/DojoGenesis/gateway/runtime/mesh"
 	"github.com/DojoGenesis/gateway/server/agent"
 	"github.com/DojoGenesis/gateway/server/maintenance"
 	"github.com/DojoGenesis/gateway/server/middleware"
@@ -140,6 +141,9 @@ type Server struct {
 	// Specialist dispatch (Phase 2): routes requests to specialist agents
 	// based on intent classification. Nil means specialist dispatch is disabled.
 	specialistRouter *specialist.Router
+
+	// Federated agent mesh (Era 4 Phase 0). Nil when mesh is not configured.
+	mesh *mesh.Mesh
 }
 
 // New creates a new Server with all dependencies injected.

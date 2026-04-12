@@ -192,6 +192,16 @@ func (s *Server) setupRoutes() {
 		}
 	}
 
+	// ─── Era 4 Phase 0: Federated mesh ──────────────────────────────────────────
+	s.router.GET("/.well-known/did.json", s.handleMeshDID)
+	meshGroup := s.router.Group("/mesh")
+	{
+		meshGroup.POST("/announce", s.handleMeshAnnounce)
+		meshGroup.GET("/peers", s.handleMeshPeers)
+		meshGroup.POST("/delegate", s.handleMeshDelegate)
+		meshGroup.GET("/health", s.handleMeshHealth)
+	}
+
 	// ─── Admin Routes (v1.0.0) ───────────────────────────────────────
 	admin := s.router.Group("/admin")
 	admin.Use(middleware.AdminAuthMiddleware())
