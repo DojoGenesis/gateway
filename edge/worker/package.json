@@ -1,0 +1,15 @@
+{
+  "name": "dojo-edge-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240806.0",
+    "vitest": "^2.0.0",
+    "wrangler": "^3.60.0"
+  }
+}

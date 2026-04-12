@@ -1,0 +1,21 @@
+name = "dojo-edge-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+
+[[d1_databases]]
+binding = "DOJO_CAS"
+database_name = "dojo-cas"
+database_id = "REPLACE_WITH_CAS_D1_DATABASE_ID"
+
+[[queues.producers]]
+queue = "dojo-channel-events"
+binding = "DOJO_CHANNEL_EVENTS"
+
+[triggers]
+routes = [
+  { pattern = "webhooks.trespiesdesign.com/*", zone_name = "trespiesdesign.com" }
+]
