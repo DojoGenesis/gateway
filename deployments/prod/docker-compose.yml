@@ -1,0 +1,166 @@
+version: '3.8'
+
+# Production stack — Hetzner VPS + Named Cloudflare Tunnel
+#
+# Images:
+#   gateway  — ghcr.io/trespies-source/agentic-gateway:latest  (GoReleaser)
+#   bridge   — ghcr.io/trespies-source/dojo-bridge:latest      (CI deploy workflow)
+#   tunnel   — cloudflare/cloudflared                           (named tunnel, permanent URL)
+#
+# Secrets: source .env before running (Infisical bootstrap vars only).
+# All channel credentials live in Infisical — not in this file.
+#
+# First deploy:
+#   1. Run scripts/server-setup.sh on the VPS
+#   2. Copy this file + cloudflared/config.yaml + .env to /opt/dojo/
+#   3. docker compose pull && docker compose up -d
+
+services:
+
+  # ─── Channel Bridge ────────────────────────────────────────────────────────
+  # Receives inbound webhooks from Slack, Discord, etc. on port 8090.
+  # Public via Cloudflare Tunnel — Infisical fetches credentials at startup.
+  bridge:
+    image: ghcr.io/trespies-source/dojo-bridge:latest
+    restart: unless-stopped
+    environment:
+      DOJO_CREDENTIAL_BACKEND: "${DOJO_CREDENTIAL_BACKEND:-infisical}"
+      DOJO_INFISICAL_PROJECT_ID: "${DOJO_INFISICAL_PROJECT_ID}"
+      DOJO_INFISICAL_CLIENT_ID: "${DOJO_INFISICAL_CLIENT_ID}"
+      DOJO_INFISICAL_CLIENT_SECRET: "${DOJO_INFISICAL_CLIENT_SECRET}"
+      DOJO_INFISICAL_SITE_URL: "${DOJO_INFISICAL_SITE_URL:-https://app.infisical.com}"
+      DOJO_INFISICAL_ENVIRONMENT: "${DOJO_INFISICAL_ENVIRONMENT:-prod}"
+      DOJO_INFISICAL_SECRET_PATH: "${DOJO_INFISICAL_SECRET_PATH:-/channel}"
+      DOJO_BRIDGE_PORT: "8090"
+      DOJO_DATA_DIR: "/app/data"
+    volumes:
+      - bridge-data:/app/data
+    networks:
+      - dojo-prod
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/health 2>/dev/null || exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ─── Cloudflare Tunnel ─────────────────────────────────────────────────────
+  # Named tunnel — permanent URL: https://bridge.trespiesdesign.com
+  # Routes /webhooks/* to the bridge service on port 8090.
+  # Credentials file is mounted from ./cloudflared/<TUNNEL-UUID>.json
+  tunnel:
+    image: cloudflare/cloudflared:2026.3.0
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yaml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    networks:
+      - dojo-prod
+    depends_on:
+      bridge:
+        condition: service_started
+
+  # ─── Agentic Gateway ───────────────────────────────────────────────────────
+  # Core LLM routing (Anthropic, Google, Kimi). Port 7340 — not exposed publicly.
+  # Accessible from VPS localhost and over SSH tunnel for CLI use.
+  gateway:
+    image: ghcr.io/trespies-source/agentic-gateway:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7340:7340"  # localhost only — expose via SSH tunnel for remote CLI
+    environment:
+      PORT: "7340"
+      ENVIRONMENT: "production"
+      MCP_CONFIG_PATH: "/etc/gateway/gateway-config.yaml"
+      MCP_BY_DOJO_BINARY: "/opt/mcp-servers/mcp-by-dojo-genesis"
+      MEMORY_DB_PATH: "/app/data/dojo_memory.db"
+      OTEL_ENABLED: "${OTEL_ENABLED:-false}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_SERVICE_NAME: "agentic-gateway"
+    volumes:
+      - ./gateway-config.yaml:/etc/gateway/gateway-config.yaml:ro
+      - mcp-bin:/opt/mcp-servers:ro
+      - gateway-data:/app/data
+    depends_on:
+      mcp-by-dojo:
+        condition: service_completed_successfully
+    networks:
+      - dojo-prod
+    healthcheck:
+      test: ["CMD", "/agentic-gateway", "--health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ─── MCP Binary Provider ───────────────────────────────────────────────────
+  mcp-by-dojo:
+    image: ghcr.io/trespies-source/mcpbydojogenesis:latest
+    volumes:
+      - mcp-bin:/opt/mcp-servers
+    entrypoint: ["sh", "-c", "cp /usr/local/bin/mcp-by-dojo-genesis /opt/mcp-servers/ && chmod +x /opt/mcp-servers/mcp-by-dojo-genesis"]
+    networks:
+      - dojo-prod
+
+  # ─── OTEL Collector ────────────────────────────────────────────────────────
+  # Optional — set OTEL_ENABLED=true in .env to activate telemetry.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.0
+    restart: unless-stopped
+    volumes:
+      - ./otel-config.yaml:/etc/otel/config.yaml:ro
+    command: ["--config=/etc/otel/config.yaml"]
+    networks:
+      - dojo-prod
+    profiles:
+      - observability
+
+  # ─── Langfuse ──────────────────────────────────────────────────────────────
+  # Optional — run with: docker compose --profile observability up -d
+  langfuse:
+    image: langfuse/langfuse:2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"  # localhost only
+    environment:
+      DATABASE_URL: "postgresql://langfuse:${POSTGRES_PASSWORD:-langfuse_password}@postgres:5432/langfuse"
+      NEXTAUTH_URL: "http://localhost:3000"
+      NEXTAUTH_SECRET: "${LANGFUSE_NEXTAUTH_SECRET}"
+      SALT: "${LANGFUSE_SALT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dojo-prod
+    profiles:
+      - observability
+
+  # ─── PostgreSQL (Langfuse only) ────────────────────────────────────────────
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-langfuse_password}"
+      POSTGRES_DB: langfuse
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - dojo-prod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - observability
+
+networks:
+  dojo-prod:
+    driver: bridge
+
+volumes:
+  bridge-data:
+  gateway-data:
+  mcp-bin:
+  postgres-data:

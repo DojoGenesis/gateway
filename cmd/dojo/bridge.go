@@ -105,8 +105,8 @@ func runBridgeCommand(args []string) error {
 	gw := channel.NewWebhookGateway(natsBus, credStore)
 
 	// Register all platform adapters. Only adapters whose required credentials
-	// are present in env are registered; others are skipped with a WARN log.
-	buildAndRegisterAdapters(gw)
+	// are present in the credential store are registered; others are skipped with a WARN log.
+	buildAndRegisterAdapters(gw, credStore)
 
 	// Create the bridge with nil runner (runner will be injected when
 	// workflow execution is wired in Phase 3).
@@ -156,20 +156,33 @@ func runBridgeCommand(args []string) error {
 }
 
 // buildAndRegisterAdapters constructs and registers all platform adapters with
-// the WebhookGateway. An adapter is only registered if its required credentials
-// are present in the environment. Missing-credential adapters are logged at WARN.
-func buildAndRegisterAdapters(gw *channel.WebhookGateway) {
+// the WebhookGateway. Credentials are fetched from the CredentialStore (which
+// may be EnvCredentialStore or InfisicalCredentialStore depending on
+// DOJO_CREDENTIAL_BACKEND). Adapters with missing credentials are skipped with
+// a WARN log — nothing crashes.
+func buildAndRegisterAdapters(gw *channel.WebhookGateway, creds channel.CredentialStore) {
+	ctx := context.Background()
+
+	// cred fetches a credential from the store, returning "" on any error.
+	cred := func(platform, key string) string {
+		v, err := creds.Get(ctx, platform, key)
+		if err != nil {
+			return ""
+		}
+		return v
+	}
+
 	// --- Phase 1 adapters ---
 
-	// Slack: requires DOJO_SLACK_TOKEN + DOJO_SLACK_SIGNINGSECRET
-	slackToken := os.Getenv("DOJO_SLACK_TOKEN")
-	slackSecret := os.Getenv("DOJO_SLACK_SIGNINGSECRET")
+	// Slack: requires TOKEN + SIGNINGSECRET
+	slackToken := cred("slack", "TOKEN")
+	slackSecret := cred("slack", "SIGNINGSECRET")
 	if slackToken != "" && slackSecret != "" {
 		gw.Register("slack", slack.New(slack.SlackConfig{
 			BotToken:      slackToken,
 			SigningSecret: slackSecret,
 			Mode:          envOr("DOJO_SLACK_MODE", "http"),
-			AppToken:      os.Getenv("DOJO_SLACK_APPTOKEN"),
+			AppToken:      cred("slack", "APPTOKEN"),
 		}))
 		slog.Info("bridge: registered adapter", "platform", "slack")
 	} else {
@@ -177,15 +190,15 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway) {
 			"hint", "set DOJO_SLACK_TOKEN and DOJO_SLACK_SIGNINGSECRET")
 	}
 
-	// Discord: requires DOJO_DISCORD_BOT_TOKEN + DOJO_DISCORD_PUBLIC_KEY
-	discordToken := os.Getenv("DOJO_DISCORD_BOT_TOKEN")
-	discordPublicKey := os.Getenv("DOJO_DISCORD_PUBLIC_KEY")
+	// Discord: requires BOT_TOKEN + PUBLIC_KEY
+	discordToken := cred("discord", "BOT_TOKEN")
+	discordPublicKey := cred("discord", "PUBLIC_KEY")
 	if discordToken != "" && discordPublicKey != "" {
 		discordAdapter, err := discord.New(discord.DiscordConfig{
 			BotToken:  discordToken,
 			PublicKey: discordPublicKey,
-			AppID:     os.Getenv("DOJO_DISCORD_APP_ID"),
-			GuildID:   os.Getenv("DOJO_DISCORD_GUILD_ID"),
+			AppID:     cred("discord", "APP_ID"),
+			GuildID:   cred("discord", "GUILD_ID"),
 		})
 		if err != nil {
 			slog.Error("bridge: failed to create Discord adapter", "error", err)
@@ -198,12 +211,12 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway) {
 			"hint", "set DOJO_DISCORD_BOT_TOKEN and DOJO_DISCORD_PUBLIC_KEY")
 	}
 
-	// Telegram: requires DOJO_TELEGRAM_BOT_TOKEN
-	telegramToken := os.Getenv("DOJO_TELEGRAM_BOT_TOKEN")
+	// Telegram: requires BOT_TOKEN
+	telegramToken := cred("telegram", "BOT_TOKEN")
 	if telegramToken != "" {
 		gw.Register("telegram", telegram.NewTelegramAdapter(
 			telegramToken,
-			os.Getenv("DOJO_TELEGRAM_SECRET_TOKEN"),
+			cred("telegram", "SECRET_TOKEN"),
 		))
 		slog.Info("bridge: registered adapter", "platform", "telegram")
 	} else {
@@ -213,9 +226,9 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway) {
 
 	// --- Phase 2 adapters ---
 
-	// Email (SendGrid Inbound Parse): requires DOJO_EMAIL_WEBHOOK_SECRET + DOJO_EMAIL_SENDGRID_API_KEY
-	emailSecret := os.Getenv("DOJO_EMAIL_WEBHOOK_SECRET")
-	emailAPIKey := os.Getenv("DOJO_EMAIL_SENDGRID_API_KEY")
+	// Email (SendGrid Inbound Parse): requires WEBHOOK_SECRET + SENDGRID_API_KEY
+	emailSecret := cred("email", "WEBHOOK_SECRET")
+	emailAPIKey := cred("email", "SENDGRID_API_KEY")
 	if emailSecret != "" && emailAPIKey != "" {
 		gw.Register("email", email.New(email.EmailConfig{
 			WebhookSecret:  emailSecret,
@@ -229,14 +242,14 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway) {
 			"hint", "set DOJO_EMAIL_WEBHOOK_SECRET and DOJO_EMAIL_SENDGRID_API_KEY")
 	}
 
-	// SMS (Twilio): requires DOJO_SMS_ACCOUNT_SID + DOJO_SMS_AUTH_TOKEN
-	smsAccountSID := os.Getenv("DOJO_SMS_ACCOUNT_SID")
-	smsAuthToken := os.Getenv("DOJO_SMS_AUTH_TOKEN")
+	// SMS (Twilio): requires ACCOUNT_SID + AUTH_TOKEN
+	smsAccountSID := cred("sms", "ACCOUNT_SID")
+	smsAuthToken := cred("sms", "AUTH_TOKEN")
 	if smsAccountSID != "" && smsAuthToken != "" {
 		gw.Register("sms", sms.NewSMSAdapter(sms.SMSConfig{
 			AccountSID: smsAccountSID,
 			AuthToken:  smsAuthToken,
-			FromNumber: os.Getenv("DOJO_SMS_FROM_NUMBER"),
+			FromNumber: cred("sms", "FROM_NUMBER"),
 		}))
 		slog.Info("bridge: registered adapter", "platform", "sms")
 	} else {
@@ -244,15 +257,15 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway) {
 			"hint", "set DOJO_SMS_ACCOUNT_SID and DOJO_SMS_AUTH_TOKEN")
 	}
 
-	// WhatsApp (Meta Cloud API): requires DOJO_WHATSAPP_PHONE_NUMBER_ID + DOJO_WHATSAPP_ACCESS_TOKEN
-	waPhoneID := os.Getenv("DOJO_WHATSAPP_PHONE_NUMBER_ID")
-	waAccessToken := os.Getenv("DOJO_WHATSAPP_ACCESS_TOKEN")
+	// WhatsApp (Meta Cloud API): requires PHONE_NUMBER_ID + ACCESS_TOKEN
+	waPhoneID := cred("whatsapp", "PHONE_NUMBER_ID")
+	waAccessToken := cred("whatsapp", "ACCESS_TOKEN")
 	if waPhoneID != "" && waAccessToken != "" {
 		gw.Register("whatsapp", whatsapp.NewWhatsAppAdapter(whatsapp.WhatsAppConfig{
 			PhoneNumberID: waPhoneID,
 			AccessToken:   waAccessToken,
-			VerifyToken:   os.Getenv("DOJO_WHATSAPP_VERIFY_TOKEN"),
-			AppSecret:     os.Getenv("DOJO_WHATSAPP_APP_SECRET"),
+			VerifyToken:   cred("whatsapp", "VERIFY_TOKEN"),
+			AppSecret:     cred("whatsapp", "APP_SECRET"),
 		}))
 		slog.Info("bridge: registered adapter", "platform", "whatsapp")
 	} else {
@@ -260,9 +273,9 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway) {
 			"hint", "set DOJO_WHATSAPP_PHONE_NUMBER_ID and DOJO_WHATSAPP_ACCESS_TOKEN")
 	}
 
-	// Teams (Microsoft Bot Framework): requires DOJO_TEAMS_BOT_TOKEN + DOJO_TEAMS_APP_ID
-	teamsBotToken := os.Getenv("DOJO_TEAMS_BOT_TOKEN")
-	teamsAppID := os.Getenv("DOJO_TEAMS_APP_ID")
+	// Teams (Microsoft Bot Framework): requires BOT_TOKEN + APP_ID
+	teamsBotToken := cred("teams", "BOT_TOKEN")
+	teamsAppID := cred("teams", "APP_ID")
 	if teamsBotToken != "" && teamsAppID != "" {
 		gw.Register("teams", teams.NewTeamsAdapter(teamsBotToken, teamsAppID))
 		slog.Info("bridge: registered adapter", "platform", "teams")
@@ -271,9 +284,8 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway) {
 			"hint", "set DOJO_TEAMS_BOT_TOKEN and DOJO_TEAMS_APP_ID")
 	}
 
-	// WebChat (embedded widget): no required credentials; DOJO_WEBCHAT_TOKEN is optional.
-	// WebChat is always registered — it has no platform-side authentication requirement.
-	gw.Register("webchat", webchat.NewWebChatAdapter(os.Getenv("DOJO_WEBCHAT_TOKEN")))
+	// WebChat (embedded widget): TOKEN is optional — always registered.
+	gw.Register("webchat", webchat.NewWebChatAdapter(cred("webchat", "TOKEN")))
 	slog.Info("bridge: registered adapter", "platform", "webchat")
 }
 

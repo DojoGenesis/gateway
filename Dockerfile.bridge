@@ -1,0 +1,51 @@
+# Dockerfile.bridge — Channel Bridge (dojo-bridge binary)
+# Mirrors Dockerfile workspace structure but builds ./cmd/dojo/ instead of main.go.
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /app
+
+# Copy workspace and module files (same structure as main Dockerfile)
+COPY go.work go.work.sum* ./
+COPY go.mod go.sum ./
+COPY shared/go.mod shared/go.sum* ./shared/
+COPY events/go.mod events/go.sum* ./events/
+COPY provider/go.mod provider/go.sum* ./provider/
+COPY tools/go.mod tools/go.sum* ./tools/
+COPY memory/go.mod memory/go.sum* ./memory/
+COPY server/go.mod server/go.sum* ./server/
+COPY mcp/go.mod mcp/go.sum* ./mcp/
+COPY orchestration/go.mod orchestration/go.sum* ./orchestration/
+COPY disposition/go.mod disposition/go.sum* ./disposition/
+COPY skill/go.mod skill/go.sum* ./skill/
+
+# Download dependencies for all workspace modules
+RUN cd shared && go mod download && \
+    cd ../events && go mod download && \
+    cd ../provider && go mod download && \
+    cd ../tools && go mod download && \
+    cd ../memory && go mod download && \
+    cd ../server && go mod download && \
+    cd ../mcp && go mod download && \
+    cd ../orchestration && go mod download && \
+    cd ../disposition && go mod download && \
+    cd ../skill && go mod download
+
+# Copy full source tree
+COPY . .
+
+# Build bridge binary only
+RUN CGO_ENABLED=0 go build \
+    -ldflags="-s -w" \
+    -o /dojo-bridge ./cmd/dojo/
+
+# Runtime stage — distroless for minimal attack surface
+FROM gcr.io/distroless/static-debian12
+
+COPY --from=builder /dojo-bridge /dojo-bridge
+
+EXPOSE 8090
+
+# Run as non-root user (nobody)
+USER 65534:65534
+
+ENTRYPOINT ["/dojo-bridge", "bridge"]

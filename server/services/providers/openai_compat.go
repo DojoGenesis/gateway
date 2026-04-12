@@ -32,10 +32,11 @@ type oaiRequest struct {
 }
 
 type oaiMessage struct {
-	Role       string        `json:"role"`
-	Content    string        `json:"content"`
-	ToolCalls  []oaiToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string        `json:"tool_call_id,omitempty"`
+	Role             string        `json:"role"`
+	Content          string        `json:"content"`
+	ToolCalls        []oaiToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string        `json:"tool_call_id,omitempty"`
+	ReasoningContent string        `json:"reasoning_content,omitempty"` // Kimi: must be present when returned by model
 }
 
 type oaiTool struct {
@@ -61,9 +62,10 @@ type oaiResponse struct {
 	Model   string `json:"model"`
 	Choices []struct {
 		Message struct {
-			Role      string        `json:"role"`
-			Content   string        `json:"content"`
-			ToolCalls []oaiToolCall `json:"tool_calls,omitempty"`
+			Role             string        `json:"role"`
+			Content          string        `json:"content"`
+			ToolCalls        []oaiToolCall `json:"tool_calls,omitempty"`
+			ReasoningContent string        `json:"reasoning_content,omitempty"`
 		} `json:"message"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
@@ -224,7 +226,7 @@ func (p *openaiCompatibleProvider) GenerateEmbedding(ctx context.Context, text s
 func convertToOAIMessages(msgs []provider.Message) []oaiMessage {
 	result := make([]oaiMessage, len(msgs))
 	for i, m := range msgs {
-		msg := oaiMessage{Role: m.Role, Content: m.Content, ToolCallID: m.ToolCallID}
+		msg := oaiMessage{Role: m.Role, Content: m.Content, ToolCallID: m.ToolCallID, ReasoningContent: m.ReasoningContent}
 		// Convert provider.ToolCall to OpenAI format so assistant messages
 		// that invoked tools include the tool_calls array. Without this,
 		// subsequent "tool" role messages are rejected by the API.

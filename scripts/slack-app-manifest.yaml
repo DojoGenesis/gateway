@@ -1,0 +1,39 @@
+_metadata:
+  major_version: 1
+  minor_version: 1
+
+display_information:
+  name: Dojo Gateway
+  description: Agentic gateway — routes Slack messages through the Dojo channel bridge.
+  background_color: "#1a1a2e"
+
+features:
+  bot_user:
+    display_name: Dojo
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      - chat:write          # send messages
+      - channels:history    # read public channel messages
+      - channels:read       # list channels
+      - im:history          # read DMs
+      - im:write            # open DM conversations
+      - users:read          # look up users by ID
+
+settings:
+  event_subscriptions:
+    # Production URL — permanent via Named Cloudflare Tunnel.
+    # For local dev: run `./bin/dojo-bridge tunnel 8090` and swap in the tunnel URL.
+    request_url: https://bridge.trespiesdesign.com/webhook/slack/events
+    bot_events:
+      - message.channels   # messages in public channels the bot is in
+      - message.im         # direct messages to the bot
+
+  interactivity:
+    is_enabled: false
+
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

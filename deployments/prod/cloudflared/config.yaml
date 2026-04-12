@@ -1,0 +1,25 @@
+# Cloudflare Named Tunnel Configuration
+#
+# Setup (one-time on your local machine):
+#   cloudflared tunnel login
+#   cloudflared tunnel create dojo-bridge
+#   cloudflared tunnel route dns dojo-bridge bridge.trespiesdesign.com
+#
+# After running `cloudflared tunnel create dojo-bridge`, two things are generated:
+#   1. This config file — replace <TUNNEL-UUID> with the actual UUID printed
+#   2. A credentials file at ~/.cloudflared/<TUNNEL-UUID>.json — copy it here
+#      cp ~/.cloudflared/<TUNNEL-UUID>.json ./cloudflared/<TUNNEL-UUID>.json
+#
+# The credentials file is mounted read-only into the tunnel container.
+# Do NOT commit the .json credentials file — add it to .gitignore.
+
+tunnel: <TUNNEL-UUID>
+credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
+
+ingress:
+  # Bridge webhook endpoint — receives Slack, Discord, Telegram, etc.
+  - hostname: bridge.trespiesdesign.com
+    service: http://bridge:8090
+
+  # Catch-all required by cloudflared
+  - service: http_status:404

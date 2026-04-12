@@ -49,7 +49,12 @@ func (gw *WebhookGateway) Register(platform string, adapter WebhookAdapter) {
 // ServeHTTP implements http.Handler. It routes requests matching
 // /webhooks/{platform} to the corresponding WebhookAdapter.
 //
-// Flow: verify signature -> read body -> normalize -> publish to bus -> 200 OK
+// Flow: read body -> handshake check -> verify signature -> normalize -> publish -> 200 OK
+//
+// The body is read once and restored on the request so that VerifySignature
+// and HandleWebhook can both re-read it. Handshake requests (e.g. Slack
+// url_verification) are detected before signature verification and delegated
+// directly to HandleWebhook, because Slack does not sign those requests.
 func (gw *WebhookGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Extract platform from path: /webhooks/{platform}
 	platform := extractPlatform(r.URL.Path)
@@ -67,6 +72,22 @@ func (gw *WebhookGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Read the body once and restore it so both VerifySignature and
+	// HandleWebhook / Normalize can re-read it.
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "channel: failed to read body", http.StatusBadRequest)
+		return
+	}
+	r.Body = io.NopCloser(strings.NewReader(string(body)))
+
+	// Detect handshake payloads (e.g. Slack url_verification). These are not
+	// signed by the platform, so they must be handled before VerifySignature.
+	if isHandshakePayload(body) {
+		adapter.HandleWebhook(w, r)
+		return
+	}
+
 	// Verify signature before processing.
 	if err := adapter.VerifySignature(r); err != nil {
 		slog.Warn("channel: signature verification failed",
@@ -77,17 +98,8 @@ func (gw *WebhookGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read the body.
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		slog.Error("channel: failed to read request body",
-			"platform", platform,
-			"error", err,
-		)
-		http.Error(w, "channel: failed to read body", http.StatusBadRequest)
-		return
-	}
-	defer r.Body.Close()
+	// Restore body again after VerifySignature consumed it.
+	r.Body = io.NopCloser(strings.NewReader(string(body)))
 
 	// Normalize to ChannelMessage.
 	msg, err := adapter.Normalize(body)
@@ -128,6 +140,13 @@ func (gw *WebhookGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Return 200 immediately (Chatwoot pattern).
 	w.WriteHeader(http.StatusOK)
+}
+
+// isHandshakePayload returns true when the body is a platform handshake
+// request that must be answered before signature verification.
+// Currently detects Slack url_verification challenges.
+func isHandshakePayload(body []byte) bool {
+	return strings.Contains(string(body), `"url_verification"`)
 }
 
 // extractPlatform parses the platform name from a URL path like

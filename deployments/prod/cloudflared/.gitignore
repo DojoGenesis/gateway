@@ -1,0 +1,2 @@
+# Tunnel credentials — contain long-lived secrets, never commit
+*.json

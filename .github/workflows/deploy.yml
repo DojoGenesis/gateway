@@ -1,0 +1,96 @@
+name: Deploy
+
+# Runs on every push to main:
+#   1. Build and test (gate)
+#   2. Build + push ghcr.io/trespies-source/dojo-bridge:latest (multi-arch)
+#   3. SSH to Hetzner VPS and run docker compose pull + up -d
+#
+# Required GitHub secrets:
+#   GHCR_TOKEN          — PAT from TresPies-source with write:packages scope
+#   HETZNER_HOST        — VPS IP address
+#   HETZNER_SSH_KEY     — private SSH key (matching a key in root's authorized_keys)
+#   INFISICAL_CLIENT_ID      — (informational: lives in VPS .env, not used here)
+#   INFISICAL_CLIENT_SECRET  — (informational: lives in VPS .env, not used here)
+#   INFISICAL_PROJECT_ID     — (informational: lives in VPS .env, not used here)
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+
+  # ─── Gate: Build + Test ──────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build all modules
+        run: go build ./...
+
+      - name: Run tests
+        run: go test -race ./...
+
+  # ─── Build + Push Bridge Image ───────────────────────────────────────────────
+  build-bridge:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: trespies-source
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build and push dojo-bridge
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.bridge
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/trespies-source/dojo-bridge:latest
+            ghcr.io/trespies-source/dojo-bridge:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─── Deploy to Hetzner VPS ───────────────────────────────────────────────────
+  deploy:
+    needs: build-bridge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Hetzner VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: root
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/dojo
+            echo "==> Pulling latest images..."
+            docker compose pull --quiet
+            echo "==> Restarting services..."
+            docker compose up -d --remove-orphans
+            echo "==> Deploy complete at $(date)"
+            docker compose ps

@@ -31,11 +31,12 @@ type CompletionRequest struct {
 }
 
 type CompletionResponse struct {
-	ID        string
-	Model     string
-	Content   string
-	Usage     Usage
-	ToolCalls []ToolCall
+	ID               string
+	Model            string
+	Content          string
+	Usage            Usage
+	ToolCalls        []ToolCall
+	ReasoningContent string // preserved from providers that emit reasoning (e.g. Kimi) for multi-turn continuity
 }
 
 type CompletionChunk struct {
@@ -45,10 +46,11 @@ type CompletionChunk struct {
 }
 
 type Message struct {
-	Role       string
-	Content    string
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Role             string
+	Content          string
+	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string     `json:"tool_call_id,omitempty"`
+	ReasoningContent string     `json:"reasoning_content,omitempty"` // Kimi: must round-trip when present
 }
 
 type Tool struct {

@@ -453,6 +453,11 @@ func main() {
 		WorkflowCAS:         workflowCAS,
 	})
 
+	// Load provider keys that were persisted by a previous run (or by the CLI).
+	// This means cloud providers (anthropic, openai, kimi, etc.) survive a
+	// gateway restart without requiring the CLI to re-push them.
+	server.RestorePersistedProviderKeys()
+
 	if err := server.Start(); err != nil {
 		slog.Error("failed to start server", "error", err)
 		os.Exit(1)

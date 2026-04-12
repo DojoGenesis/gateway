@@ -1042,11 +1042,15 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 		// v0.0.18: Accumulate tool results
 		allToolResults = append(allToolResults, toolResults...)
 
-		// Add assistant message with tool calls
+		// Add assistant message with tool calls.
+		// ReasoningContent is preserved so providers that emit it (e.g. Kimi with
+		// enable_thinking: false still injecting reasoning_content) don't 400 on
+		// the next iteration due to a missing reasoning_content field.
 		messages = append(messages, providerpkg.Message{
-			Role:      "assistant",
-			Content:   response.Content,
-			ToolCalls: response.ToolCalls,
+			Role:             "assistant",
+			Content:          response.Content,
+			ToolCalls:        response.ToolCalls,
+			ReasoningContent: response.ReasoningContent,
 		})
 
 		// Add tool results as messages

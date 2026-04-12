@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -780,13 +781,39 @@ func (s *Server) handleGatewayOrchestrate(c *gin.Context) {
 		CreatedAt:   time.Now(),
 	}
 
+	// Register state BEFORE starting the goroutine so the DAG poll endpoint
+	// can find it immediately (even while executing). Without this, the DAG
+	// handler always returns 404 because s.orchestrations is never populated
+	// from this path.
+	orchState := &OrchestrationState{
+		ID:        task.ID,
+		TaskID:    task.ID,
+		Status:    "planning",
+		CreatedAt: task.CreatedAt,
+		Plan:      orchPlan,
+	}
+	s.orchestrations.Store(orchState)
+
 	// Execute orchestration (async)
 	go func() {
 		userID := req.UserID
 		if userID == "" {
 			userID = "anonymous"
 		}
-		_ = s.orchestrationEngine.Execute(c.Request.Context(), orchPlan, task, userID)
+		orchState.mu.Lock()
+		orchState.Status = "executing"
+		orchState.mu.Unlock()
+
+		execErr := s.orchestrationEngine.Execute(c.Request.Context(), orchPlan, task, userID)
+
+		orchState.mu.Lock()
+		if execErr != nil {
+			orchState.Status = "failed"
+			orchState.Error = execErr.Error()
+		} else {
+			orchState.Status = "complete"
+		}
+		orchState.mu.Unlock()
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{
@@ -999,6 +1026,37 @@ func providerKeysPath() (string, error) {
 		return "", err
 	}
 	return filepath.Join(home, ".zen-sci", "provider_keys.json"), nil
+}
+
+// RestorePersistedProviderKeys reads ~/.zen-sci/provider_keys.json and
+// hot-registers any stored provider keys. Called once at startup so cloud
+// providers survive a gateway restart without requiring the CLI to re-push keys.
+func (s *Server) RestorePersistedProviderKeys() {
+	path, err := providerKeysPath()
+	if err != nil {
+		slog.Warn("RestorePersistedProviderKeys: cannot determine keys path", "error", err)
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		// File not present is normal on first boot.
+		return
+	}
+	keys := make(map[string]string)
+	if err := json.Unmarshal(data, &keys); err != nil {
+		slog.Warn("RestorePersistedProviderKeys: failed to parse keys file", "path", path, "error", err)
+		return
+	}
+	restored := 0
+	for provider, key := range keys {
+		if key == "" {
+			continue
+		}
+		s.hotRegisterProvider(provider, key)
+		slog.Info("restored persisted provider key", "provider", provider)
+		restored++
+	}
+	slog.Info("persisted provider keys restored", "count", restored)
 }
 
 // handleSetProviderKey stores or clears a provider API key.

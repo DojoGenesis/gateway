@@ -46,6 +46,18 @@ Thumbs.db
 
 # Test artifacts
 .test_*
-dojo
-gateway
+/dojo
+/gateway
 workers/telemetry/node_modules/
+
+# Compiled binaries
+wasm-modules/dip-scorer/dip-scorer
+
+# Wrangler state
+workers/telemetry/.wrangler/
+
+# External repo clones
+claude-plugins-official/
+
+# Claude workspace state
+**/.claude/
