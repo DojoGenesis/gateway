@@ -4,31 +4,38 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Copy workspace and module files
+# Copy workspace and root module files
 COPY go.work go.work.sum* ./
 COPY go.mod go.sum ./
-COPY shared/go.mod shared/go.sum* ./shared/
-COPY events/go.mod events/go.sum* ./events/
-COPY provider/go.mod provider/go.sum* ./provider/
-COPY tools/go.mod tools/go.sum* ./tools/
-COPY memory/go.mod memory/go.sum* ./memory/
-COPY server/go.mod server/go.sum* ./server/
-COPY mcp/go.mod mcp/go.sum* ./mcp/
-COPY orchestration/go.mod orchestration/go.sum* ./orchestration/
-COPY disposition/go.mod disposition/go.sum* ./disposition/
-COPY skill/go.mod skill/go.sum* ./skill/
 
-# Download dependencies for all modules
-RUN cd shared && go mod download && \
-    cd ../events && go mod download && \
-    cd ../provider && go mod download && \
-    cd ../tools && go mod download && \
-    cd ../memory && go mod download && \
-    cd ../server && go mod download && \
-    cd ../mcp && go mod download && \
-    cd ../orchestration && go mod download && \
-    cd ../disposition && go mod download && \
-    cd ../skill && go mod download
+# Copy each workspace module's go.mod/go.sum for dependency caching.
+# This list must match the `use` block in go.work.
+COPY apps/go.mod apps/go.sum* ./apps/
+COPY cmd/dojo/go.mod cmd/dojo/go.sum* ./cmd/dojo/
+COPY disposition/go.mod disposition/go.sum* ./disposition/
+COPY integration/go.mod integration/go.sum* ./integration/
+COPY mcp/go.mod mcp/go.sum* ./mcp/
+COPY memory/go.mod memory/go.sum* ./memory/
+COPY orchestration/go.mod orchestration/go.sum* ./orchestration/
+COPY provider/go.mod provider/go.sum* ./provider/
+COPY runtime/actor/go.mod runtime/actor/go.sum* ./runtime/actor/
+COPY runtime/cas/go.mod runtime/cas/go.sum* ./runtime/cas/
+COPY runtime/d1client/go.mod runtime/d1client/go.sum* ./runtime/d1client/
+COPY runtime/event/go.mod runtime/event/go.sum* ./runtime/event/
+COPY runtime/wasm/go.mod runtime/wasm/go.sum* ./runtime/wasm/
+COPY server/go.mod server/go.sum* ./server/
+COPY skill/go.mod skill/go.sum* ./skill/
+COPY tools/go.mod tools/go.sum* ./tools/
+COPY wasm-modules/dip-scorer/go.mod wasm-modules/dip-scorer/go.sum* ./wasm-modules/dip-scorer/
+COPY workflow/go.mod workflow/go.sum* ./workflow/
+
+# Download dependencies for all workspace modules
+RUN for dir in apps cmd/dojo disposition integration mcp memory \
+    orchestration provider runtime/actor runtime/cas runtime/d1client \
+    runtime/event runtime/wasm server skill tools \
+    wasm-modules/dip-scorer workflow; do \
+      cd /app/$dir && go mod download; \
+    done
 
 # Copy source code
 COPY . .
@@ -43,7 +50,7 @@ FROM gcr.io/distroless/static-debian12
 
 COPY --from=builder /agentic-gateway /agentic-gateway
 
-EXPOSE 8080
+EXPOSE 7340
 
 # Health check: the binary supports --health-check flag (self-contained HTTP probe).
 # Docker Compose uses: ["/agentic-gateway", "--health-check"]
