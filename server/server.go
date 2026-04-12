@@ -124,6 +124,9 @@ type Server struct {
 	workflowCAS cas.Store
 	execBus     *ExecutionBus
 
+	// D1 sync loop (Era 4 Phase 1). Nil when DOJO_D1_* env vars are not set.
+	d1Syncer *cas.D1Syncer
+
 	// Provider latency tracking (Gap 13)
 	latencyTracker *services.ProviderLatencyTracker
 

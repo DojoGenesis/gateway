@@ -50,3 +50,4 @@ type GCResult struct {
 	// Freed is the number of bytes freed.
 	Freed int64
 }
+

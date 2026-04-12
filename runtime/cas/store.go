@@ -89,6 +89,10 @@ func NewSQLiteStore(dbPath string) (Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := migrateSchema(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 
 	return &sqliteStore{db: db}, nil
 }
@@ -119,6 +123,26 @@ func createTables(db *sql.DB) error {
 	return nil
 }
 
+func migrateSchema(db *sql.DB) error {
+	// Add sync_cursor column if it doesn't exist (Era 4 Phase 1).
+	// SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so check first.
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('content') WHERE name='sync_cursor'`).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("cas: check sync_cursor: %w", err)
+	}
+	if count == 0 {
+		if _, err := db.Exec(`ALTER TABLE content ADD COLUMN sync_cursor INTEGER DEFAULT 0`); err != nil {
+			return fmt.Errorf("cas: add sync_cursor: %w", err)
+		}
+		// Create index for delta queries
+		if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_content_sync_cursor ON content(sync_cursor)`); err != nil {
+			return fmt.Errorf("cas: create sync_cursor index: %w", err)
+		}
+	}
+	return nil
+}
+
 func computeHash(data []byte) Ref {
 	h := sha256.Sum256(data)
 	return Ref(hex.EncodeToString(h[:]))
@@ -137,8 +161,10 @@ func (s *sqliteStore) Put(ctx context.Context, content []byte, meta ContentMeta)
 	}
 
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO content (hash, data, meta, created_at) VALUES (?, ?, ?, ?)
-		 ON CONFLICT(hash) DO UPDATE SET meta = excluded.meta, created_at = excluded.created_at`,
+		`INSERT INTO content (hash, data, meta, created_at, sync_cursor)
+		 VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(sync_cursor), 0) + 1 FROM content))
+		 ON CONFLICT(hash) DO UPDATE SET meta = excluded.meta, created_at = excluded.created_at,
+		 sync_cursor = (SELECT COALESCE(MAX(sync_cursor), 0) + 1 FROM content)`,
 		string(ref), content, string(metaJSON), meta.CreatedAt,
 	)
 	if err != nil {
@@ -406,6 +432,42 @@ func (s *sqliteStore) Import(ctx context.Context, r io.Reader) ([]Ref, error) {
 		refs = append(refs, ref)
 	}
 	return refs, nil
+}
+
+// Delta returns content entries with sync_cursor > since, ordered ascending, limited to limit.
+func (s *sqliteStore) Delta(ctx context.Context, since int64, limit int) ([]DeltaEntry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT hash, data, meta, sync_cursor FROM content WHERE sync_cursor > ? ORDER BY sync_cursor ASC LIMIT ?`,
+		since, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cas: delta: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []DeltaEntry
+	for rows.Next() {
+		var e DeltaEntry
+		var metaJSON string
+		if err := rows.Scan(&e.Hash, &e.Data, &metaJSON, &e.SyncCursor); err != nil {
+			return nil, fmt.Errorf("cas: delta scan: %w", err)
+		}
+		if err := json.Unmarshal([]byte(metaJSON), &e.Meta); err != nil {
+			return nil, fmt.Errorf("cas: delta unmarshal: %w", err)
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+// MaxSyncCursor returns the highest sync_cursor value in the store.
+func (s *sqliteStore) MaxSyncCursor(ctx context.Context) (int64, error) {
+	var cursor int64
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(sync_cursor), 0) FROM content`).Scan(&cursor)
+	if err != nil {
+		return 0, fmt.Errorf("cas: max cursor: %w", err)
+	}
+	return cursor, nil
 }
 
 func (s *sqliteStore) Close() error {

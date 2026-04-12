@@ -184,6 +184,11 @@ func (s *Server) setupRoutes() {
 			casGroup.POST("/refs", s.handleCASStoreRef)
 			casGroup.GET("/export", s.handleCASExport)
 			casGroup.POST("/import", s.handleCASImport)
+
+			// Era 4 Phase 1: D1 sync endpoints
+			casGroup.GET("/delta", s.handleCASDelta)
+			casGroup.PUT("/batch", s.handleCASBatch)
+			casGroup.GET("/status", s.handleCASSyncStatus)
 		}
 	}
 
