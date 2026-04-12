@@ -61,3 +61,4 @@ claude-plugins-official/
 
 # Claude workspace state
 **/.claude/
+cmd/dojo/dojo
