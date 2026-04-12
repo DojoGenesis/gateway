@@ -51,6 +51,7 @@ Thumbs.db
 workers/telemetry/node_modules/
 
 # Compiled binaries
+AgenticGatewayByDojoGenesis
 wasm-modules/dip-scorer/dip-scorer
 
 # Wrangler state

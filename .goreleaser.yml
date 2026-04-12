@@ -23,7 +23,7 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X main.Version={{.Version}}
+      - -X github.com/DojoGenesis/gateway/server.Version={{.Version}}
       - -X main.Commit={{.Commit}}
       - -X main.Date={{.Date}}
     ignore: []

@@ -34,7 +34,11 @@ import (
 	"github.com/DojoGenesis/gateway/specialist"
 )
 
-const Version = "1.1.0"
+// Version is the server version. The default is the development version string;
+// goreleaser overrides this at build time via ldflags:
+//
+//	-X github.com/DojoGenesis/gateway/server.Version={{.Version}}
+var Version = "1.1.0"
 
 // MCPStatusProvider is the interface used by the server to query MCP status.
 // *mcp.MCPHostManager satisfies this interface.

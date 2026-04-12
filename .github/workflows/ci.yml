@@ -114,12 +114,12 @@ jobs:
 
       - name: Health check
         run: |
-          curl -sf http://localhost:8080/health || exit 1
+          curl -sf http://localhost:7340/health || exit 1
 
       - name: Verify API endpoints respond
         run: |
           # Check that /v1/chat/completions returns 401 (auth required) or 200
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/v1/chat/completions -X POST -H "Content-Type: application/json" -d '{"messages":[{"role":"user","content":"test"}]}')
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:7340/v1/chat/completions -X POST -H "Content-Type: application/json" -d '{"messages":[{"role":"user","content":"test"}]}')
           if [ "$STATUS" -eq "000" ]; then
             echo "Gateway not responding"
             exit 1
@@ -128,7 +128,7 @@ jobs:
 
       - name: Verify admin endpoints
         run: |
-          curl -sf http://localhost:8080/admin/metrics/prometheus || exit 1
+          curl -sf http://localhost:7340/admin/metrics/prometheus || exit 1
 
       - name: Stop gateway
         if: always()
