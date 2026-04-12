@@ -2,155 +2,162 @@ package cas
 
 import (
 	"context"
-	"io"
 	"testing"
 	"time"
 )
 
-// mockLocalStore implements Store + deltaQuerier for testing.
-type mockLocalStore struct {
-	entries []DeltaEntry
-	putLog  [][]byte
-}
-
-func (m *mockLocalStore) Put(_ context.Context, content []byte, meta ContentMeta) (Ref, error) {
-	m.putLog = append(m.putLog, content)
-	return computeHash(content), nil
-}
-
-func (m *mockLocalStore) Get(_ context.Context, _ Ref) ([]byte, ContentMeta, error) {
-	return nil, ContentMeta{}, ErrNotFound
-}
-
-func (m *mockLocalStore) Has(_ context.Context, _ Ref) (bool, error) {
-	return false, nil
-}
-
-func (m *mockLocalStore) Tag(_ context.Context, _, _ string, _ Ref) error {
-	return nil
-}
-
-func (m *mockLocalStore) Resolve(_ context.Context, _, _ string) (Ref, error) {
-	return "", ErrNotFound
-}
-
-func (m *mockLocalStore) Untag(_ context.Context, _, _ string) error {
-	return nil
-}
-
-func (m *mockLocalStore) List(_ context.Context, _ string) ([]TagEntry, error) {
-	return nil, nil
-}
-
-func (m *mockLocalStore) GC(_ context.Context) (GCResult, error) {
-	return GCResult{}, nil
-}
-
-func (m *mockLocalStore) Export(_ context.Context, _ []Ref, _ io.Writer) error {
-	return nil
-}
-
-func (m *mockLocalStore) Import(_ context.Context, _ io.Reader) ([]Ref, error) {
-	return nil, nil
-}
-
-func (m *mockLocalStore) Close() error {
-	return nil
-}
-
-// deltaQuerier implementation for mockLocalStore.
-func (m *mockLocalStore) Delta(_ context.Context, since int64, limit int) ([]DeltaEntry, error) {
-	var result []DeltaEntry
-	for _, e := range m.entries {
-		if e.SyncCursor > since {
-			result = append(result, e)
-			if len(result) >= limit {
-				break
-			}
-		}
+// newTestStore creates an in-memory SQLite store for testing.
+// The store implements both Store and deltaQuerier.
+func newTestStore(t *testing.T) Store {
+	t.Helper()
+	store, err := NewSQLiteStore(":memory:")
+	if err != nil {
+		t.Fatalf("NewSQLiteStore: %v", err)
 	}
-	return result, nil
+	t.Cleanup(func() { store.Close() })
+	return store
 }
 
-func (m *mockLocalStore) MaxSyncCursor(_ context.Context) (int64, error) {
-	var max int64
-	for _, e := range m.entries {
-		if e.SyncCursor > max {
-			max = e.SyncCursor
-		}
-	}
-	return max, nil
-}
-
-// mockRemoteStore captures puts for verification.
-type mockRemoteStore struct {
-	mockLocalStore
-	received []Ref
-}
-
-func (m *mockRemoteStore) Put(_ context.Context, content []byte, meta ContentMeta) (Ref, error) {
-	ref := computeHash(content)
-	m.received = append(m.received, ref)
-	return ref, nil
-}
-
-func TestD1SyncerSyncsEntries(t *testing.T) {
-	local := &mockLocalStore{
-		entries: []DeltaEntry{
-			{Hash: "aaa", Data: []byte("hello"), SyncCursor: 1, Meta: ContentMeta{Type: ContentSkill}},
-			{Hash: "bbb", Data: []byte("world"), SyncCursor: 2, Meta: ContentMeta{Type: ContentSkill}},
-		},
-	}
-	remote := &mockRemoteStore{}
-
-	cfg := D1SyncConfig{Interval: 50 * time.Millisecond, BatchSize: 100}
-	syncer := NewD1Syncer(local, remote, cfg)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
-	syncer.Run(ctx)
-
-	if len(remote.received) != 2 {
-		t.Fatalf("expected 2 synced entries, got %d", len(remote.received))
-	}
-
-	status := syncer.Status()
-	if status.LastCursor != 2 {
-		t.Errorf("expected cursor=2, got %d", status.LastCursor)
-	}
-	if !status.Healthy {
-		t.Error("expected healthy=true")
-	}
-}
-
-func TestD1SyncerStatusWhenEmpty(t *testing.T) {
-	local := &mockLocalStore{}
-	remote := &mockRemoteStore{}
-
-	cfg := D1SyncConfig{Interval: 50 * time.Millisecond, BatchSize: 100}
-	syncer := NewD1Syncer(local, remote, cfg)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
-	syncer.Run(ctx)
-
-	status := syncer.Status()
-	if status.LastCursor != 0 {
-		t.Errorf("expected cursor=0, got %d", status.LastCursor)
-	}
-	if !status.Healthy {
-		t.Error("expected healthy=true when nothing to sync")
-	}
-}
-
+// TestDefaultD1SyncConfig verifies that the default config has interval=5s and batch=500.
 func TestDefaultD1SyncConfig(t *testing.T) {
 	cfg := DefaultD1SyncConfig()
 	if cfg.Interval != 5*time.Second {
-		t.Errorf("expected 5s interval, got %v", cfg.Interval)
+		t.Errorf("expected Interval=5s, got %v", cfg.Interval)
 	}
 	if cfg.BatchSize != 500 {
-		t.Errorf("expected 500 batch size, got %d", cfg.BatchSize)
+		t.Errorf("expected BatchSize=500, got %d", cfg.BatchSize)
+	}
+}
+
+// TestNewD1Syncer verifies that NewD1Syncer returns a non-nil syncer
+// and that its initial Status has Healthy=false.
+func TestNewD1Syncer(t *testing.T) {
+	local := newTestStore(t)
+	remote := newTestStore(t)
+	cfg := D1SyncConfig{Interval: 5 * time.Second, BatchSize: 500}
+
+	syncer := NewD1Syncer(local, remote, cfg)
+	if syncer == nil {
+		t.Fatal("NewD1Syncer returned nil")
+	}
+
+	status := syncer.Status()
+	if status.Healthy {
+		t.Error("expected initial Healthy=false, got true")
+	}
+}
+
+// TestD1SyncerSyncOnce puts 3 blobs in local, calls syncOnce, and verifies
+// that the remote store received all 3 blobs and that the cursor advanced.
+func TestD1SyncerSyncOnce(t *testing.T) {
+	local := newTestStore(t)
+	remote := newTestStore(t)
+	cfg := D1SyncConfig{Interval: 5 * time.Second, BatchSize: 500}
+	syncer := NewD1Syncer(local, remote, cfg)
+
+	ctx := context.Background()
+	blobs := [][]byte{
+		[]byte("blob-alpha"),
+		[]byte("blob-beta"),
+		[]byte("blob-gamma"),
+	}
+	var refs []Ref
+	for _, b := range blobs {
+		ref, err := local.Put(ctx, b, ContentMeta{Type: ContentSkill})
+		if err != nil {
+			t.Fatalf("local.Put: %v", err)
+		}
+		refs = append(refs, ref)
+	}
+
+	syncer.syncOnce(ctx)
+
+	// All 3 blobs should now exist in the remote store.
+	for i, ref := range refs {
+		ok, err := remote.Has(ctx, ref)
+		if err != nil {
+			t.Fatalf("remote.Has(%s): %v", ref, err)
+		}
+		if !ok {
+			t.Errorf("blob %d (ref=%s) not found in remote store", i, ref)
+		}
+	}
+
+	// Cursor should have advanced past 0.
+	status := syncer.Status()
+	if status.LastCursor <= 0 {
+		t.Errorf("expected LastCursor > 0, got %d", status.LastCursor)
+	}
+}
+
+// TestD1SyncerSyncEmpty verifies that syncOnce on an empty store
+// sets Healthy=true and leaves cursor at 0.
+func TestD1SyncerSyncEmpty(t *testing.T) {
+	local := newTestStore(t)
+	remote := newTestStore(t)
+	cfg := D1SyncConfig{Interval: 5 * time.Second, BatchSize: 500}
+	syncer := NewD1Syncer(local, remote, cfg)
+
+	syncer.syncOnce(context.Background())
+
+	status := syncer.Status()
+	if !status.Healthy {
+		t.Error("expected Healthy=true after syncing empty store")
+	}
+	if status.LastCursor != 0 {
+		t.Errorf("expected LastCursor=0, got %d", status.LastCursor)
+	}
+}
+
+// TestD1SyncerStatus verifies that after a successful sync, Status reports
+// Healthy=true and LastCursor > 0.
+func TestD1SyncerStatus(t *testing.T) {
+	local := newTestStore(t)
+	remote := newTestStore(t)
+	cfg := D1SyncConfig{Interval: 5 * time.Second, BatchSize: 500}
+	syncer := NewD1Syncer(local, remote, cfg)
+
+	ctx := context.Background()
+	_, err := local.Put(ctx, []byte("status-test-blob"), ContentMeta{Type: ContentConfig})
+	if err != nil {
+		t.Fatalf("local.Put: %v", err)
+	}
+
+	syncer.syncOnce(ctx)
+
+	status := syncer.Status()
+	if !status.Healthy {
+		t.Error("expected Healthy=true after successful sync")
+	}
+	if status.LastCursor <= 0 {
+		t.Errorf("expected LastCursor > 0, got %d", status.LastCursor)
+	}
+}
+
+// TestD1SyncerRunCancellation starts Run in a goroutine, cancels the context,
+// and verifies the loop exits cleanly within a reasonable timeout.
+func TestD1SyncerRunCancellation(t *testing.T) {
+	local := newTestStore(t)
+	remote := newTestStore(t)
+	cfg := D1SyncConfig{Interval: 50 * time.Millisecond, BatchSize: 500}
+	syncer := NewD1Syncer(local, remote, cfg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan struct{})
+	go func() {
+		syncer.Run(ctx)
+		close(done)
+	}()
+
+	// Let one tick fire, then cancel.
+	time.Sleep(80 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+		// Exited cleanly.
+	case <-time.After(2 * time.Second):
+		t.Error("Run did not exit within 2s after context cancellation")
 	}
 }
