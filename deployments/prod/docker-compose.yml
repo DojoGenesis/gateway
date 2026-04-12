@@ -98,7 +98,7 @@ services:
     image: ghcr.io/dojogenesis/mcpbydojogenesis:latest
     volumes:
       - mcp-bin:/opt/mcp-servers
-    entrypoint: ["sh", "-c", "cp /usr/local/bin/mcp-by-dojo-genesis /opt/mcp-servers/ && chmod +x /opt/mcp-servers/mcp-by-dojo-genesis"]
+    entrypoint: ["sh", "-c", "cp /app/server /opt/mcp-servers/mcp-by-dojo-genesis && chmod +x /opt/mcp-servers/mcp-by-dojo-genesis"]
     networks:
       - dojo-prod
 
