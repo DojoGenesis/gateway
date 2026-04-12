@@ -47,4 +47,8 @@ type ServerDeps struct {
 	// WorkflowCAS is the CAS store used for workflow definition lookup and execution.
 	// If nil, the /api/workflows/* and execution endpoints are disabled.
 	WorkflowCAS cas.Store
+
+	// D1Syncer is the optional local-to-D1 CAS sync loop (Era 4).
+	// If nil, GET /api/cas/status reports sync as disabled.
+	D1Syncer *cas.D1Syncer
 }

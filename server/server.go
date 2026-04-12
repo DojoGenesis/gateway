@@ -200,6 +200,7 @@ func New(deps ServerDeps) *Server {
 		orchestrations:        NewOrchestrationStore(),
 		agents:                make(map[string]*AgentRuntime),
 		workflowCAS:           deps.WorkflowCAS,
+		d1Syncer:              deps.D1Syncer,
 		specialistRouter:      deps.SpecialistRouter,
 		execBus:               newExecutionBus(),
 		latencyTracker:        services.NewProviderLatencyTracker(60),

@@ -416,6 +416,7 @@ func main() {
 	// ─── Era 4: D1 CAS sync loop (optional — only starts if D1 env vars are set) ──
 	d1SyncCtx, d1SyncCancel := context.WithCancel(context.Background())
 	defer d1SyncCancel()
+	var d1Syncer *cas.D1Syncer
 	if d1AccountID := os.Getenv("DOJO_D1_ACCOUNT_ID"); d1AccountID != "" {
 		d1Cfg := cas.D1Config{
 			AccountID:  d1AccountID,
@@ -427,10 +428,9 @@ func main() {
 			slog.Warn("[d1sync] failed to create D1 store — sync disabled", "error", d1Err)
 		} else if workflowCAS != nil {
 			syncCfg := cas.DefaultD1SyncConfig()
-			syncer := cas.NewD1Syncer(workflowCAS, d1Store, syncCfg)
-			go syncer.Run(d1SyncCtx)
+			d1Syncer = cas.NewD1Syncer(workflowCAS, d1Store, syncCfg)
+			go d1Syncer.Run(d1SyncCtx)
 			slog.Info("[d1sync] sync loop started", "interval", syncCfg.Interval)
-			// TODO: pass syncer to server deps so GET /cas/status can report it
 		}
 	}
 
@@ -472,6 +472,7 @@ func main() {
 		AuthDB:              authDB,
 		SpecialistRouter:    specialistRouter,
 		WorkflowCAS:         workflowCAS,
+		D1Syncer:            d1Syncer,
 	})
 
 	// Load provider keys that were persisted by a previous run (or by the CLI).
