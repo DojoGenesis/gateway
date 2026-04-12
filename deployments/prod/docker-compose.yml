@@ -3,8 +3,8 @@ version: '3.8'
 # Production stack — Hetzner VPS + Named Cloudflare Tunnel
 #
 # Images:
-#   gateway  — ghcr.io/trespies-source/agentic-gateway:latest  (GoReleaser)
-#   bridge   — ghcr.io/trespies-source/dojo-bridge:latest      (CI deploy workflow)
+#   gateway  — ghcr.io/dojogenesis/agentic-gateway:latest  (GoReleaser)
+#   bridge   — ghcr.io/dojogenesis/dojo-bridge:latest      (CI deploy workflow)
 #   tunnel   — cloudflare/cloudflared                           (named tunnel, permanent URL)
 #
 # Secrets: source .env before running (Infisical bootstrap vars only).
@@ -21,7 +21,7 @@ services:
   # Receives inbound webhooks from Slack, Discord, etc. on port 8090.
   # Public via Cloudflare Tunnel — Infisical fetches credentials at startup.
   bridge:
-    image: ghcr.io/trespies-source/dojo-bridge:latest
+    image: ghcr.io/dojogenesis/dojo-bridge:latest
     restart: unless-stopped
     environment:
       DOJO_CREDENTIAL_BACKEND: "${DOJO_CREDENTIAL_BACKEND:-infisical}"
@@ -64,7 +64,7 @@ services:
   # Core LLM routing (Anthropic, Google, Kimi). Port 7340 — not exposed publicly.
   # Accessible from VPS localhost and over SSH tunnel for CLI use.
   gateway:
-    image: ghcr.io/trespies-source/agentic-gateway:latest
+    image: ghcr.io/dojogenesis/agentic-gateway:latest
     restart: unless-stopped
     ports:
       - "127.0.0.1:7340:7340"  # localhost only — expose via SSH tunnel for remote CLI
@@ -95,7 +95,7 @@ services:
 
   # ─── MCP Binary Provider ───────────────────────────────────────────────────
   mcp-by-dojo:
-    image: ghcr.io/trespies-source/mcpbydojogenesis:latest
+    image: ghcr.io/dojogenesis/mcpbydojogenesis:latest
     volumes:
       - mcp-bin:/opt/mcp-servers
     entrypoint: ["sh", "-c", "cp /usr/local/bin/mcp-by-dojo-genesis /opt/mcp-servers/ && chmod +x /opt/mcp-servers/mcp-by-dojo-genesis"]

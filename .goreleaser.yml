@@ -76,7 +76,7 @@ dockers:
     goarch: amd64
     dockerfile: Dockerfile.goreleaser
     image_templates:
-      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-amd64"
+      - "ghcr.io/dojogenesis/agentic-gateway:v{{ .Version }}-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
@@ -91,7 +91,7 @@ dockers:
     goarch: arm64
     dockerfile: Dockerfile.goreleaser
     image_templates:
-      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-arm64"
+      - "ghcr.io/dojogenesis/agentic-gateway:v{{ .Version }}-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
       - "--label=org.opencontainers.image.created={{.Date}}"
@@ -102,19 +102,16 @@ dockers:
     extra_files: []
 
 docker_manifests:
-  - name_template: "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}"
+  - name_template: "ghcr.io/dojogenesis/agentic-gateway:v{{ .Version }}"
     image_templates:
-      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-amd64"
-      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-arm64"
-  - name_template: "ghcr.io/trespies-source/agentic-gateway:latest"
+      - "ghcr.io/dojogenesis/agentic-gateway:v{{ .Version }}-amd64"
+      - "ghcr.io/dojogenesis/agentic-gateway:v{{ .Version }}-arm64"
+  - name_template: "ghcr.io/dojogenesis/agentic-gateway:latest"
     image_templates:
-      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-amd64"
-      - "ghcr.io/trespies-source/agentic-gateway:v{{ .Version }}-arm64"
+      - "ghcr.io/dojogenesis/agentic-gateway:v{{ .Version }}-amd64"
+      - "ghcr.io/dojogenesis/agentic-gateway:v{{ .Version }}-arm64"
 
 release:
-  github:
-    owner: TresPies-source
-    name: AgenticGatewayByDojoGenesis
   draft: false
   prerelease: auto
   name_template: "v{{.Version}}"
@@ -126,4 +123,4 @@ release:
     **Full Changelog**: https://github.com/DojoGenesis/gateway/compare/{{ .PreviousTag }}...{{ .Tag }}
 
     ---
-    **Docker:** `docker pull ghcr.io/trespies-source/agentic-gateway:{{ .Version }}`
+    **Docker:** `docker pull ghcr.io/dojogenesis/agentic-gateway:{{ .Version }}`

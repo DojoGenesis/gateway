@@ -2,7 +2,7 @@ FROM gcr.io/distroless/static-debian12
 
 COPY agentic-gateway /agentic-gateway
 
-EXPOSE 8080
+EXPOSE 7340
 
 # Health check: the binary supports --health-check flag (self-contained HTTP probe).
 # Docker Compose uses: ["/agentic-gateway", "--health-check"]
