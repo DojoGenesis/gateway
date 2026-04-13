@@ -90,6 +90,8 @@ export function setConversations(list: Conversation[]): void {
 
 export const activeConversationId = $state({ value: '' });
 
+export const currentConversationId = $state<{ value: string | null }>({ value: null });
+
 // ── Models ───────────────────────────────────────────────────────────────────
 
 export const models = $state<Model[]>([]);

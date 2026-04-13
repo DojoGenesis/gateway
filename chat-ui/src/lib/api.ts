@@ -176,6 +176,36 @@ export async function deleteConversation(id: string): Promise<void> {
 	});
 }
 
+export async function createConversation(title?: string): Promise<Conversation> {
+	return apiFetch<Conversation>('/v1/conversations', {
+		method: 'POST',
+		body: JSON.stringify({ title: title || 'New conversation' })
+	});
+}
+
+export async function createMessage(
+	conversationId: string,
+	role: string,
+	content: string,
+	model?: string
+): Promise<void> {
+	await apiFetch<unknown>(`/v1/conversations/${encodeURIComponent(conversationId)}/messages`, {
+		method: 'POST',
+		body: JSON.stringify({ role, content, model })
+	});
+}
+
+export async function listMessages(
+	conversationId: string,
+	limit = 50,
+	offset = 0
+): Promise<import('./types').ConversationMessage[]> {
+	const data = await apiFetch<{ messages?: import('./types').ConversationMessage[] }>(
+		`/v1/conversations/${encodeURIComponent(conversationId)}/messages?limit=${limit}&offset=${offset}`
+	);
+	return data.messages ?? [];
+}
+
 // ── Health ────────────────────────────────────────────────────────────────────
 
 export async function healthCheck(): Promise<boolean> {
@@ -185,4 +215,77 @@ export async function healthCheck(): Promise<boolean> {
 	} catch {
 		return false;
 	}
+}
+
+// ── Admin types ───────────────────────────────────────────────────────────────
+
+export interface AdminUser {
+	id: string;
+	email: string;
+	display_name: string;
+	is_active: boolean;
+	created_at: string;
+}
+
+export interface ProviderStatus {
+	name: string;
+	status: string;
+	latency_ms: number;
+	last_checked: string;
+}
+
+export interface CostSummary {
+	total_tokens: number;
+	total_cost: number;
+	by_provider: Record<string, number>;
+	by_user: Record<string, number>;
+}
+
+export interface MCPStatus {
+	name: string;
+	status: string;
+	tools_count: number;
+}
+
+export interface HealthStatus {
+	status: string;
+	uptime: string;
+	version: string;
+}
+
+// ── Admin API ─────────────────────────────────────────────────────────────────
+
+export async function adminListUsers(): Promise<AdminUser[]> {
+	const data = await apiFetch<{ users: AdminUser[] }>('/admin/users');
+	return data.users ?? [];
+}
+
+export async function adminDeactivateUser(userId: string): Promise<void> {
+	await apiFetch<unknown>(`/admin/users/${encodeURIComponent(userId)}/deactivate`, {
+		method: 'POST'
+	});
+}
+
+export async function adminActivateUser(userId: string): Promise<void> {
+	await apiFetch<unknown>(`/admin/users/${encodeURIComponent(userId)}/activate`, {
+		method: 'POST'
+	});
+}
+
+export async function adminGetProviders(): Promise<ProviderStatus[]> {
+	const data = await apiFetch<{ providers: ProviderStatus[] }>('/admin/providers');
+	return data.providers ?? [];
+}
+
+export async function adminGetCosts(): Promise<CostSummary> {
+	return apiFetch<CostSummary>('/admin/costs');
+}
+
+export async function adminGetMCPStatus(): Promise<MCPStatus[]> {
+	const data = await apiFetch<{ servers: MCPStatus[] }>('/admin/mcp/status');
+	return data.servers ?? [];
+}
+
+export async function adminGetHealth(): Promise<HealthStatus> {
+	return apiFetch<HealthStatus>('/admin/health');
 }

@@ -7,6 +7,7 @@
 		messages,
 		conversations,
 		activeConversationId,
+		currentConversationId,
 		models,
 		selectedModel,
 		isStreaming,
@@ -21,7 +22,14 @@
 		setConversations,
 		setModels
 	} from '$lib/stores.svelte';
-	import { streamChat, listModels, listConversations } from '$lib/api';
+	import {
+		streamChat,
+		listModels,
+		listConversations,
+		createConversation,
+		createMessage,
+		listMessages
+	} from '$lib/api';
 	import { renderMarkdown } from '$lib/markdown';
 	import type { ChatMessage } from '$lib/types';
 
@@ -56,6 +64,10 @@
 		try {
 			const list = await listConversations();
 			setConversations(list);
+			// Restore most recent conversation on first load if none already active
+			if (list.length > 0 && !currentConversationId.value) {
+				await selectConversation(list[0].id, list[0].title);
+			}
 		} catch {
 			// Not fatal — conversations sidebar just stays empty
 		}
@@ -97,10 +109,31 @@
 
 		const model = selectedModel.value || 'claude-3-5-sonnet-20241022';
 
-		// Add user message
+		// Ensure a conversation exists before sending
+		if (!currentConversationId.value) {
+			try {
+				const title = text.slice(0, 50) || 'New conversation';
+				const conv = await createConversation(title);
+				currentConversationId.value = conv.id;
+				activeConversationId.value = conv.id;
+			} catch {
+				// Persist failure is non-fatal — continue without a conversation ID
+				setError('Could not create conversation — messages will not be saved');
+			}
+		}
+
+		// Add user message to UI
 		const userMsg: ChatMessage = { role: 'user', content: text };
 		appendMessage(userMsg);
 		await scrollToBottom();
+
+		// Persist user message (non-blocking — don't await before showing UI)
+		const convId = currentConversationId.value;
+		if (convId) {
+			createMessage(convId, 'user', text).catch(() => {
+				// Non-fatal — continue even if persistence fails
+			});
+		}
 
 		isStreaming.value = true;
 
@@ -110,6 +143,8 @@
 			content: m.content
 		}));
 
+		let fullResponse = '';
+
 		try {
 			// Prime an empty assistant bubble
 			appendMessage({ role: 'assistant', content: '' });
@@ -117,8 +152,19 @@
 
 			for await (const chunk of streamChat(context.slice(0, -1), model)) {
 				appendToLastAssistantMessage(chunk);
+				fullResponse += chunk;
 				await scrollToBottom();
 			}
+
+			// Persist assistant message after stream completes
+			if (convId && fullResponse) {
+				createMessage(convId, 'assistant', fullResponse, model).catch(() => {
+					// Non-fatal
+				});
+			}
+
+			// Refresh sidebar conversation list
+			loadConversations().catch(() => {});
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : 'Stream error';
 			setError(msg);
@@ -135,6 +181,11 @@
 	function newConversation() {
 		clearMessages();
 		activeConversationId.value = '';
+		currentConversationId.value = null;
+		// Focus the input after clearing
+		tick().then(() => {
+			textareaEl?.focus();
+		});
 	}
 
 	// ── Sign out ──────────────────────────────────────────────────────────────
@@ -144,12 +195,23 @@
 	}
 
 	// ── Conversation select ───────────────────────────────────────────────────
-	function selectConversation(id: string, title: string) {
-		// For now, just clear and mark active (full load would hit /v1/conversations/:id)
+	async function selectConversation(id: string, _title: string) {
 		clearMessages();
 		activeConversationId.value = id;
-		// Show the title as a system message placeholder
-		appendMessage({ role: 'system', content: `Conversation: ${title}` });
+		currentConversationId.value = id;
+
+		try {
+			const msgs = await listMessages(id);
+			// Map ConversationMessage → ChatMessage for the store
+			for (const m of msgs) {
+				appendMessage({ role: m.role, content: m.content });
+			}
+		} catch {
+			// Non-fatal — conversation is selected but history couldn't load
+			setError('Could not load conversation history');
+		}
+
+		await scrollToBottom();
 	}
 
 	// ── Format date for sidebar ───────────────────────────────────────────────
@@ -197,7 +259,7 @@
 					<button
 						class="conversation-item"
 						class:active={activeConversationId.value === conv.id}
-						onclick={() => selectConversation(conv.id, conv.title)}
+						onclick={() => void selectConversation(conv.id, conv.title)}
 					>
 						<span class="conv-title">{conv.title}</span>
 						<span class="conv-meta">{formatDate(conv.updated_at)} · {conv.message_count} msg</span>
