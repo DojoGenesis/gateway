@@ -51,6 +51,10 @@ FROM gcr.io/distroless/static-debian12
 
 COPY --from=builder /dojo-bridge /dojo-bridge
 
+# Pre-create data dir owned by nobody so Docker named volumes inherit
+# correct permissions on first mount (no root override needed).
+COPY --from=builder --chown=65534:65534 /app/data /app/data
+
 EXPOSE 8090
 
 # Run as non-root user (nobody)
