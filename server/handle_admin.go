@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -8,6 +9,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/DojoGenesis/gateway/server/database"
 )
 
 // handleAdminHealth returns detailed health information about the gateway.
@@ -264,3 +267,79 @@ func (s *Server) handleAdminMCPStatus(c *gin.Context) {
 }
 
 // handleAdminCosts is defined in handle_admin_costs.go (Gap 3 extended version).
+
+// ─── Admin User Management ───────────────────────────────────────────────────
+
+// handleAdminListUsers handles GET /admin/users.
+// Returns all authenticated portal users.
+func (s *Server) handleAdminListUsers(c *gin.Context) {
+	if s.authDB == nil {
+		s.errorResponse(c, http.StatusServiceUnavailable, "db_unavailable", "Database not configured")
+		return
+	}
+
+	users, err := database.ListPortalUsers(s.authDB)
+	if err != nil {
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to list users")
+		return
+	}
+
+	if users == nil {
+		users = []database.PortalUser{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"users": users,
+		"count": len(users),
+	})
+}
+
+// handleAdminDeactivateUser handles POST /admin/users/:id/deactivate.
+func (s *Server) handleAdminDeactivateUser(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "User ID is required")
+		return
+	}
+
+	if s.authDB == nil {
+		s.errorResponse(c, http.StatusServiceUnavailable, "db_unavailable", "Database not configured")
+		return
+	}
+
+	if err := database.DeactivatePortalUser(s.authDB, userID); err != nil {
+		if err == sql.ErrNoRows {
+			s.errorResponse(c, http.StatusNotFound, "not_found", "User not found")
+			return
+		}
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to deactivate user")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"deactivated": true, "user_id": userID})
+}
+
+// handleAdminActivateUser handles POST /admin/users/:id/activate.
+func (s *Server) handleAdminActivateUser(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "User ID is required")
+		return
+	}
+
+	if s.authDB == nil {
+		s.errorResponse(c, http.StatusServiceUnavailable, "db_unavailable", "Database not configured")
+		return
+	}
+
+	if err := database.ActivatePortalUser(s.authDB, userID); err != nil {
+		if err == sql.ErrNoRows {
+			s.errorResponse(c, http.StatusNotFound, "not_found", "User not found")
+			return
+		}
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to activate user")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"activated": true, "user_id": userID})
+}

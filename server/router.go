@@ -25,6 +25,10 @@ func (s *Server) setupRoutes() {
 		auth.POST("/register", s.handleAuthRegister)
 		auth.POST("/login", s.handleAuthLogin)
 		auth.POST("/refresh", s.handleAuthRefresh)
+
+		// OAuth2 (Wave 1 — GitHub)
+		auth.GET("/github", s.handleOAuthGitHubStart)
+		auth.GET("/github/callback", s.handleOAuthGitHubCallback)
 	}
 
 	// ─── Infrastructure ──────────────────────────────────────────────
@@ -224,5 +228,21 @@ func (s *Server) setupRoutes() {
 
 		// Cost aggregation
 		admin.GET("/costs", s.handleAdminCosts)
+
+		// User management (Wave 1)
+		admin.GET("/users", s.handleAdminListUsers)
+		admin.POST("/users/:id/deactivate", s.handleAdminDeactivateUser)
+		admin.POST("/users/:id/activate", s.handleAdminActivateUser)
+	}
+
+	// ─── Conversations API (Wave 1) ─────────────────────────────────
+	convGroup := v1.Group("/conversations")
+	{
+		convGroup.GET("", s.handleListConversations)
+		convGroup.POST("", s.handleCreateConversation)
+		convGroup.GET("/:id", s.handleGetConversation)
+		convGroup.DELETE("/:id", s.handleDeleteConversation)
+		convGroup.GET("/:id/messages", s.handleListMessages)
+		convGroup.POST("/:id/messages", s.handleCreateMessage)
 	}
 }

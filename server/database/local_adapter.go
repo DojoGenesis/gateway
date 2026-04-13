@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )
 
@@ -578,6 +579,140 @@ func (a *LocalAdapter) UpdateSettings(ctx context.Context, settings *Settings) e
 		return ErrSettingsNotFound
 	}
 
+	return nil
+}
+
+func (a *LocalAdapter) CreateMessage(ctx context.Context, msg *Message) error {
+	if msg.ID == "" {
+		msg.ID = uuid.New().String()
+	}
+	if msg.CreatedAt.IsZero() {
+		msg.CreatedAt = time.Now()
+	}
+
+	query := `
+		INSERT INTO messages (id, conversation_id, role, content, model, provider, tokens_used, created_at, metadata)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := a.db.ExecContext(ctx, query,
+		msg.ID,
+		msg.ConversationID,
+		msg.Role,
+		msg.Content,
+		msg.Model,
+		msg.Provider,
+		msg.TokensUsed,
+		msg.CreatedAt,
+		msg.Metadata,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create message: %w", err)
+	}
+
+	return nil
+}
+
+func (a *LocalAdapter) ListMessages(ctx context.Context, conversationID string, limit, offset int) ([]*Message, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	query := `
+		SELECT id, conversation_id, role, content, model, provider, tokens_used, created_at, metadata
+		FROM messages
+		WHERE conversation_id = ?
+		ORDER BY created_at ASC
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := a.db.QueryContext(ctx, query, conversationID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list messages: %w", err)
+	}
+	defer rows.Close()
+
+	msgs := []*Message{}
+	for rows.Next() {
+		msg := &Message{}
+		err := rows.Scan(
+			&msg.ID,
+			&msg.ConversationID,
+			&msg.Role,
+			&msg.Content,
+			&msg.Model,
+			&msg.Provider,
+			&msg.TokensUsed,
+			&msg.CreatedAt,
+			&msg.Metadata,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan message: %w", err)
+		}
+		msgs = append(msgs, msg)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate messages: %w", err)
+	}
+
+	return msgs, nil
+}
+
+func (a *LocalAdapter) GetMessage(ctx context.Context, id string) (*Message, error) {
+	query := `
+		SELECT id, conversation_id, role, content, model, provider, tokens_used, created_at, metadata
+		FROM messages
+		WHERE id = ?
+	`
+
+	msg := &Message{}
+	err := a.db.QueryRowContext(ctx, query, id).Scan(
+		&msg.ID,
+		&msg.ConversationID,
+		&msg.Role,
+		&msg.Content,
+		&msg.Model,
+		&msg.Provider,
+		&msg.TokensUsed,
+		&msg.CreatedAt,
+		&msg.Metadata,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("message not found: %s", id)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get message: %w", err)
+	}
+
+	return msg, nil
+}
+
+// EnsureMessagesTable creates the messages table if it does not exist.
+// This is called from the schema initialization path.
+func EnsureMessagesTable(db *sql.DB) error {
+	query := `
+		CREATE TABLE IF NOT EXISTS messages (
+			id              TEXT PRIMARY KEY,
+			conversation_id TEXT NOT NULL,
+			role            TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+			content         TEXT NOT NULL,
+			model           TEXT,
+			provider        TEXT,
+			tokens_used     INTEGER,
+			created_at      DATETIME NOT NULL,
+			metadata        TEXT,
+			FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+		);
+		CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
+		CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at ASC);
+		CREATE INDEX IF NOT EXISTS idx_messages_role ON messages(role);
+	`
+	_, err := db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("failed to create messages table: %w", err)
+	}
 	return nil
 }
 

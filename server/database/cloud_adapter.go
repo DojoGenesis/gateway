@@ -87,6 +87,18 @@ func (a *CloudAdapter) UpdateSettings(ctx context.Context, settings *Settings) e
 	return ErrCloudAdapterNotImplemented
 }
 
+func (a *CloudAdapter) CreateMessage(ctx context.Context, msg *Message) error {
+	return ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) ListMessages(ctx context.Context, conversationID string, limit, offset int) ([]*Message, error) {
+	return nil, ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) GetMessage(ctx context.Context, id string) (*Message, error) {
+	return nil, ErrCloudAdapterNotImplemented
+}
+
 func (a *CloudAdapter) Ping(ctx context.Context) error {
 	return ErrCloudAdapterNotImplemented
 }

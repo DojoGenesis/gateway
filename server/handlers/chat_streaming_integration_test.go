@@ -452,6 +452,15 @@ func (m *mockDBAdapter) CreateSettings(_ context.Context, _ *database.Settings) 
 func (m *mockDBAdapter) UpdateSettings(_ context.Context, _ *database.Settings) error {
 	return nil
 }
+func (m *mockDBAdapter) CreateMessage(_ context.Context, _ *database.Message) error {
+	return nil
+}
+func (m *mockDBAdapter) ListMessages(_ context.Context, _ string, _, _ int) ([]*database.Message, error) {
+	return []*database.Message{}, nil
+}
+func (m *mockDBAdapter) GetMessage(_ context.Context, _ string) (*database.Message, error) {
+	return nil, nil
+}
 func (m *mockDBAdapter) Ping(_ context.Context) error { return nil }
 func (m *mockDBAdapter) Close() error                 { return nil }
 

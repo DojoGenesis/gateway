@@ -157,6 +157,18 @@ func (m *mockDatabaseAdapter) UpdateSettings(ctx context.Context, settings *data
 	return nil
 }
 
+func (m *mockDatabaseAdapter) CreateMessage(ctx context.Context, msg *database.Message) error {
+	return nil
+}
+
+func (m *mockDatabaseAdapter) ListMessages(ctx context.Context, conversationID string, limit, offset int) ([]*database.Message, error) {
+	return []*database.Message{}, nil
+}
+
+func (m *mockDatabaseAdapter) GetMessage(ctx context.Context, id string) (*database.Message, error) {
+	return nil, nil
+}
+
 func (m *mockDatabaseAdapter) Ping(ctx context.Context) error {
 	return nil
 }

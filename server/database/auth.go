@@ -8,6 +8,15 @@ import (
 	"github.com/google/uuid"
 )
 
+// PortalUser holds the fields visible to admin management endpoints.
+type PortalUser struct {
+	ID          string    `json:"id"`
+	Email       string    `json:"email"`
+	DisplayName string    `json:"display_name"`
+	IsActive    bool      `json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 // CreatePortalUser inserts a new user record with hashed credentials.
 // Returns the generated user ID (UUID v4).
 func CreatePortalUser(db *sql.DB, email, passwordHash, displayName string) (string, error) {
@@ -60,4 +69,73 @@ func GetPortalUserByID(db *sql.DB, userID string) (email, displayName string, er
 	}
 
 	return email, displayName, nil
+}
+
+// ListPortalUsers returns all authenticated portal users for admin management.
+func ListPortalUsers(db *sql.DB) ([]PortalUser, error) {
+	query := `
+		SELECT id, COALESCE(email, ''), COALESCE(display_name, ''), COALESCE(is_active, 1), created_at
+		FROM local_users
+		WHERE user_type = 'authenticated'
+		ORDER BY created_at DESC
+	`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list portal users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []PortalUser
+	for rows.Next() {
+		var u PortalUser
+		if err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.IsActive, &u.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan portal user: %w", err)
+		}
+		users = append(users, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate portal users: %w", err)
+	}
+
+	return users, nil
+}
+
+// DeactivatePortalUser sets is_active=0 for the given user.
+func DeactivatePortalUser(db *sql.DB, userID string) error {
+	result, err := db.Exec(
+		`UPDATE local_users SET is_active = 0 WHERE id = ? AND user_type = 'authenticated'`,
+		userID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to deactivate portal user: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// ActivatePortalUser sets is_active=1 for the given user.
+func ActivatePortalUser(db *sql.DB, userID string) error {
+	result, err := db.Exec(
+		`UPDATE local_users SET is_active = 1 WHERE id = ? AND user_type = 'authenticated'`,
+		userID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to activate portal user: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

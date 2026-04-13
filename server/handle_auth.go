@@ -43,6 +43,11 @@ type authTokenResponse struct {
 
 // handleAuthRegister handles POST /auth/register.
 func (s *Server) handleAuthRegister(c *gin.Context) {
+	if !s.cfg.RegistrationEnabled {
+		s.errorResponse(c, http.StatusForbidden, "registration_disabled", "User registration is currently disabled")
+		return
+	}
+
 	var req authRegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid request body")

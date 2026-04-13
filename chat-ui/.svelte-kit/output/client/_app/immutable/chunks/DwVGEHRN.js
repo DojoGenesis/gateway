@@ -1,0 +1,1 @@
+import{k as y,b as u,H as _,l as g,h as t,C as o,m as i,i as l,g as n,j as m,n as p}from"./BAg31RI9.js";function C(d,r){let s=null,E=t;var a;if(t){s=m;for(var e=p(document.head);e!==null&&(e.nodeType!==o||e.data!==d);)e=i(e);if(e===null)l(!1);else{var f=i(e);e.remove(),n(f)}}t||(a=document.head.appendChild(y()));try{u(()=>r(a),_|g)}finally{E&&(l(!0),n(s))}}export{C as h};

@@ -84,6 +84,18 @@ type Settings struct {
 	UpdatedAt           time.Time `json:"updated_at"`
 }
 
+type Message struct {
+	ID             string    `json:"id"`
+	ConversationID string    `json:"conversation_id"`
+	Role           string    `json:"role"` // "user", "assistant", "system"
+	Content        string    `json:"content"`
+	Model          *string   `json:"model,omitempty"`
+	Provider       *string   `json:"provider,omitempty"`
+	TokensUsed     *int      `json:"tokens_used,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	Metadata       *string   `json:"metadata,omitempty"`
+}
+
 type DatabaseAdapter interface {
 	GetUser(ctx context.Context, userID string) (*User, error)
 	CreateUser(ctx context.Context, user *User) error
@@ -104,6 +116,10 @@ type DatabaseAdapter interface {
 	GetSettings(ctx context.Context, userID string) (*Settings, error)
 	CreateSettings(ctx context.Context, settings *Settings) error
 	UpdateSettings(ctx context.Context, settings *Settings) error
+
+	CreateMessage(ctx context.Context, msg *Message) error
+	ListMessages(ctx context.Context, conversationID string, limit, offset int) ([]*Message, error)
+	GetMessage(ctx context.Context, id string) (*Message, error)
 
 	Ping(ctx context.Context) error
 	Close() error

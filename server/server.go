@@ -74,6 +74,9 @@ type ServerConfig struct {
 	RefreshTokenTTL time.Duration
 	// Admin API key for /admin/* endpoints (empty = unauthenticated)
 	AdminAPIKey string
+	// RegistrationEnabled controls whether POST /auth/register is open.
+	// When false, the endpoint returns 403. Defaults to true.
+	RegistrationEnabled bool
 }
 
 // Server is the main HTTP server that ties all framework modules together.
@@ -151,11 +154,12 @@ func New(deps ServerDeps) *Server {
 	cfg := deps.Config
 	if cfg == nil {
 		cfg = &ServerConfig{
-			Port:            "7340",
-			AllowedOrigins:  []string{"http://localhost:3000"},
-			AuthMode:        "api_key",
-			Environment:     "production",
-			ShutdownTimeout: 30 * time.Second,
+			Port:                "7340",
+			AllowedOrigins:      []string{"http://localhost:3000"},
+			AuthMode:            "api_key",
+			Environment:         "production",
+			ShutdownTimeout:     30 * time.Second,
+			RegistrationEnabled: true,
 		}
 	}
 
