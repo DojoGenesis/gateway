@@ -266,7 +266,11 @@ func (p *AnthropicProvider) GenerateEmbedding(ctx context.Context, text string) 
 func convertToAnthropicMessages(msgs []provider.Message) (system string, messages []anthropicMessage) {
 	for _, m := range msgs {
 		if m.Role == "system" {
-			system = m.Content
+			if system == "" {
+				system = m.Content
+			} else {
+				system = system + "\n\n" + m.Content
+			}
 			continue
 		}
 		// Convert OpenAI-style "tool" role into Anthropic tool_result user message.

@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -13,6 +15,21 @@ import (
 
 	"github.com/DojoGenesis/gateway/provider"
 )
+
+// loadSystemPrompt reads the system prompt from SYSTEM_PROMPT env var or the
+// file path specified in SYSTEM_PROMPT_FILE. Returns empty string if neither
+// is set or if the file cannot be read.
+func loadSystemPrompt() string {
+	if content := os.Getenv("SYSTEM_PROMPT"); content != "" {
+		return strings.TrimSpace(content)
+	}
+	if path := os.Getenv("SYSTEM_PROMPT_FILE"); path != "" {
+		if data, err := os.ReadFile(path); err == nil {
+			return strings.TrimSpace(string(data))
+		}
+	}
+	return ""
+}
 
 // ─── OpenAI-Compatible Request/Response Types ────────────────────────────────
 
@@ -114,6 +131,28 @@ func (s *Server) nonStreamChatCompletions(c *gin.Context, ctx context.Context, r
 		return
 	}
 
+	// ─── Base system prompt injection ──────────────────────────────────
+	// Prepends a system message from SYSTEM_PROMPT or SYSTEM_PROMPT_FILE env vars.
+	// Runs before RAG so RAG context is appended after the base prompt.
+	if sysPrompt := loadSystemPrompt(); sysPrompt != "" {
+		sysMsg := OpenAIChatMessage{Role: "system", Content: sysPrompt}
+		req.Messages = append([]OpenAIChatMessage{sysMsg}, req.Messages...)
+		slog.Debug("base system prompt injected", "chars", len(sysPrompt))
+	}
+
+	// ─── RAG context injection ──────────────────────────────────
+	if userID, ok := getUserIDFromContext(c); ok && s.authDB != nil {
+		ragCtx, ragErr := s.BuildRAGContext(ctx, userID, lastUserMsg, 5)
+		if ragErr != nil {
+			slog.Warn("rag context retrieval failed", "error", ragErr)
+		} else if ragCtx != "" {
+			// Prepend RAG context as a system message
+			ragMsg := OpenAIChatMessage{Role: "system", Content: ragCtx}
+			req.Messages = append([]OpenAIChatMessage{ragMsg}, req.Messages...)
+			slog.Debug("rag context injected", "user_id", userID, "chars", len(ragCtx))
+		}
+	}
+
 	// Build provider completion request directly
 	messages := make([]provider.Message, len(req.Messages))
 	for i, m := range req.Messages {
@@ -194,6 +233,35 @@ func (s *Server) streamChatCompletions(c *gin.Context, ctx context.Context, req 
 	if s.pluginManager == nil {
 		s.errorResponse(c, http.StatusServiceUnavailable, "server_error", "No providers configured")
 		return
+	}
+
+	// ─── Base system prompt injection ──────────────────────────────────
+	// Prepends a system message from SYSTEM_PROMPT or SYSTEM_PROMPT_FILE env vars.
+	// Runs before RAG so RAG context is appended after the base prompt.
+	if sysPrompt := loadSystemPrompt(); sysPrompt != "" {
+		sysMsg := OpenAIChatMessage{Role: "system", Content: sysPrompt}
+		req.Messages = append([]OpenAIChatMessage{sysMsg}, req.Messages...)
+		slog.Debug("base system prompt injected", "chars", len(sysPrompt))
+	}
+
+	// ─── RAG context injection ──────────────────────────────────
+	// Extract last user message for RAG query
+	lastUserMsg := ""
+	for i := len(req.Messages) - 1; i >= 0; i-- {
+		if req.Messages[i].Role == "user" {
+			lastUserMsg = req.Messages[i].Content
+			break
+		}
+	}
+	if userID, ok := getUserIDFromContext(c); ok && s.authDB != nil && lastUserMsg != "" {
+		ragCtx, ragErr := s.BuildRAGContext(ctx, userID, lastUserMsg, 5)
+		if ragErr != nil {
+			slog.Warn("rag context retrieval failed", "error", ragErr)
+		} else if ragCtx != "" {
+			ragMsg := OpenAIChatMessage{Role: "system", Content: ragCtx}
+			req.Messages = append([]OpenAIChatMessage{ragMsg}, req.Messages...)
+			slog.Debug("rag context injected", "user_id", userID, "chars", len(ragCtx))
+		}
 	}
 
 	messages := make([]provider.Message, len(req.Messages))

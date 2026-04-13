@@ -26,6 +26,7 @@ import (
 	"github.com/DojoGenesis/gateway/runtime/cas"
 	"github.com/DojoGenesis/gateway/server/agent"
 	"github.com/DojoGenesis/gateway/server/config"
+	"github.com/DojoGenesis/gateway/server/database"
 	"github.com/DojoGenesis/gateway/server/logging"
 	"github.com/DojoGenesis/gateway/server/orchestration"
 	"github.com/DojoGenesis/gateway/server/services"
@@ -385,6 +386,36 @@ func main() {
 			)`,
 			`CREATE INDEX IF NOT EXISTS idx_local_users_type ON local_users(user_type)`,
 			`CREATE INDEX IF NOT EXISTS idx_local_users_last_accessed ON local_users(last_accessed_at DESC)`,
+			`CREATE TABLE IF NOT EXISTS conversations (
+				id TEXT PRIMARY KEY,
+				user_id TEXT NOT NULL,
+				title TEXT,
+				project_id TEXT,
+				created_at DATETIME NOT NULL,
+				updated_at DATETIME NOT NULL,
+				last_message_at DATETIME,
+				message_count INTEGER DEFAULT 0,
+				is_archived BOOLEAN DEFAULT 0,
+				metadata TEXT,
+				FOREIGN KEY (user_id) REFERENCES local_users(id) ON DELETE CASCADE
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_conversations_last_message ON conversations(last_message_at DESC)`,
+			`CREATE INDEX IF NOT EXISTS idx_conversations_user_archived ON conversations(user_id, is_archived, last_message_at DESC)`,
+			`CREATE TABLE IF NOT EXISTS messages (
+				id TEXT PRIMARY KEY,
+				conversation_id TEXT NOT NULL,
+				role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+				content TEXT NOT NULL,
+				model TEXT,
+				provider TEXT,
+				tokens_used INTEGER,
+				created_at DATETIME NOT NULL,
+				metadata TEXT,
+				FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at ASC)`,
 			`INSERT OR IGNORE INTO schema_migrations (version, applied_at, description) VALUES ('20260207_v0.0.30_local_auth', datetime('now'), 'Local-first authentication foundation')`,
 		}
 		for _, stmt := range baseStmts {
@@ -416,6 +447,15 @@ func main() {
 				}
 			}
 			slog.Info("portal auth migration applied")
+		}
+	}
+
+	// ─── RAG Document Tables ────────────────────────────────────────
+	if authDB != nil {
+		if err := database.EnsureDocumentsTable(authDB); err != nil {
+			slog.Warn("failed to create RAG document tables", "error", err)
+		} else {
+			slog.Info("RAG document tables ready")
 		}
 	}
 
