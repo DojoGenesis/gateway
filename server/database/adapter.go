@@ -14,6 +14,7 @@ var (
 	ErrDuplicateAPIKey        = errors.New("api key already exists for provider")
 	ErrInvalidUserType        = errors.New("invalid user type")
 	ErrInvalidMigrationStatus = errors.New("invalid migration status")
+	ErrTemplateNotFound       = errors.New("prompt template not found")
 )
 
 type UserType string
@@ -96,6 +97,17 @@ type Message struct {
 	Metadata       *string   `json:"metadata,omitempty"`
 }
 
+type PromptTemplate struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description,omitempty"`
+	SystemPrompt string    `json:"system_prompt"`
+	IsPublic     bool      `json:"is_public"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type DatabaseAdapter interface {
 	GetUser(ctx context.Context, userID string) (*User, error)
 	CreateUser(ctx context.Context, user *User) error
@@ -120,6 +132,12 @@ type DatabaseAdapter interface {
 	CreateMessage(ctx context.Context, msg *Message) error
 	ListMessages(ctx context.Context, conversationID string, limit, offset int) ([]*Message, error)
 	GetMessage(ctx context.Context, id string) (*Message, error)
+
+	CreatePromptTemplate(ctx context.Context, tmpl *PromptTemplate) error
+	GetPromptTemplate(ctx context.Context, id string) (*PromptTemplate, error)
+	ListPromptTemplates(ctx context.Context, userID string, includePublic bool) ([]*PromptTemplate, error)
+	UpdatePromptTemplate(ctx context.Context, tmpl *PromptTemplate) error
+	DeletePromptTemplate(ctx context.Context, id string) error
 
 	Ping(ctx context.Context) error
 	Close() error

@@ -1,4 +1,4 @@
-.PHONY: build build-spa test test-cover vet lint docker docker-compose-up docker-compose-down clean generate-openapi
+.PHONY: build build-spa build-chat-spa test test-cover vet lint docker docker-compose-up docker-compose-down clean generate-openapi
 
 # Build the Workflow Builder SPA and embed it into the Go binary.
 # Must be run before `make build` when the SPA has changed.
@@ -9,6 +9,16 @@ build-spa:
 	@rm -rf server/workflowui/dist
 	@cp -r workflow-builder/build server/workflowui/dist
 	@echo "SPA embedded: server/workflowui/dist/ ($$(find server/workflowui/dist -type f | wc -l | tr -d ' ') files)"
+
+# Build the Chat UI SPA and embed it into the Go binary.
+# Must be run before `make build` when the chat SPA has changed.
+build-chat-spa:
+	@echo "Building Chat UI SPA..."
+	@cd chat-ui && npm install && npm run build
+	@echo "Copying SPA output to server/chatui/dist/ ..."
+	@rm -rf server/chatui/dist
+	@cp -r chat-ui/build server/chatui/dist
+	@echo "Chat SPA embedded: server/chatui/dist/ ($$(find server/chatui/dist -type f | wc -l | tr -d ' ') files)"
 
 # Build the binary (run `make build-spa` first if the SPA has changed)
 build:

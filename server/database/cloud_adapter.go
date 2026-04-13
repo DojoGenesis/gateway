@@ -99,6 +99,26 @@ func (a *CloudAdapter) GetMessage(ctx context.Context, id string) (*Message, err
 	return nil, ErrCloudAdapterNotImplemented
 }
 
+func (a *CloudAdapter) CreatePromptTemplate(ctx context.Context, tmpl *PromptTemplate) error {
+	return ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) GetPromptTemplate(ctx context.Context, id string) (*PromptTemplate, error) {
+	return nil, ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) ListPromptTemplates(ctx context.Context, userID string, includePublic bool) ([]*PromptTemplate, error) {
+	return nil, ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) UpdatePromptTemplate(ctx context.Context, tmpl *PromptTemplate) error {
+	return ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) DeletePromptTemplate(ctx context.Context, id string) error {
+	return ErrCloudAdapterNotImplemented
+}
+
 func (a *CloudAdapter) Ping(ctx context.Context) error {
 	return ErrCloudAdapterNotImplemented
 }

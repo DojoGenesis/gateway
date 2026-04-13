@@ -1,0 +1,26 @@
+[Unit]
+Description=Dojo Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dojo
+Group=dojo
+ExecStart=/usr/local/bin/dojo-gateway -config /etc/dojo/config.yaml
+WorkingDirectory=/var/lib/dojo
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+# Environment variables (override via /etc/dojo/env or systemd drop-in)
+EnvironmentFile=-/etc/dojo/env
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dojo
+
+[Install]
+WantedBy=multi-user.target

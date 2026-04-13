@@ -1,0 +1,18 @@
+port: 7340
+environment: production
+data_dir: /var/lib/dojo
+registration_enabled: false
+jwt_secret: "${DOJO_JWT_SECRET}"
+
+providers:
+  anthropic:
+    api_key: "${ANTHROPIC_API_KEY}"
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+
+oauth:
+  github:
+    enabled: true
+    client_id: "${GITHUB_OAUTH_CLIENT_ID}"
+    client_secret: "${GITHUB_OAUTH_CLIENT_SECRET}"
+    redirect_uri: "https://gateway.trespies.dev/auth/github/callback"

@@ -1,0 +1,15 @@
+gateway.trespies.dev {
+    reverse_proxy localhost:7340
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    log {
+        output file /var/log/caddy/gateway.log
+        format json
+    }
+}

@@ -168,6 +168,13 @@ func (s *Server) setupRoutes() {
 	s.router.GET("/workflow", wbHandler)
 	s.router.GET("/workflow/*filepath", wbHandler)
 
+	// ─── Chat UI SPA (Wave 2) ─────────────────────────────────────────
+	// Served from embedded dist/ compiled by `make build-chat-spa`.
+	// SvelteKit base path is /chat, so all internal links resolve here.
+	chatSPAHandler := s.chatUIHandler()
+	s.router.GET("/chat", chatSPAHandler)
+	s.router.GET("/chat/*filepath", chatSPAHandler)
+
 	// ─── CAS API ────────────────────────────────────────────────────────
 	if s.workflowCAS != nil {
 		casGroup := s.router.Group("/api/cas")
@@ -237,6 +244,7 @@ func (s *Server) setupRoutes() {
 
 	// ─── Conversations API (Wave 1) ─────────────────────────────────
 	convGroup := v1.Group("/conversations")
+	convGroup.Use(middleware.AuthMiddleware())
 	{
 		convGroup.GET("", s.handleListConversations)
 		convGroup.POST("", s.handleCreateConversation)
@@ -244,5 +252,16 @@ func (s *Server) setupRoutes() {
 		convGroup.DELETE("/:id", s.handleDeleteConversation)
 		convGroup.GET("/:id/messages", s.handleListMessages)
 		convGroup.POST("/:id/messages", s.handleCreateMessage)
+	}
+
+	// ─── Prompt Templates API (Wave 2) ──────────────────────────────
+	tmplGroup := v1.Group("/templates")
+	tmplGroup.Use(middleware.AuthMiddleware())
+	{
+		tmplGroup.GET("", s.handleListTemplates)
+		tmplGroup.GET("/:id", s.handleGetTemplate)
+		tmplGroup.POST("", s.handleCreateTemplate)
+		tmplGroup.PUT("/:id", s.handleUpdateTemplate)
+		tmplGroup.DELETE("/:id", s.handleDeleteTemplate)
 	}
 }

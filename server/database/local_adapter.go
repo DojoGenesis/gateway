@@ -689,6 +689,261 @@ func (a *LocalAdapter) GetMessage(ctx context.Context, id string) (*Message, err
 	return msg, nil
 }
 
+// ─── Prompt Templates ────────────────────────────────────────────────────────
+
+func (a *LocalAdapter) CreatePromptTemplate(ctx context.Context, tmpl *PromptTemplate) error {
+	query := `
+		INSERT INTO prompt_templates (id, user_id, title, description, system_prompt, is_public, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := a.db.ExecContext(ctx, query,
+		tmpl.ID,
+		tmpl.UserID,
+		tmpl.Title,
+		tmpl.Description,
+		tmpl.SystemPrompt,
+		tmpl.IsPublic,
+		tmpl.CreatedAt,
+		tmpl.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create prompt template: %w", err)
+	}
+	return nil
+}
+
+func (a *LocalAdapter) GetPromptTemplate(ctx context.Context, id string) (*PromptTemplate, error) {
+	query := `
+		SELECT id, user_id, title, description, system_prompt, is_public, created_at, updated_at
+		FROM prompt_templates
+		WHERE id = ?
+	`
+
+	tmpl := &PromptTemplate{}
+	err := a.db.QueryRowContext(ctx, query, id).Scan(
+		&tmpl.ID,
+		&tmpl.UserID,
+		&tmpl.Title,
+		&tmpl.Description,
+		&tmpl.SystemPrompt,
+		&tmpl.IsPublic,
+		&tmpl.CreatedAt,
+		&tmpl.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrTemplateNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get prompt template: %w", err)
+	}
+
+	return tmpl, nil
+}
+
+func (a *LocalAdapter) ListPromptTemplates(ctx context.Context, userID string, includePublic bool) ([]*PromptTemplate, error) {
+	var query string
+	var args []interface{}
+
+	if includePublic {
+		query = `
+			SELECT id, user_id, title, description, system_prompt, is_public, created_at, updated_at
+			FROM prompt_templates
+			WHERE user_id = ? OR is_public = 1
+			ORDER BY updated_at DESC
+		`
+		args = []interface{}{userID}
+	} else {
+		query = `
+			SELECT id, user_id, title, description, system_prompt, is_public, created_at, updated_at
+			FROM prompt_templates
+			WHERE user_id = ?
+			ORDER BY updated_at DESC
+		`
+		args = []interface{}{userID}
+	}
+
+	rows, err := a.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list prompt templates: %w", err)
+	}
+	defer rows.Close()
+
+	tmpls := []*PromptTemplate{}
+	for rows.Next() {
+		tmpl := &PromptTemplate{}
+		err := rows.Scan(
+			&tmpl.ID,
+			&tmpl.UserID,
+			&tmpl.Title,
+			&tmpl.Description,
+			&tmpl.SystemPrompt,
+			&tmpl.IsPublic,
+			&tmpl.CreatedAt,
+			&tmpl.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan prompt template: %w", err)
+		}
+		tmpls = append(tmpls, tmpl)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate prompt templates: %w", err)
+	}
+
+	return tmpls, nil
+}
+
+func (a *LocalAdapter) UpdatePromptTemplate(ctx context.Context, tmpl *PromptTemplate) error {
+	query := `
+		UPDATE prompt_templates
+		SET title = ?, description = ?, system_prompt = ?, is_public = ?, updated_at = ?
+		WHERE id = ?
+	`
+
+	result, err := a.db.ExecContext(ctx, query,
+		tmpl.Title,
+		tmpl.Description,
+		tmpl.SystemPrompt,
+		tmpl.IsPublic,
+		tmpl.UpdatedAt,
+		tmpl.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update prompt template: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return ErrTemplateNotFound
+	}
+
+	return nil
+}
+
+func (a *LocalAdapter) DeletePromptTemplate(ctx context.Context, id string) error {
+	query := `DELETE FROM prompt_templates WHERE id = ?`
+
+	result, err := a.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete prompt template: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return ErrTemplateNotFound
+	}
+
+	return nil
+}
+
+// EnsurePromptTemplatesTable creates the prompt_templates table if it does not exist.
+// This is called from the schema initialization path.
+func EnsurePromptTemplatesTable(db *sql.DB) error {
+	query := `
+		CREATE TABLE IF NOT EXISTS prompt_templates (
+			id            TEXT PRIMARY KEY,
+			user_id       TEXT NOT NULL,
+			title         TEXT NOT NULL,
+			description   TEXT DEFAULT '',
+			system_prompt TEXT NOT NULL,
+			is_public     BOOLEAN DEFAULT 0,
+			created_at    DATETIME NOT NULL,
+			updated_at    DATETIME NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_prompt_templates_user ON prompt_templates(user_id);
+		CREATE INDEX IF NOT EXISTS idx_prompt_templates_public ON prompt_templates(is_public) WHERE is_public = 1;
+	`
+	_, err := db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("failed to create prompt_templates table: %w", err)
+	}
+	return nil
+}
+
+// SeedDefaultTemplates inserts pre-seeded public system templates if they don't exist.
+// Templates are keyed by title + user_id = "system" to remain idempotent on restart.
+func SeedDefaultTemplates(db *sql.DB) error {
+	type seedEntry struct {
+		title        string
+		description  string
+		systemPrompt string
+	}
+
+	seeds := []seedEntry{
+		{
+			title:       "Grant Writing Assistant",
+			description: "Expert grant writer specializing in community development and social equity funding.",
+			systemPrompt: "You are an expert grant writer specializing in community development and social equity funding. " +
+				"Help draft compelling narratives that connect data to impact. Reference specific metrics and cite data sources. " +
+				"Focus on logic models, theory of change, and measurable outcomes.",
+		},
+		{
+			title:       "Atlas Data Analyst",
+			description: "Spatial equity data analyst with expertise in the Madison Equity Atlas methodology.",
+			systemPrompt: "You are a spatial equity data analyst. You have expertise in the Madison Equity Atlas methodology " +
+				"including the Neighborhood Attendance Risk Index (NARI), Blinder-Oaxaca decomposition, and OLS regression for " +
+				"chronic absenteeism drivers. Interpret results in plain language for policymakers. When discussing statistics, " +
+				"always note confidence levels and practical significance.",
+		},
+		{
+			title:       "Policy Brief Drafter",
+			description: "Policy brief writer for Common Wealth Development (CWD), writing for Madison and Dane County officials.",
+			systemPrompt: "You are a policy brief writer for Common Wealth Development (CWD), a community development organization " +
+				"in Madison, WI. Write for the audience of Madison City Council members and Dane County Board supervisors. " +
+				"Use clear, accessible language. Structure briefs with: Executive Summary, Background, Key Findings, " +
+				"Recommendations, and Call to Action.",
+		},
+		{
+			title:       "Meeting Summarizer",
+			description: "Summarizes meeting notes into a structured format with decisions, action items, and next steps.",
+			systemPrompt: "Summarize meeting notes into a structured format: 1) Key Decisions Made, 2) Action Items (with owners " +
+				"and deadlines), 3) Open Questions, 4) Next Steps. Be concise. Use bullet points. Flag any decisions that seem " +
+				"to contradict prior commitments.",
+		},
+	}
+
+	now := time.Now()
+	for _, s := range seeds {
+		// Check if a system template with this title already exists.
+		var count int
+		err := db.QueryRow(
+			`SELECT COUNT(*) FROM prompt_templates WHERE user_id = 'system' AND title = ?`,
+			s.title,
+		).Scan(&count)
+		if err != nil {
+			return fmt.Errorf("failed to check existing seed template %q: %w", s.title, err)
+		}
+		if count > 0 {
+			continue
+		}
+
+		_, err = db.Exec(
+			`INSERT INTO prompt_templates (id, user_id, title, description, system_prompt, is_public, created_at, updated_at)
+			 VALUES (?, 'system', ?, ?, ?, 1, ?, ?)`,
+			uuid.New().String(),
+			s.title,
+			s.description,
+			s.systemPrompt,
+			now,
+			now,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to seed template %q: %w", s.title, err)
+		}
+	}
+
+	return nil
+}
+
 // EnsureMessagesTable creates the messages table if it does not exist.
 // This is called from the schema initialization path.
 func EnsureMessagesTable(db *sql.DB) error {
