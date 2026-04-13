@@ -119,10 +119,11 @@ func (s *Server) handleWorkflowExecute(c *gin.Context) {
 	runID := uuid.New().String()
 	s.execBus.Register(runID)
 
+	runner := NewCommandSkillRunner()
 	executor := workflow.NewWorkflowExecutor(s.workflowCAS, func(wfID, stepID, status string) {
 		s.execBus.Publish(runID, stepID, status)
 		s.wsHub.Publish(wfID, stepID, status)
-	})
+	}, runner)
 
 	// Execute in a background goroutine; use a detached context so the
 	// execution continues even after the POST response is flushed.

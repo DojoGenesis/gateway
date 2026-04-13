@@ -1,0 +1,71 @@
+{
+  "version": "1.0.0",
+  "name": "atlas-pipeline",
+  "description": "Madison Equity Atlas data-to-policy pipeline — 6-stage DAG from fetch through final assembly",
+  "artifact_type": "application/vnd.dojo.workflow.v1",
+  "trigger": {
+    "type": "manual"
+  },
+  "steps": [
+    {
+      "id": "fetch",
+      "skill": "run_command",
+      "inputs": {
+        "command": "make fetch",
+        "working_directory": "/Users/alfonsomorales/ZenflowProjects/CWD/atlas",
+        "timeout": "300"
+      },
+      "depends_on": []
+    },
+    {
+      "id": "process",
+      "skill": "run_command",
+      "inputs": {
+        "command": "make process",
+        "working_directory": "/Users/alfonsomorales/ZenflowProjects/CWD/atlas",
+        "timeout": "300"
+      },
+      "depends_on": ["fetch"]
+    },
+    {
+      "id": "enrich",
+      "skill": "run_command",
+      "inputs": {
+        "command": "make enrich",
+        "working_directory": "/Users/alfonsomorales/ZenflowProjects/CWD/atlas",
+        "timeout": "300"
+      },
+      "depends_on": ["process"]
+    },
+    {
+      "id": "analyze",
+      "skill": "run_command",
+      "inputs": {
+        "command": "make analyze",
+        "working_directory": "/Users/alfonsomorales/ZenflowProjects/CWD/atlas",
+        "timeout": "300"
+      },
+      "depends_on": ["enrich"]
+    },
+    {
+      "id": "synthesize",
+      "skill": "run_command",
+      "inputs": {
+        "command": "make synthesize",
+        "working_directory": "/Users/alfonsomorales/ZenflowProjects/CWD/atlas",
+        "timeout": "300"
+      },
+      "depends_on": ["analyze"]
+    },
+    {
+      "id": "assemble",
+      "skill": "run_command",
+      "inputs": {
+        "command": "make assemble",
+        "working_directory": "/Users/alfonsomorales/ZenflowProjects/CWD/atlas",
+        "timeout": "300"
+      },
+      "depends_on": ["synthesize"]
+    }
+  ]
+}
