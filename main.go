@@ -369,16 +369,39 @@ func main() {
 	if err != nil {
 		slog.Warn("failed to open auth database", "path", authDBPath, "error", err)
 	} else {
-		// Apply portal auth migration if not yet applied.
-		// Check schema_migrations — if table doesn't exist or row not found, apply migration.
-		needsMigration := true
+		// Apply migrations in order. Each is idempotent (CREATE IF NOT EXISTS / INSERT OR IGNORE).
+
+		// ── v0.0.30: base schema (local_users, schema_migrations, conversations, etc.)
+		baseStmts := []string{
+			`CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at DATETIME NOT NULL, description TEXT)`,
+			`CREATE TABLE IF NOT EXISTS local_users (
+				id TEXT PRIMARY KEY,
+				user_type TEXT DEFAULT 'guest' CHECK(user_type IN ('guest', 'authenticated')),
+				created_at DATETIME NOT NULL,
+				last_accessed_at DATETIME NOT NULL,
+				cloud_user_id TEXT,
+				migration_status TEXT DEFAULT 'none' CHECK(migration_status IN ('none', 'pending', 'in_progress', 'completed', 'failed')),
+				metadata TEXT
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_local_users_type ON local_users(user_type)`,
+			`CREATE INDEX IF NOT EXISTS idx_local_users_last_accessed ON local_users(last_accessed_at DESC)`,
+			`INSERT OR IGNORE INTO schema_migrations (version, applied_at, description) VALUES ('20260207_v0.0.30_local_auth', datetime('now'), 'Local-first authentication foundation')`,
+		}
+		for _, stmt := range baseStmts {
+			if _, execErr := authDB.Exec(stmt); execErr != nil {
+				slog.Warn("base auth migration statement failed", "error", execErr)
+			}
+		}
+
+		// ── v1.0.0: portal auth columns (email, password_hash, display_name)
+		needsPortalMigration := true
 		var migrationVersion string
 		row := authDB.QueryRow("SELECT version FROM schema_migrations WHERE version = '20260219_v1.0.0_portal_auth'")
 		if scanErr := row.Scan(&migrationVersion); scanErr == nil {
-			needsMigration = false
+			needsPortalMigration = false
 			slog.Info("portal auth migration already applied")
 		}
-		if needsMigration {
+		if needsPortalMigration {
 			slog.Info("applying portal auth migration")
 			stmts := []string{
 				"ALTER TABLE local_users ADD COLUMN email TEXT",
