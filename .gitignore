@@ -69,3 +69,4 @@ server/workflowui/dist/
 chat-ui/node_modules/
 chat-ui/.svelte-kit/
 chat-ui/build/
+# Root package-lock (npm init artifact)
