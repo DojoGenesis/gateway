@@ -41,6 +41,9 @@ RUN for dir in apps cmd/dojo disposition integration mcp memory \
 # Copy full source tree
 COPY . .
 
+# Create data dir for runtime volume ownership
+RUN mkdir -p /app/data
+
 # Build bridge binary only
 RUN CGO_ENABLED=0 go build \
     -ldflags="-s -w" \
