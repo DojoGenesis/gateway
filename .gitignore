@@ -64,3 +64,8 @@ claude-plugins-official/
 **/.claude/
 cmd/dojo/dojo
 server/workflowui/dist/
+
+# Chat UI SPA
+chat-ui/node_modules/
+chat-ui/.svelte-kit/
+chat-ui/build/
