@@ -14,8 +14,8 @@ DATA_DIR="/var/lib/dojo"
 BINARY_PATH="/usr/local/bin/dojo-gateway"
 SERVICE_NAME="dojo-gateway"
 
-# TODO: Update URL to match actual goreleaser output path
-RELEASE_URL="https://github.com/DojoGenesis/gateway/releases/download/${GATEWAY_VERSION}/gateway_linux_amd64"
+RELEASE_TARBALL="agentic-gateway_${GATEWAY_VERSION#v}_linux_amd64.tar.gz"
+RELEASE_URL="https://github.com/DojoGenesis/gateway/releases/download/${GATEWAY_VERSION}/${RELEASE_TARBALL}"
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 
@@ -87,8 +87,11 @@ if [[ -x "${BINARY_PATH}" ]]; then
 fi
 
 if $NEEDS_DOWNLOAD; then
-    run "curl -fSL '${RELEASE_URL}' -o '${BINARY_PATH}'"
+    run "curl -fSL '${RELEASE_URL}' -o '/tmp/${RELEASE_TARBALL}'"
+    run "tar xzf '/tmp/${RELEASE_TARBALL}' -C /tmp agentic-gateway"
+    run "mv /tmp/agentic-gateway '${BINARY_PATH}'"
     run "chmod 755 '${BINARY_PATH}'"
+    run "rm -f '/tmp/${RELEASE_TARBALL}'"
 fi
 
 # ---------------------------------------------------------------------------

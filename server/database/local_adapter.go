@@ -971,6 +971,273 @@ func EnsureMessagesTable(db *sql.DB) error {
 	return nil
 }
 
+// ─── Document / RAG ──────────────────────────────────────────────────────────
+
+// EnsureDocumentsTable creates the documents, document_chunks, and FTS tables if they do not exist.
+// FTS5 support is probed at runtime; if unavailable we fall back to plain LIKE search.
+func EnsureDocumentsTable(db *sql.DB) error {
+	// Core documents table
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS documents (
+			id           TEXT PRIMARY KEY,
+			user_id      TEXT NOT NULL,
+			filename     TEXT NOT NULL,
+			content_type TEXT NOT NULL DEFAULT 'text/plain',
+			size_bytes   INTEGER NOT NULL DEFAULT 0,
+			chunk_count  INTEGER NOT NULL DEFAULT 0,
+			status       TEXT NOT NULL DEFAULT 'processing',
+			created_at   DATETIME NOT NULL,
+			metadata     TEXT
+		);
+		CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create documents table: %w", err)
+	}
+
+	// Chunks table (regular, for retrieval)
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS document_chunks (
+			id          TEXT PRIMARY KEY,
+			document_id TEXT NOT NULL,
+			chunk_index INTEGER NOT NULL,
+			content     TEXT NOT NULL,
+			created_at  DATETIME NOT NULL,
+			FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+		);
+		CREATE INDEX IF NOT EXISTS idx_chunks_document ON document_chunks(document_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create document_chunks table: %w", err)
+	}
+
+	// Attempt FTS5 virtual table creation. modernc.org/sqlite ships with FTS5.
+	// If it fails for any reason we leave it absent and fall back to LIKE.
+	_, ftsErr := db.Exec(`
+		CREATE VIRTUAL TABLE IF NOT EXISTS document_chunks_fts USING fts5(
+			content,
+			chunk_id   UNINDEXED,
+			document_id UNINDEXED,
+			chunk_index UNINDEXED
+		);
+	`)
+	if ftsErr != nil {
+		// FTS5 not available — log and continue. Searches will use LIKE.
+		_ = ftsErr
+	}
+
+	return nil
+}
+
+func (a *LocalAdapter) CreateDocument(ctx context.Context, doc *Document) error {
+	_, err := a.db.ExecContext(ctx, `
+		INSERT INTO documents (id, user_id, filename, content_type, size_bytes, chunk_count, status, created_at, metadata)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		doc.ID, doc.UserID, doc.Filename, doc.ContentType,
+		doc.SizeBytes, doc.ChunkCount, doc.Status, doc.CreatedAt, doc.Metadata,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create document: %w", err)
+	}
+	return nil
+}
+
+func (a *LocalAdapter) GetDocument(ctx context.Context, id string) (*Document, error) {
+	doc := &Document{}
+	err := a.db.QueryRowContext(ctx, `
+		SELECT id, user_id, filename, content_type, size_bytes, chunk_count, status, created_at, metadata
+		FROM documents WHERE id = ?`, id,
+	).Scan(&doc.ID, &doc.UserID, &doc.Filename, &doc.ContentType,
+		&doc.SizeBytes, &doc.ChunkCount, &doc.Status, &doc.CreatedAt, &doc.Metadata)
+	if err == sql.ErrNoRows {
+		return nil, ErrDocumentNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get document: %w", err)
+	}
+	return doc, nil
+}
+
+func (a *LocalAdapter) ListDocuments(ctx context.Context, userID string) ([]*Document, error) {
+	rows, err := a.db.QueryContext(ctx, `
+		SELECT id, user_id, filename, content_type, size_bytes, chunk_count, status, created_at, metadata
+		FROM documents WHERE user_id = ? ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list documents: %w", err)
+	}
+	defer rows.Close()
+
+	docs := []*Document{}
+	for rows.Next() {
+		doc := &Document{}
+		if err := rows.Scan(&doc.ID, &doc.UserID, &doc.Filename, &doc.ContentType,
+			&doc.SizeBytes, &doc.ChunkCount, &doc.Status, &doc.CreatedAt, &doc.Metadata); err != nil {
+			return nil, fmt.Errorf("failed to scan document: %w", err)
+		}
+		docs = append(docs, doc)
+	}
+	return docs, rows.Err()
+}
+
+func (a *LocalAdapter) DeleteDocument(ctx context.Context, id string) error {
+	// Delete FTS entries first (no CASCADE on virtual table)
+	_, _ = a.db.ExecContext(ctx, `DELETE FROM document_chunks_fts WHERE document_id = ?`, id)
+
+	result, err := a.db.ExecContext(ctx, `DELETE FROM documents WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete document: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return ErrDocumentNotFound
+	}
+	return nil
+}
+
+func (a *LocalAdapter) UpdateDocumentStatus(ctx context.Context, id string, status string, chunkCount int) error {
+	result, err := a.db.ExecContext(ctx,
+		`UPDATE documents SET status = ?, chunk_count = ? WHERE id = ?`,
+		status, chunkCount, id)
+	if err != nil {
+		return fmt.Errorf("failed to update document status: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return ErrDocumentNotFound
+	}
+	return nil
+}
+
+// hasFTS5 probes whether the document_chunks_fts virtual table exists.
+func (a *LocalAdapter) hasFTS5(ctx context.Context) bool {
+	var name string
+	err := a.db.QueryRowContext(ctx,
+		`SELECT name FROM sqlite_master WHERE type='table' AND name='document_chunks_fts'`,
+	).Scan(&name)
+	return err == nil && name != ""
+}
+
+func (a *LocalAdapter) CreateDocumentChunks(ctx context.Context, chunks []*DocumentChunk) error {
+	if len(chunks) == 0 {
+		return nil
+	}
+
+	tx, err := a.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	stmtChunks, err := tx.PrepareContext(ctx, `
+		INSERT INTO document_chunks (id, document_id, chunk_index, content, created_at)
+		VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare chunk insert: %w", err)
+	}
+	defer stmtChunks.Close()
+
+	// FTS5 insert — prepared separately; may be nil if FTS5 unavailable
+	var stmtFTS *sql.Stmt
+	if a.hasFTS5(ctx) {
+		stmtFTS, err = tx.PrepareContext(ctx, `
+			INSERT INTO document_chunks_fts (content, chunk_id, document_id, chunk_index)
+			VALUES (?, ?, ?, ?)`)
+		if err != nil {
+			// FTS5 write failed — proceed without FTS (search falls back to LIKE)
+			stmtFTS = nil
+		}
+	}
+	if stmtFTS != nil {
+		defer stmtFTS.Close()
+	}
+
+	for _, c := range chunks {
+		if c.ID == "" {
+			c.ID = uuid.New().String()
+		}
+		if c.CreatedAt.IsZero() {
+			c.CreatedAt = time.Now()
+		}
+		if _, err := stmtChunks.ExecContext(ctx, c.ID, c.DocumentID, c.ChunkIndex, c.Content, c.CreatedAt); err != nil {
+			return fmt.Errorf("failed to insert chunk %d: %w", c.ChunkIndex, err)
+		}
+		if stmtFTS != nil {
+			if _, err := stmtFTS.ExecContext(ctx, c.Content, c.ID, c.DocumentID, c.ChunkIndex); err != nil {
+				// Non-fatal: FTS insert failure shouldn't abort the whole upload
+				_ = err
+			}
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (a *LocalAdapter) SearchDocumentChunks(ctx context.Context, userID string, query string, limit int) ([]*DocumentChunk, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+
+	var (
+		rows *sql.Rows
+		err  error
+	)
+
+	if a.hasFTS5(ctx) {
+		rows, err = a.db.QueryContext(ctx, `
+			SELECT dc.id, dc.document_id, dc.chunk_index, dc.content, dc.created_at
+			FROM document_chunks_fts fts
+			JOIN document_chunks dc ON dc.id = fts.chunk_id
+			JOIN documents d ON d.id = dc.document_id
+			WHERE d.user_id = ? AND document_chunks_fts MATCH ?
+			ORDER BY rank
+			LIMIT ?`,
+			userID, query, limit)
+	} else {
+		// Fallback: simple LIKE search
+		rows, err = a.db.QueryContext(ctx, `
+			SELECT dc.id, dc.document_id, dc.chunk_index, dc.content, dc.created_at
+			FROM document_chunks dc
+			JOIN documents d ON d.id = dc.document_id
+			WHERE d.user_id = ? AND dc.content LIKE ?
+			LIMIT ?`,
+			userID, "%"+query+"%", limit)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to search chunks: %w", err)
+	}
+	defer rows.Close()
+
+	chunks := []*DocumentChunk{}
+	for rows.Next() {
+		c := &DocumentChunk{}
+		if err := rows.Scan(&c.ID, &c.DocumentID, &c.ChunkIndex, &c.Content, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan chunk: %w", err)
+		}
+		chunks = append(chunks, c)
+	}
+	return chunks, rows.Err()
+}
+
+func (a *LocalAdapter) GetDocumentChunks(ctx context.Context, documentID string) ([]*DocumentChunk, error) {
+	rows, err := a.db.QueryContext(ctx, `
+		SELECT id, document_id, chunk_index, content, created_at
+		FROM document_chunks WHERE document_id = ? ORDER BY chunk_index ASC`, documentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get document chunks: %w", err)
+	}
+	defer rows.Close()
+
+	chunks := []*DocumentChunk{}
+	for rows.Next() {
+		c := &DocumentChunk{}
+		if err := rows.Scan(&c.ID, &c.DocumentID, &c.ChunkIndex, &c.Content, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan chunk: %w", err)
+		}
+		chunks = append(chunks, c)
+	}
+	return chunks, rows.Err()
+}
+
 func (a *LocalAdapter) Ping(ctx context.Context) error {
 	return a.db.PingContext(ctx)
 }

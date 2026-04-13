@@ -119,6 +119,38 @@ func (a *CloudAdapter) DeletePromptTemplate(ctx context.Context, id string) erro
 	return ErrCloudAdapterNotImplemented
 }
 
+func (a *CloudAdapter) CreateDocument(ctx context.Context, doc *Document) error {
+	return ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) GetDocument(ctx context.Context, id string) (*Document, error) {
+	return nil, ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) ListDocuments(ctx context.Context, userID string) ([]*Document, error) {
+	return nil, ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) DeleteDocument(ctx context.Context, id string) error {
+	return ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) UpdateDocumentStatus(ctx context.Context, id string, status string, chunkCount int) error {
+	return ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) CreateDocumentChunks(ctx context.Context, chunks []*DocumentChunk) error {
+	return ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) SearchDocumentChunks(ctx context.Context, userID string, query string, limit int) ([]*DocumentChunk, error) {
+	return nil, ErrCloudAdapterNotImplemented
+}
+
+func (a *CloudAdapter) GetDocumentChunks(ctx context.Context, documentID string) ([]*DocumentChunk, error) {
+	return nil, ErrCloudAdapterNotImplemented
+}
+
 func (a *CloudAdapter) Ping(ctx context.Context) error {
 	return ErrCloudAdapterNotImplemented
 }

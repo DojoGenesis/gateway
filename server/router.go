@@ -264,4 +264,15 @@ func (s *Server) setupRoutes() {
 		tmplGroup.PUT("/:id", s.handleUpdateTemplate)
 		tmplGroup.DELETE("/:id", s.handleDeleteTemplate)
 	}
+
+	// ─── Documents / RAG API (Wave 2) ───────────────────────────────
+	docGroup := v1.Group("/documents")
+	docGroup.Use(middleware.AuthMiddleware())
+	{
+		docGroup.POST("", s.handleUploadDocument)
+		docGroup.GET("", s.handleListRAGDocuments)
+		docGroup.GET("/:id", s.handleGetRAGDocument)
+		docGroup.DELETE("/:id", s.handleDeleteRAGDocument)
+		docGroup.POST("/search", s.handleSearchRAGDocuments)
+	}
 }

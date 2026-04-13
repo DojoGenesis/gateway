@@ -15,6 +15,8 @@ var (
 	ErrInvalidUserType        = errors.New("invalid user type")
 	ErrInvalidMigrationStatus = errors.New("invalid migration status")
 	ErrTemplateNotFound       = errors.New("prompt template not found")
+	ErrDocumentNotFound       = errors.New("document not found")
+	ErrChunkNotFound          = errors.New("chunk not found")
 )
 
 type UserType string
@@ -108,6 +110,28 @@ type PromptTemplate struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// Document represents an uploaded file stored for RAG retrieval.
+type Document struct {
+	ID          string    `json:"id"`
+	UserID      string    `json:"user_id"`
+	Filename    string    `json:"filename"`
+	ContentType string    `json:"content_type"`
+	SizeBytes   int64     `json:"size_bytes"`
+	ChunkCount  int       `json:"chunk_count"`
+	Status      string    `json:"status"` // "processing", "ready", "error"
+	CreatedAt   time.Time `json:"created_at"`
+	Metadata    *string   `json:"metadata,omitempty"`
+}
+
+// DocumentChunk is a text segment extracted from a Document, indexed for FTS search.
+type DocumentChunk struct {
+	ID         string    `json:"id"`
+	DocumentID string    `json:"document_id"`
+	ChunkIndex int       `json:"chunk_index"`
+	Content    string    `json:"content"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 type DatabaseAdapter interface {
 	GetUser(ctx context.Context, userID string) (*User, error)
 	CreateUser(ctx context.Context, user *User) error
@@ -138,6 +162,17 @@ type DatabaseAdapter interface {
 	ListPromptTemplates(ctx context.Context, userID string, includePublic bool) ([]*PromptTemplate, error)
 	UpdatePromptTemplate(ctx context.Context, tmpl *PromptTemplate) error
 	DeletePromptTemplate(ctx context.Context, id string) error
+
+	// Document management (RAG pipeline)
+	CreateDocument(ctx context.Context, doc *Document) error
+	GetDocument(ctx context.Context, id string) (*Document, error)
+	ListDocuments(ctx context.Context, userID string) ([]*Document, error)
+	DeleteDocument(ctx context.Context, id string) error
+	UpdateDocumentStatus(ctx context.Context, id string, status string, chunkCount int) error
+
+	CreateDocumentChunks(ctx context.Context, chunks []*DocumentChunk) error
+	SearchDocumentChunks(ctx context.Context, userID string, query string, limit int) ([]*DocumentChunk, error)
+	GetDocumentChunks(ctx context.Context, documentID string) ([]*DocumentChunk, error)
 
 	Ping(ctx context.Context) error
 	Close() error
