@@ -32,12 +32,12 @@ type OAuthConfig struct {
 //
 //	GITHUB_OAUTH_CLIENT_ID     — OAuth app client ID
 //	GITHUB_OAUTH_CLIENT_SECRET — OAuth app client secret
-//	GITHUB_OAUTH_REDIRECT_URI  — Callback URI (default: https://gateway.trespies.dev/auth/github/callback)
+//	GITHUB_OAUTH_REDIRECT_URI  — Callback URI (default: https://pdi.trespies.dev/auth/github/callback)
 //	GITHUB_OAUTH_ENABLED       — Set to "true" to enable the flow
 func loadOAuthConfig() OAuthConfig {
 	redirectURI := os.Getenv("GITHUB_OAUTH_REDIRECT_URI")
 	if redirectURI == "" {
-		redirectURI = "https://gateway.trespies.dev/auth/github/callback"
+		redirectURI = "https://pdi.trespies.dev/auth/github/callback"
 	}
 	return OAuthConfig{
 		GitHubClientID:     os.Getenv("GITHUB_OAUTH_CLIENT_ID"),
@@ -206,27 +206,14 @@ func (s *Server) handleOAuthGitHubCallback(c *gin.Context) {
 		return
 	}
 
-	// Set tokens as httpOnly cookies and redirect to the chat UI.
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "access_token",
-		Value:    accessJWT,
-		Path:     "/",
-		MaxAge:   int(s.cfg.AccessTokenTTL.Seconds()),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    refreshJWT,
-		Path:     "/",
-		MaxAge:   int(s.cfg.RefreshTokenTTL.Seconds()),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
-
-	c.Redirect(http.StatusFound, "/chat")
+	// Redirect to the chat SPA with tokens in the URL fragment so the SPA can
+	// persist them to localStorage (httpOnly cookies are not readable by JS).
+	q := url.Values{}
+	q.Set("access_token", accessJWT)
+	q.Set("refresh_token", refreshJWT)
+	q.Set("user_id", userID)
+	q.Set("display_name", displayName)
+	c.Redirect(http.StatusFound, "/chat?"+q.Encode())
 }
 
 // ─── Helper functions ────────────────────────────────────────────────────────

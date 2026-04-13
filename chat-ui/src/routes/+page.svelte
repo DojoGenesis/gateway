@@ -40,6 +40,20 @@
 
 	// ── Init ──────────────────────────────────────────────────────────────────
 	onMount(async () => {
+		// Consume OAuth callback tokens from query params (GitHub OAuth flow).
+		const params = new URLSearchParams(window.location.search);
+		const oauthToken = params.get('access_token');
+		if (oauthToken) {
+			saveAuth(
+				oauthToken,
+				params.get('refresh_token') ?? '',
+				params.get('user_id') ?? '',
+				params.get('display_name') ?? ''
+			);
+			// Remove tokens from URL without triggering a navigation.
+			history.replaceState({}, '', window.location.pathname);
+		}
+
 		loadAuthFromStorage();
 		if (!auth.isAuthenticated) {
 			goto(`${base}/login`);
