@@ -38,8 +38,17 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 	if (!res.ok) {
 		let msg = `HTTP ${res.status}`;
 		try {
-			const body = (await res.json()) as { error?: string; message?: string };
-			msg = body.error ?? body.message ?? msg;
+			const body = (await res.json()) as {
+				error?: string | { message?: string; code?: string };
+				message?: string;
+			};
+			if (typeof body.error === 'string') {
+				msg = body.error;
+			} else if (body.error && typeof body.error === 'object') {
+				msg = body.error.message ?? body.error.code ?? msg;
+			} else if (body.message) {
+				msg = body.message;
+			}
 		} catch {
 			// ignore parse errors
 		}
@@ -69,7 +78,7 @@ export async function refreshToken(token: string): Promise<AuthResponse> {
 // ── Models ───────────────────────────────────────────────────────────────────
 
 export async function listModels(): Promise<Model[]> {
-	const data = await apiFetch<ModelsResponse>('/v1/models');
+	const data = await apiFetch<ModelsResponse>('/v1/models', { cache: 'no-store' });
 	return data.data ?? [];
 }
 
@@ -100,8 +109,12 @@ export async function* streamChat(
 	if (!res.ok) {
 		let msg = `HTTP ${res.status}`;
 		try {
-			const body = (await res.json()) as { error?: string };
-			msg = body.error ?? msg;
+			const body = (await res.json()) as { error?: string | { message?: string; code?: string } };
+			if (typeof body.error === 'string') {
+				msg = body.error;
+			} else if (body.error && typeof body.error === 'object') {
+				msg = body.error.message ?? body.error.code ?? msg;
+			}
 		} catch {
 			// ignore
 		}

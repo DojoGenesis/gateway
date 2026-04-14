@@ -207,10 +207,7 @@ func (pa *PrimaryAgent) HandleQuery(ctx context.Context, query string, providerN
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, pa.timeout)
 	defer cancel()
 
-	systemPrompt := os.Getenv("QWEN3_SYSTEM_PROMPT")
-	if systemPrompt == "" {
-		systemPrompt = "You are a helpful AI coding assistant."
-	}
+	systemPrompt := resolveBaseSystemPrompt()
 
 	messages := []providerpkg.Message{
 		{
@@ -304,10 +301,7 @@ func (pa *PrimaryAgent) HandleStreamingQuery(ctx context.Context, query string, 
 
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, pa.timeout)
 
-	systemPrompt := os.Getenv("QWEN3_SYSTEM_PROMPT")
-	if systemPrompt == "" {
-		systemPrompt = "You are a helpful AI coding assistant."
-	}
+	systemPrompt := resolveBaseSystemPrompt()
 
 	messages := []providerpkg.Message{
 		{
@@ -467,14 +461,28 @@ func (pa *PrimaryAgent) ClassifyIntent(ctx context.Context, query string) (Inten
 	return pa.miniAgent.ClassifyIntent(ctx, query)
 }
 
+// resolveBaseSystemPrompt returns the configured base system prompt.
+// Precedence: SYSTEM_PROMPT env > SYSTEM_PROMPT_FILE > QWEN3_SYSTEM_PROMPT > built-in default.
+func resolveBaseSystemPrompt() string {
+	if v := os.Getenv("SYSTEM_PROMPT"); v != "" {
+		return strings.TrimSpace(v)
+	}
+	if path := os.Getenv("SYSTEM_PROMPT_FILE"); path != "" {
+		if data, err := os.ReadFile(path); err == nil {
+			if trimmed := strings.TrimSpace(string(data)); trimmed != "" {
+				return trimmed
+			}
+		}
+	}
+	if v := os.Getenv("QWEN3_SYSTEM_PROMPT"); v != "" {
+		return v
+	}
+	return "You are a helpful AI coding assistant."
+}
+
 // buildSystemPrompt creates an intent-specific system prompt.
 func (pa *PrimaryAgent) buildSystemPrompt(intent Intent) string {
-	basePrompt := "You are a helpful AI coding assistant."
-
-	envPrompt := os.Getenv("QWEN3_SYSTEM_PROMPT")
-	if envPrompt != "" {
-		basePrompt = envPrompt
-	}
+	basePrompt := resolveBaseSystemPrompt()
 
 	switch intent {
 	case IntentThink:

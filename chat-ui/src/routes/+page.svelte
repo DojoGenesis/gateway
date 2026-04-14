@@ -121,7 +121,7 @@
 			textareaEl.style.height = 'auto';
 		}
 
-		const model = selectedModel.value || 'claude-3-5-sonnet-20241022';
+		const model = selectedModel.value || 'claude-sonnet-4-20250514';
 
 		// Ensure a conversation exists before sending
 		if (!currentConversationId.value) {
@@ -164,7 +164,7 @@
 			appendMessage({ role: 'assistant', content: '' });
 			await scrollToBottom();
 
-			for await (const chunk of streamChat(context.slice(0, -1), model)) {
+			for await (const chunk of streamChat(context, model)) {
 				appendToLastAssistantMessage(chunk);
 				fullResponse += chunk;
 				await scrollToBottom();

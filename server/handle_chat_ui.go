@@ -56,6 +56,12 @@ func (s *Server) chatUIHandler() gin.HandlerFunc {
 			return
 		}
 
+		// HTML files must not be cached so browsers always fetch the latest
+		// index.html (which references content-hashed JS/CSS). Immutable assets
+		// can be cached indefinitely since their filenames change on rebuild.
+		if strings.HasSuffix(urlPath, ".html") || urlPath == "index.html" {
+			c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+		}
 		c.Data(http.StatusOK, contentType, data)
 	}
 }
