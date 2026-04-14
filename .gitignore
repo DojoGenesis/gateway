@@ -70,3 +70,5 @@ chat-ui/node_modules/
 chat-ui/.svelte-kit/
 chat-ui/build/
 # Root package-lock (npm init artifact)
+dojo-gateway-linux
+system-prompt.txt
