@@ -106,7 +106,7 @@ func (a *TelegramAdapter) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "failed to read body", http.StatusInternalServerError)
 		return
 	}
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 
 	if _, err := a.Normalize(raw); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -252,7 +252,7 @@ func (a *TelegramAdapter) StartLongPolling(ctx context.Context, handler func(*ch
 		}
 
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			time.Sleep(2 * time.Second)
@@ -321,7 +321,7 @@ func (a *TelegramAdapter) Send(ctx context.Context, msg *channel.ChannelMessage)
 	if err != nil {
 		return fmt.Errorf("telegram: send: HTTP error: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)

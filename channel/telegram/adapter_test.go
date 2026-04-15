@@ -329,7 +329,7 @@ func TestTelegramAdapter_Send(t *testing.T) {
 		capturedPath = r.URL.Path
 		capturedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	defer srv.Close()
 

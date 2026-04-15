@@ -367,7 +367,7 @@ func TestWhatsAppAdapter_Send(t *testing.T) {
 		capturedAuth = r.Header.Get("Authorization")
 		capturedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"messages":[{"id":"wamid.resp001"}]}`))
+		_, _ = w.Write([]byte(`{"messages":[{"id":"wamid.resp001"}]}`))
 	}))
 	defer srv.Close()
 
@@ -426,7 +426,7 @@ func TestWhatsAppAdapter_Send(t *testing.T) {
 func TestWhatsAppAdapter_Send_APIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":{"message":"Invalid access token"}}`))
+		_, _ = w.Write([]byte(`{"error":{"message":"Invalid access token"}}`))
 	}))
 	defer srv.Close()
 

@@ -193,7 +193,7 @@ func (a *WhatsAppAdapter) Send(ctx context.Context, msg *channel.ChannelMessage)
 	if err != nil {
 		return fmt.Errorf("whatsapp: send: HTTP error: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -272,7 +272,7 @@ func (a *WhatsAppAdapter) handleVerification(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, challenge)
+	_, _ = fmt.Fprint(w, challenge)
 }
 
 // handleMessage processes a POST webhook payload.
@@ -287,7 +287,7 @@ func (a *WhatsAppAdapter) handleMessage(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "failed to read body", http.StatusInternalServerError)
 		return
 	}
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 
 	msg, err := a.Normalize(raw)
 	if err != nil {

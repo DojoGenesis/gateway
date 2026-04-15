@@ -93,7 +93,7 @@ func (a *WebChatAdapter) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to read body", http.StatusInternalServerError)
 		return
 	}
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 
 	if _, err := a.Normalize(raw); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
