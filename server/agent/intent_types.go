@@ -67,5 +67,6 @@ type RoutingDecision struct {
 	Confidence        float64
 	Category          IntentCategory
 	Reasoning         []string
-	SpecialistAgentID string // bridges category → specialist agent
+	SpecialistAgentID string            // bridges category → specialist agent
+	Scores            map[string]float64 `json:"scores,omitempty"` // per-route similarity scores from Tier 2; empty for Tier 1/3 decisions
 }

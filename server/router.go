@@ -249,6 +249,7 @@ func (s *Server) setupRoutes() {
 		admin.GET("/routing/mode", s.handleAdminRoutingMode)
 		admin.POST("/routing/mode", s.handleAdminSetRoutingMode)
 		admin.GET("/routing/stats", s.handleAdminRoutingStats)
+		admin.POST("/routing/threshold", s.handleAdminSetRouteThreshold)
 
 		// User management (Wave 1)
 		admin.GET("/users", s.handleAdminListUsers)

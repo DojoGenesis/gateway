@@ -154,6 +154,62 @@ func (s *Server) handleAdminSetRoutingMode(c *gin.Context) {
 	})
 }
 
+// handleAdminSetRouteThreshold updates the similarity threshold for a named route.
+//
+// POST /admin/routing/threshold
+//
+// Request body:
+//
+//	{"route": "deep_inference", "threshold": 0.62}
+//
+// Response 200 — updated route summary list.
+// Response 400 — missing fields, unknown route, or threshold out of [0.0, 1.0].
+// Response 503 — semantic router not initialised.
+func (s *Server) handleAdminSetRouteThreshold(c *gin.Context) {
+	if s.semanticRouter == nil {
+		slog.Warn("handleAdminSetRouteThreshold: semanticRouter not initialised")
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "semantic router not initialised",
+		})
+		return
+	}
+
+	var req struct {
+		Route     string  `json:"route"     binding:"required"`
+		Threshold float64 `json:"threshold" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		slog.Warn("handleAdminSetRouteThreshold: invalid request body", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "request body must contain 'route' and 'threshold' fields",
+		})
+		return
+	}
+
+	if req.Threshold < 0.0 || req.Threshold > 1.0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "threshold must be in [0.0, 1.0]",
+		})
+		return
+	}
+
+	if err := s.semanticRouter.SetRouteThreshold(req.Route, req.Threshold); err != nil {
+		slog.Warn("handleAdminSetRouteThreshold: route not found", "route", req.Route)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	slog.Info("admin: route threshold updated", "route", req.Route, "threshold", req.Threshold)
+	summaries := buildRouteSummaries(s.semanticRouter.GetRoutes())
+	c.JSON(http.StatusOK, gin.H{
+		"route":     req.Route,
+		"threshold": req.Threshold,
+		"routes":    summaries,
+	})
+}
+
 // handleAdminRoutingStats returns routing statistics and a route inventory.
 //
 // GET /admin/routing/stats
@@ -189,6 +245,7 @@ func (s *Server) handleAdminRoutingStats(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"current_mode": currentMode.String(),
 		"route_count":  len(routes),
+		"initialized":  s.semanticRouter.IsInitialized(),
 		"stats":        nil,
 	})
 }

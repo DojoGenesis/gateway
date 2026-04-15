@@ -75,12 +75,15 @@ func (b *ProviderEmbeddingBackend) Embed(ctx context.Context, text string) ([]fl
 //
 // Thread-safety: route definitions are protected by a RWMutex; the routing
 // mode is stored as an atomic int32 so reads and writes are lock-free.
+// initialized is an atomic bool so IsInitialized and TryInitialize are safe
+// to call from any goroutine.
 type SemanticRouter struct {
-	mu        sync.RWMutex
-	routes    []RouteDefinition
-	mode      atomic.Int32 // stores RoutingMode
-	embedder  EmbeddingBackend
-	llmRouter LLMRouter
+	mu          sync.RWMutex
+	routes      []RouteDefinition
+	mode        atomic.Int32 // stores RoutingMode
+	initialized atomic.Bool
+	embedder    EmbeddingBackend
+	llmRouter   LLMRouter
 }
 
 // NewSemanticRouter creates a SemanticRouter with the given EmbeddingBackend
@@ -125,6 +128,21 @@ func (sr *SemanticRouter) SetMode(mode RoutingMode) {
 	slog.Info("semantic router: mode changed", "mode", mode.String())
 }
 
+// SetRouteThreshold updates the similarity threshold for a named route.
+// Returns an error if no route with that name exists.
+func (sr *SemanticRouter) SetRouteThreshold(name string, threshold float64) error {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	for i := range sr.routes {
+		if sr.routes[i].Name == name {
+			sr.routes[i].Threshold = threshold
+			slog.Info("semantic router: threshold updated", "route", name, "threshold", threshold)
+			return nil
+		}
+	}
+	return fmt.Errorf("semantic router: route %q not found", name)
+}
+
 // Initialize computes centroids for all registered routes by embedding each
 // utterance and averaging the resulting vectors. This must be called before
 // Route; it may also be called again after AddRoute to update centroids.
@@ -150,7 +168,31 @@ func (sr *SemanticRouter) Initialize(ctx context.Context) error {
 	}
 
 	slog.Info("semantic router: initialization complete", "routes", len(sr.routes))
+	sr.initialized.Store(true)
 	return nil
+}
+
+// IsInitialized reports whether centroids have been successfully computed.
+// Safe to call from any goroutine.
+func (sr *SemanticRouter) IsInitialized() bool {
+	return sr.initialized.Load()
+}
+
+// TryInitialize attempts to initialize the router if it has not been
+// initialized yet. Returns (true, nil) when initialization succeeds,
+// (false, nil) when the router was already initialized, and (false, err)
+// when initialization fails. Thread-safe: concurrent calls are safe because
+// Initialize holds the write lock, but only one caller will observe the
+// centroids being computed — subsequent callers after the first success
+// will return (false, nil).
+func (sr *SemanticRouter) TryInitialize(ctx context.Context) (bool, error) {
+	if sr.initialized.Load() {
+		return false, nil
+	}
+	if err := sr.Initialize(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // Route classifies query and returns a RoutingDecision. The pipeline executed
@@ -269,6 +311,7 @@ func (sr *SemanticRouter) tier2Embedding(ctx context.Context, query string) (Rou
 		return RoutingDecision{}, false, fmt.Errorf("tier2: embed query: %w", err)
 	}
 
+	allScores := make(map[string]float64, len(routes))
 	var best RouteMatch
 	found := false
 	for _, route := range routes {
@@ -276,6 +319,7 @@ func (sr *SemanticRouter) tier2Embedding(ctx context.Context, query string) (Rou
 			continue
 		}
 		sim := cosineSimilarityLocal(vec, route.Centroid)
+		allScores[route.Name] = sim
 		if !found || sim > best.Similarity {
 			best = RouteMatch{Route: route, Similarity: sim}
 			found = true
@@ -291,8 +335,15 @@ func (sr *SemanticRouter) tier2Embedding(ctx context.Context, query string) (Rou
 		threshold = best.Route.Threshold
 	}
 
+	slog.Debug("semantic router: tier2 scores",
+		"query_len", len(query),
+		"best_route", best.Route.Name,
+		"best_similarity", best.Similarity,
+		"threshold", threshold,
+		"matched", best.Similarity >= threshold,
+	)
+
 	if best.Similarity < threshold {
-		slog.Debug("semantic router: tier2 no match", "best_route", best.Route.Name, "similarity", best.Similarity, "threshold", threshold)
 		return RoutingDecision{}, false, nil
 	}
 
@@ -303,6 +354,7 @@ func (sr *SemanticRouter) tier2Embedding(ctx context.Context, query string) (Rou
 		Fallback:   best.Route.Fallback,
 		Confidence: best.Similarity,
 		Category:   category,
+		Scores:     allScores,
 		Reasoning: []string{
 			fmt.Sprintf("tier2: embedding match route=%s similarity=%.4f threshold=%.4f",
 				best.Route.Name, best.Similarity, threshold),

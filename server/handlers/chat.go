@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -191,6 +192,11 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 		"confidence", decision.Confidence,
 		"reasoning", decision.Reasoning,
 	)
+
+	// Emit per-route similarity scores as a debug header when Tier 2 was used.
+	if len(decision.Scores) > 0 {
+		c.Header("X-Route-Scores", formatRouteScores(decision.Scores))
+	}
 
 	// Route based on decision
 	switch decision.Handler {
@@ -730,4 +736,29 @@ func (h *ChatHandler) lookupUserTier(ctx context.Context, userID string) string 
 	}
 
 	return ""
+}
+
+// formatRouteScores produces a compact "route=score" string for the top-3
+// routes by descending similarity, e.g. "fast_inference=0.82,direct_response=0.71,deep_inference=0.65".
+// Intended for the X-Route-Scores debug header.
+func formatRouteScores(scores map[string]float64) string {
+	type routeScore struct {
+		name  string
+		score float64
+	}
+	pairs := make([]routeScore, 0, len(scores))
+	for name, score := range scores {
+		pairs = append(pairs, routeScore{name, score})
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i].score > pairs[j].score
+	})
+	if len(pairs) > 3 {
+		pairs = pairs[:3]
+	}
+	parts := make([]string, len(pairs))
+	for i, p := range pairs {
+		parts[i] = fmt.Sprintf("%s=%.4f", p.name, p.score)
+	}
+	return strings.Join(parts, ",")
 }

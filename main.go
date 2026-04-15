@@ -337,27 +337,20 @@ func main() {
 
 	// Initialization embeds all route utterances — this requires a live provider
 	// with embedding support. If the provider isn't loaded yet (keys pushed later
-	// by CLI), initialization is deferred and the legacy classifier handles traffic
-	// until the admin triggers re-init or the provider becomes available.
+	// by CLI), initialization is deferred and TryInitialize will be called
+	// automatically when a provider key is registered via POST /v1/settings/providers.
 	if _, err := pluginManager.GetProvider(embeddingProvider); err == nil {
 		initCtx, initCancel := context.WithTimeout(context.Background(), 60*time.Second)
-		if err := semanticRouter.Initialize(initCtx); err != nil {
-			slog.Warn("semantic router initialization failed — falling back to legacy classifier",
-				"error", err,
-				"embedding_provider", embeddingProvider)
-			semanticRouter = nil
-		} else {
+		if ok, err := semanticRouter.TryInitialize(initCtx); err != nil {
+			slog.Warn("semantic router initialization failed — will retry when provider loads",
+				"error", err, "embedding_provider", embeddingProvider)
+		} else if ok {
 			slog.Info("semantic router initialized — embedding-based routing active")
 		}
 		initCancel()
 	} else {
-		slog.Info("semantic router deferred — embedding provider not yet loaded, using legacy classifier",
+		slog.Info("semantic router deferred — embedding provider not yet loaded, will auto-init when available",
 			"provider", embeddingProvider)
-		// Keep semanticRouter non-nil but uninitialized. The chat handler's
-		// fallback to the legacy classifier handles this safely because
-		// tier2Embedding will fail and cascade through to tier3 or degrade.
-		// Set to nil to use legacy classifier cleanly until provider is available.
-		semanticRouter = nil
 	}
 
 	// ─── Initialize Orchestration ────────────────────────────────────
