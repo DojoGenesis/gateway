@@ -103,12 +103,12 @@ func VerifySkill(ctx context.Context, ref ResolvedRef) (*VerifyResult, error) {
 	}
 
 	args := buildCosignArgs(ref)
-	cmd := exec.CommandContext(ctx, cosignPath, args...)
+	cmd := exec.CommandContext(ctx, cosignPath, args...) //nolint:gosec // cosign binary path is validated
 
 	output, err := cmd.Output()
 	if err != nil {
 		// cosign exits non-zero when no signature found.
-		return &VerifyResult{
+		return &VerifyResult{ //nolint:nilerr // error intentionally swallowed; non-zero exit means unsigned
 			Verified:  false,
 			TrustTier: TierCommunity,
 		}, nil
@@ -117,7 +117,7 @@ func VerifySkill(ctx context.Context, ref ResolvedRef) (*VerifyResult, error) {
 	result, parseErr := parseCosignOutput(output)
 	if parseErr != nil {
 		// Output was present but unparseable; treat as community.
-		return &VerifyResult{
+		return &VerifyResult{ //nolint:nilerr // error intentionally swallowed; unparseable output treated as community
 			Verified:  false,
 			TrustTier: TierCommunity,
 		}, nil
@@ -226,7 +226,7 @@ func VerifyCASBlob(ctx context.Context, data []byte, bundleJSON []byte) (*Verify
 		"--certificate-oidc-issuer", "https://token.actions.githubusercontent.com",
 		dataFile.Name(),
 	}
-	cmd := exec.CommandContext(ctx, cosignPath, args...)
+	cmd := exec.CommandContext(ctx, cosignPath, args...) //nolint:gosec // rekor-cli binary path is validated
 	if err := cmd.Run(); err != nil {
 		// Non-zero exit means verification failed (unsigned or invalid signature).
 		return &VerifyResult{

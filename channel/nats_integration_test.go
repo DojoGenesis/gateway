@@ -35,7 +35,7 @@ func TestIntegration_SlackStub_NATSBus_CredentialStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get credential: %v", err)
 	}
-	if token != "xoxb-test-integration-token" {
+	if token != "xoxb-test-integration-token" { //nolint:gosec // test constant
 		t.Fatalf("token = %q, want %q", token, "xoxb-test-integration-token")
 	}
 
@@ -157,7 +157,7 @@ func TestIntegration_SlackStub_NATSBus_CredentialStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("registry GetCredential: %v", err)
 	}
-	if regToken != "xoxb-test-integration-token" {
+	if regToken != "xoxb-test-integration-token" { //nolint:gosec // test constant
 		t.Errorf("registry token = %q, want %q", regToken, "xoxb-test-integration-token")
 	}
 
@@ -235,7 +235,7 @@ func TestIntegration_AdapterRegistry_CredentialInjection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCredential: %v", err)
 	}
-	if token != "xoxb-registry-test" {
+	if token != "xoxb-registry-test" { //nolint:gosec // test constant
 		t.Errorf("got %q, want %q", token, "xoxb-registry-test")
 	}
 

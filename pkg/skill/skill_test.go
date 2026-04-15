@@ -32,13 +32,13 @@ func createSkillDir(t *testing.T, frontmatter, body string) string {
 	dir := t.TempDir()
 
 	content := "---\n" + frontmatter + "\n---\n\n" + body
-	err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0644)
+	err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o600)
 	if err != nil {
 		t.Fatalf("failed to write SKILL.md: %v", err)
 	}
 
 	// Add a supplementary file to verify tar includes it.
-	err = os.WriteFile(filepath.Join(dir, "helpers.md"), []byte("# Helpers\n\nSome helper content."), 0644)
+	err = os.WriteFile(filepath.Join(dir, "helpers.md"), []byte("# Helpers\n\nSome helper content."), 0o600)
 	if err != nil {
 		t.Fatalf("failed to write helpers.md: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestPackSkill_MissingSkillMd(t *testing.T) {
 
 func TestPackSkill_NoFrontmatter(t *testing.T) {
 	dir := t.TempDir()
-	_ = os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("# No frontmatter here"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("# No frontmatter here"), 0o600)
 	_, _, _, err := PackSkill(dir)
 	if err == nil {
 		t.Error("expected error for missing frontmatter")

@@ -415,7 +415,7 @@ func main() {
 	// ─── Initialize Auth Database (Portal v1.0) ─────────────────────
 	var authDB *sql.DB
 	authDBDir := getEnv("AUTH_DB_DIR", ".dojo")
-	if err := os.MkdirAll(authDBDir, 0o755); err != nil {
+	if err := os.MkdirAll(authDBDir, 0o750); err != nil {
 		slog.Warn("failed to create auth DB directory", "dir", authDBDir, "error", err)
 	}
 	authDBPath := filepath.Join(authDBDir, "dojo.db")
@@ -661,7 +661,7 @@ func getEnv(key, defaultValue string) string {
 // Existing environment variables are NOT overridden — shell env always wins.
 // Values may optionally be wrapped in single or double quotes.
 func loadDotEnv(path string) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path is from config, not user input
 	if err != nil {
 		return // .env is optional — no error if absent
 	}

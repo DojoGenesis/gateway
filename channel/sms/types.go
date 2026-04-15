@@ -21,9 +21,3 @@ type SMSConfig struct {
 	FromNumber string
 }
 
-// twilioMessage is the payload sent to the Twilio Messages API.
-type twilioMessage struct {
-	From string
-	To   string
-	Body string
-}

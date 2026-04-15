@@ -119,7 +119,7 @@ func TestSMSAdapter_Normalize_WithMedia(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSMSAdapter_VerifySignature_Valid(t *testing.T) {
-	authToken := "test-auth-token"
+	authToken := "test-auth-token" //nolint:gosec // test constant
 	a := NewSMSAdapter(SMSConfig{AuthToken: authToken})
 
 	// Build form values matching what Twilio sends.

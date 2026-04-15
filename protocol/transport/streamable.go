@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -150,7 +151,7 @@ func (t *streamableHTTP) Serve(ctx context.Context, handler Handler) error {
 		_ = t.server.Shutdown(shutdownCtx)
 		return ctx.Err()
 	case err := <-errCh:
-		if err == http.ErrServerClosed {
+		if errors.Is(err, http.ErrServerClosed) {
 			return nil
 		}
 		return err

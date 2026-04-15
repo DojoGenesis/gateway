@@ -15,7 +15,7 @@ import (
 
 const (
 	apiBaseURL        = "https://api.telegram.org"
-	secretTokenHeader = "X-Telegram-Bot-Api-Secret-Token"
+	secretTokenHeader = "X-Telegram-Bot-Api-Secret-Token" //nolint:gosec // not a credential, this is an HTTP header name
 	platform          = "telegram"
 )
 

@@ -68,7 +68,7 @@ func TestHTTPTransport_Initialize(t *testing.T) {
 	}
 	body, _ := json.Marshal(req)
 
-	resp, err := http.Post(addr, "application/json", bytes.NewReader(body))
+	resp, err := http.Post(addr, "application/json", bytes.NewReader(body)) //nolint:gosec // test server URL
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestHTTPTransport_ToolCall(t *testing.T) {
 	}
 	body, _ := json.Marshal(req)
 
-	resp, err := http.Post(addr, "application/json", bytes.NewReader(body))
+	resp, err := http.Post(addr, "application/json", bytes.NewReader(body)) //nolint:gosec // test server URL
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestHTTPTransport_UnknownMethod(t *testing.T) {
 	}
 	body, _ := json.Marshal(req)
 
-	resp, err := http.Post(addr, "application/json", bytes.NewReader(body))
+	resp, err := http.Post(addr, "application/json", bytes.NewReader(body)) //nolint:gosec // test server URL
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestHTTPTransport_UnknownMethod(t *testing.T) {
 func TestHTTPTransport_MethodNotAllowed(t *testing.T) {
 	_, addr := setupHTTPServer(t)
 
-	resp, err := http.Get(addr)
+	resp, err := http.Get(addr) //nolint:gosec // test server URL
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}

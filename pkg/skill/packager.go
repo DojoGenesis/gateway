@@ -31,7 +31,7 @@ func PackSkill(dirPath string) (manifest SkillManifest, configBlob []byte, conte
 
 	// Read and parse SKILL.md frontmatter.
 	skillPath := filepath.Join(dirPath, "SKILL.md")
-	skillData, err := os.ReadFile(skillPath)
+	skillData, err := os.ReadFile(skillPath) //nolint:gosec // path from validated skill path
 	if err != nil {
 		return manifest, nil, nil, fmt.Errorf("skill: pack: read SKILL.md: %w", err)
 	}
@@ -208,7 +208,7 @@ func stripQuotes(s string) string {
 // function ensures the deferred f.Close fires after each file is written,
 // preventing file descriptor accumulation during filepath.Walk.
 func addFileToTar(tw *tar.Writer, path string, relPath string, info os.FileInfo) error {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path from validated asset list
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
@@ -264,7 +264,7 @@ func createTar(dirPath string) ([]byte, error) {
 			realPath, err := filepath.EvalSymlinks(path)
 			if err != nil {
 				// Skip unresolvable symlinks.
-				return nil
+				return nil //nolint:nilerr // error intentionally swallowed; unresolvable symlinks are skipped
 			}
 			if !strings.HasPrefix(realPath, absDir+string(os.PathSeparator)) {
 				// Symlink points outside the skill directory; skip it.

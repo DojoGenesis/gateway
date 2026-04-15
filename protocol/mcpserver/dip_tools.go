@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"time"
 )
 
@@ -227,9 +226,6 @@ func dipGet(ctx context.Context, client *http.Client, url string) (interface{}, 
 	}
 	return result, nil
 }
-
-// uuidPattern validates that a string looks like a UUID.
-var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // dipPost performs an HTTP POST to the DIP API and returns the parsed JSON response.
 func dipPost(ctx context.Context, client *http.Client, url string, jsonBody []byte) (interface{}, error) {
