@@ -78,7 +78,7 @@ func (c *InfisicalHTTPClient) ensureToken(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("infisical: auth request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
@@ -130,7 +130,7 @@ func (c *InfisicalHTTPClient) GetSecret(ctx context.Context, key, environment, s
 	if err != nil {
 		return "", fmt.Errorf("infisical: get secret %q: %w", key, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return "", fmt.Errorf("infisical: secret %q not found", key)
@@ -177,7 +177,7 @@ func (c *InfisicalHTTPClient) ListSecrets(ctx context.Context, environment, secr
 	if err != nil {
 		return nil, fmt.Errorf("infisical: list secrets: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)

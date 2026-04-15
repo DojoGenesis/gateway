@@ -131,7 +131,7 @@ func (a *TeamsAdapter) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to read body", http.StatusInternalServerError)
 		return
 	}
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 
 	if _, err := a.Normalize(raw); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -227,7 +227,7 @@ func (a *TeamsAdapter) Send(ctx context.Context, msg *channel.ChannelMessage) er
 	if err != nil {
 		return fmt.Errorf("teams: send: HTTP error: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)

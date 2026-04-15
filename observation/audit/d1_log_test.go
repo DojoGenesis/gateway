@@ -66,7 +66,7 @@ func newAuditMockServer(db *auditMockDB) *httptest.Server {
 			},
 		}
 		b, _ := json.Marshal(resp)
-		w.Write(b)
+		_, _ = w.Write(b)
 	}))
 }
 

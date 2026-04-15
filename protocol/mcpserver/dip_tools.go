@@ -206,7 +206,7 @@ func dipGet(ctx context.Context, client *http.Client, url string) (interface{}, 
 	if err != nil {
 		return nil, fmt.Errorf("http get %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024)) // 10 MB max
 	if err != nil {
@@ -245,7 +245,7 @@ func dipPost(ctx context.Context, client *http.Client, url string, jsonBody []by
 	if err != nil {
 		return nil, fmt.Errorf("http post %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024)) // 10 MB max
 	if err != nil {

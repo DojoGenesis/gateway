@@ -262,7 +262,7 @@ func TestFlywheel_NATSBus_WebhookToReply(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /webhooks/stub: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("webhook status = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -334,7 +334,7 @@ func TestFlywheel_NATSBus_PatternMatchRouting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if len(adapter.Sent()) != 1 {
 		t.Errorf("matching message: got %d sent, want 1", len(adapter.Sent()))
@@ -346,7 +346,7 @@ func TestFlywheel_NATSBus_PatternMatchRouting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if len(adapter.Sent()) != 1 {
 		t.Errorf("non-matching message: got %d sent, still want 1", len(adapter.Sent()))
@@ -387,7 +387,7 @@ func TestFlywheel_NATSBus_WorkflowFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	sent := adapter.Sent()
 	if len(sent) != 1 {

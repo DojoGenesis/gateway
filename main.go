@@ -524,7 +524,7 @@ func main() {
 				"error", casErr, "path", casPath)
 		} else {
 			workflowCAS = store
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 			slog.Info("workflow CAS initialized", "path", casPath)
 		}
 	}
@@ -665,7 +665,7 @@ func loadDotEnv(path string) {
 	if err != nil {
 		return // .env is optional — no error if absent
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -684,7 +684,7 @@ func loadDotEnv(path string) {
 			val = val[1 : len(val)-1]
 		}
 		if os.Getenv(key) == "" {
-			os.Setenv(key, val)
+			_ = os.Setenv(key, val)
 		}
 	}
 }

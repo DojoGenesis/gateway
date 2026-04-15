@@ -401,7 +401,7 @@ func TestFlywheel_WebhookToReply(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /webhooks/stub: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("webhook status = %d, want %d", resp.StatusCode, http.StatusOK)

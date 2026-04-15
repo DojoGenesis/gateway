@@ -147,7 +147,7 @@ func (t *streamableHTTP) Serve(ctx context.Context, handler Handler) error {
 		// Use a bounded shutdown context instead of context.Background(). (#23)
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		t.server.Shutdown(shutdownCtx)
+		_ = t.server.Shutdown(shutdownCtx)
 		return ctx.Err()
 	case err := <-errCh:
 		if err == http.ErrServerClosed {
@@ -197,7 +197,7 @@ func (t *streamableHTTP) handleMCP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func (t *streamableHTTP) handleSSE(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +229,7 @@ func (t *streamableHTTP) handleSSE(w http.ResponseWriter, r *http.Request) {
 	t.mu.Unlock()
 
 	// Send initial connection event.
-	fmt.Fprintf(w, "event: endpoint\ndata: /mcp\n\n")
+	_, _ = fmt.Fprintf(w, "event: endpoint\ndata: /mcp\n\n")
 	flusher.Flush()
 
 	// Keep connection alive until closed.
@@ -276,9 +276,9 @@ func (t *streamableHTTP) SendSSE(_ context.Context, sessionID string, data io.Re
 
 	scanner := bufio.NewScanner(data)
 	for scanner.Scan() {
-		fmt.Fprintf(session.w, "data: %s\n", scanner.Text())
+		_, _ = fmt.Fprintf(session.w, "data: %s\n", scanner.Text())
 	}
-	fmt.Fprintf(session.w, "\n")
+	_, _ = fmt.Fprintf(session.w, "\n")
 	session.flusher.Flush()
 
 	return scanner.Err()
@@ -316,7 +316,7 @@ func writeJSONRPCError(w http.ResponseWriter, id interface{}, code int, message 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK) // JSON-RPC errors still use 200
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // generateSessionID returns a cryptographically random hex session ID. (#27)

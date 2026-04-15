@@ -89,7 +89,7 @@ func mockDIPAPI(t *testing.T) *httptest.Server {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"nodes": []map[string]interface{}{
 				{"id": "aaa-bbb", "name": "Button", "type": "component"},
 			},
@@ -100,7 +100,7 @@ func mockDIPAPI(t *testing.T) *httptest.Server {
 	mux.HandleFunc("GET /api/v1/nodes/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":   id,
 			"name": "Button",
 			"type": "component",
@@ -129,7 +129,7 @@ func mockDIPAPI(t *testing.T) *httptest.Server {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":    "meas-001",
 			"score": 0.85,
 		})
@@ -138,7 +138,7 @@ func mockDIPAPI(t *testing.T) *httptest.Server {
 	// GET /api/v1/lenses
 	mux.HandleFunc("GET /api/v1/lenses", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"lenses": []map[string]interface{}{
 				{"id": "lens-001", "name": "visual-harmony", "license_type": "guided"},
 			},
@@ -149,7 +149,7 @@ func mockDIPAPI(t *testing.T) *httptest.Server {
 	mux.HandleFunc("GET /api/v1/components/{id}/profile", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"component_id": id,
 			"measurements": []map[string]interface{}{
 				{"score": 0.9, "lens": "visual-harmony"},
@@ -161,7 +161,7 @@ func mockDIPAPI(t *testing.T) *httptest.Server {
 	mux.HandleFunc("GET /api/v1/components/{id}/deviations", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"component_id": id,
 			"patterns":     []map[string]interface{}{},
 		})
@@ -170,7 +170,7 @@ func mockDIPAPI(t *testing.T) *httptest.Server {
 	// GET /api/v1/nodes (for resources)
 	mux.HandleFunc("GET /api/v1/nodes", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"nodes": []map[string]interface{}{
 				{"id": "comp-001", "name": "Button", "type": "component"},
 			},
@@ -507,7 +507,7 @@ func TestDIPToolWithServerError(t *testing.T) {
 	// Create a mock that returns 500 for everything.
 	errServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error":"internal server error"}`))
+		_, _ = w.Write([]byte(`{"error":"internal server error"}`))
 	}))
 	defer errServer.Close()
 

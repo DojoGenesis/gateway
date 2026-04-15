@@ -216,7 +216,7 @@ func TestSMSAdapter_Send(t *testing.T) {
 		capturedBody = string(body)
 		capturedAuth = r.Header.Get("Authorization")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"sid":"SM001","status":"queued"}`))
+		_, _ = w.Write([]byte(`{"sid":"SM001","status":"queued"}`))
 	}))
 	defer srv.Close()
 

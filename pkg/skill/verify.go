@@ -201,23 +201,23 @@ func VerifyCASBlob(ctx context.Context, data []byte, bundleJSON []byte) (*Verify
 	if err != nil {
 		return nil, fmt.Errorf("cosign verify-blob: create data temp: %w", err)
 	}
-	defer os.Remove(dataFile.Name())
+	defer func() { _ = os.Remove(dataFile.Name()) }()
 	if _, err := dataFile.Write(data); err != nil {
-		dataFile.Close()
+		_ = dataFile.Close()
 		return nil, fmt.Errorf("cosign verify-blob: write data: %w", err)
 	}
-	dataFile.Close()
+	_ = dataFile.Close()
 
 	bundleFile, err := os.CreateTemp("", "cas-bundle-*.json")
 	if err != nil {
 		return nil, fmt.Errorf("cosign verify-blob: create bundle temp: %w", err)
 	}
-	defer os.Remove(bundleFile.Name())
+	defer func() { _ = os.Remove(bundleFile.Name()) }()
 	if _, err := bundleFile.Write(bundleJSON); err != nil {
-		bundleFile.Close()
+		_ = bundleFile.Close()
 		return nil, fmt.Errorf("cosign verify-blob: write bundle: %w", err)
 	}
-	bundleFile.Close()
+	_ = bundleFile.Close()
 
 	args := []string{
 		"verify-blob",

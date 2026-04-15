@@ -151,7 +151,7 @@ func (s *mcpServer) Stop(ctx context.Context) error {
 	// Shut down HTTP server if running.
 	if s.httpServer != nil {
 		if err := s.httpServer.Shutdown(ctx); err != nil {
-			s.httpServer.Close() // force close on shutdown failure
+			_ = s.httpServer.Close() // force close on shutdown failure
 		}
 		s.httpServer = nil
 	}

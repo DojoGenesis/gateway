@@ -59,7 +59,7 @@ func (m *rekorMockServer) start() *httptest.Server {
 			uuids = []string{}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(uuids)
+		_ = json.NewEncoder(w).Encode(uuids)
 	})
 
 	// GET /api/v1/log/entries/{uuid}
@@ -75,7 +75,7 @@ func (m *rekorMockServer) start() *httptest.Server {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(entry)
+		_ = json.NewEncoder(w).Encode(entry)
 	})
 
 	return httptest.NewServer(mux)

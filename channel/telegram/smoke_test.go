@@ -65,7 +65,7 @@ func TestTelegram_EndToEnd_SmokeTest(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sentBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	defer apiServer.Close()
 
@@ -116,7 +116,7 @@ func TestTelegram_EndToEnd_SmokeTest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /webhooks/telegram: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("webhook status = %d, want 200", resp.StatusCode)

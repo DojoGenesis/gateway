@@ -48,7 +48,7 @@ func NewSQLiteAuditLog(dbPath string) (AuditLog, error) {
 	}
 	for _, p := range pragmas {
 		if _, err := db.Exec(p); err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("audit: pragma %q: %w", p, err)
 		}
 	}
@@ -58,7 +58,7 @@ func NewSQLiteAuditLog(dbPath string) (AuditLog, error) {
 	db.SetConnMaxLifetime(0)
 
 	if err := createAuditTables(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 
@@ -182,7 +182,7 @@ func (l *sqliteAuditLog) Query(ctx context.Context, filter AuditFilter) ([]Audit
 	if err != nil {
 		return nil, fmt.Errorf("audit: query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []AuditEntry
 	for rows.Next() {
@@ -199,13 +199,13 @@ func (l *sqliteAuditLog) Query(ctx context.Context, filter AuditFilter) ([]Audit
 		e.Duration = time.Duration(durationNs)
 
 		if toolArgsJSON.Valid && toolArgsJSON.String != "" {
-			json.Unmarshal([]byte(toolArgsJSON.String), &e.ToolArgs)
+			_ = json.Unmarshal([]byte(toolArgsJSON.String), &e.ToolArgs)
 		}
 		if capsJSON.Valid && capsJSON.String != "" {
-			json.Unmarshal([]byte(capsJSON.String), &e.CapabilitiesGranted)
+			_ = json.Unmarshal([]byte(capsJSON.String), &e.CapabilitiesGranted)
 		}
 		if metaJSON.Valid && metaJSON.String != "" {
-			json.Unmarshal([]byte(metaJSON.String), &e.Metadata)
+			_ = json.Unmarshal([]byte(metaJSON.String), &e.Metadata)
 		}
 
 		entries = append(entries, e)

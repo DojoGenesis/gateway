@@ -32,7 +32,7 @@ func SearchSkillsCmd(ctx context.Context, store *SkillStore, query string) error
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tVERSION\tTIER\tDESCRIPTION")
+	_, _ = fmt.Fprintln(w, "NAME\tVERSION\tTIER\tDESCRIPTION")
 	for _, m := range matches {
 		desc := m.Description
 		if len(desc) > 60 {
@@ -41,7 +41,7 @@ func SearchSkillsCmd(ctx context.Context, store *SkillStore, query string) error
 		// SkillManifest does not carry TrustTier; default to community badge
 		// unless the caller has enriched the manifest via PluginManifest.
 		tier := TierBadge(TierCommunity)
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", m.Name, m.Version, tier, desc)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", m.Name, m.Version, tier, desc)
 	}
 	return w.Flush()
 }
@@ -62,13 +62,13 @@ func ListSkills(ctx context.Context, store *SkillStore) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tVERSION\tDESCRIPTION")
+	_, _ = fmt.Fprintln(w, "NAME\tVERSION\tDESCRIPTION")
 	for _, m := range manifests {
 		desc := m.Description
 		if len(desc) > 60 {
 			desc = desc[:57] + "..."
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\n", m.Name, m.Version, desc)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", m.Name, m.Version, desc)
 	}
 	return w.Flush()
 }
@@ -284,25 +284,25 @@ func SkillInfo(ctx context.Context, store *SkillStore, name, version string) (*S
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(w, "Name:\t%s\n", m.Name)
-	fmt.Fprintf(w, "Version:\t%s\n", m.Version)
-	fmt.Fprintf(w, "Description:\t%s\n", m.Description)
+	_, _ = fmt.Fprintf(w, "Name:\t%s\n", m.Name)
+	_, _ = fmt.Fprintf(w, "Version:\t%s\n", m.Version)
+	_, _ = fmt.Fprintf(w, "Description:\t%s\n", m.Description)
 
 	if m.License != "" {
-		fmt.Fprintf(w, "License:\t%s\n", m.License)
+		_, _ = fmt.Fprintf(w, "License:\t%s\n", m.License)
 	}
 	if len(m.Authors) > 0 {
-		fmt.Fprintf(w, "Authors:\t%s\n", strings.Join(m.Authors, ", "))
+		_, _ = fmt.Fprintf(w, "Authors:\t%s\n", strings.Join(m.Authors, ", "))
 	}
 	if len(m.Triggers) > 0 {
-		fmt.Fprintf(w, "Triggers:\t%s\n", strings.Join(m.Triggers, ", "))
+		_, _ = fmt.Fprintf(w, "Triggers:\t%s\n", strings.Join(m.Triggers, ", "))
 	}
 	if len(m.Dependencies) > 0 {
-		fmt.Fprintf(w, "Dependencies:\t%s\n", strings.Join(m.Dependencies, ", "))
+		_, _ = fmt.Fprintf(w, "Dependencies:\t%s\n", strings.Join(m.Dependencies, ", "))
 	}
 	if len(m.Platform) > 0 {
 		for k, v := range m.Platform {
-			fmt.Fprintf(w, "Platform.%s:\t%s\n", k, v)
+			_, _ = fmt.Fprintf(w, "Platform.%s:\t%s\n", k, v)
 		}
 	}
 	if err := w.Flush(); err != nil {

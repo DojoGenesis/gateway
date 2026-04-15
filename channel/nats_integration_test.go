@@ -224,8 +224,8 @@ func TestIntegration_AdapterRegistry_CredentialInjection(t *testing.T) {
 	// Create a credential store with test credentials.
 	creds := NewEnvCredentialStore()
 	_ = creds.Set(ctx, "slack", "BOT_TOKEN", "xoxb-registry-test")
-	creds.Set(ctx, "slack", "SIGNING_SECRET", "signing-secret-test")
-	creds.Set(ctx, "discord", "TOKEN", "discord-token-test")
+	_ = creds.Set(ctx, "slack", "SIGNING_SECRET", "signing-secret-test")
+	_ = creds.Set(ctx, "discord", "TOKEN", "discord-token-test")
 
 	// Create registry with credential store.
 	registry := NewAdapterRegistry(creds)
@@ -277,7 +277,7 @@ func TestIntegration_InProcessBus_NotInProductionPath(t *testing.T) {
 
 	msg := &ChannelMessage{ID: "m", Platform: "stub", Text: "test", Timestamp: time.Now().UTC()}
 	evt, _ := ToCloudEvent(msg)
-	bus.Publish("test", evt)
+	_ = bus.Publish("test", evt)
 
 	if count != 1 {
 		t.Errorf("InProcessBus subscriber count = %d, want 1", count)
@@ -288,7 +288,7 @@ func TestIntegration_InProcessBus_NotInProductionPath(t *testing.T) {
 	natsBus := NewNATSBus(pub)
 	var natsCount int
 	natsBus.Subscribe(func(_ string, _ Event) { natsCount++ })
-	natsBus.Publish("test", evt)
+	_ = natsBus.Publish("test", evt)
 
 	if natsCount != 1 {
 		t.Errorf("NATSBus subscriber count = %d, want 1", natsCount)

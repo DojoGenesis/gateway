@@ -113,7 +113,7 @@ func (f *RemoteFetcher) fetchJSON(ctx context.Context, url, accept string) ([]by
 	if err != nil {
 		return nil, fmt.Errorf("request %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GET %s: status %d", url, resp.StatusCode)
@@ -133,7 +133,7 @@ func (f *RemoteFetcher) fetchBlob(ctx context.Context, url string) ([]byte, erro
 	if err != nil {
 		return nil, fmt.Errorf("request %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GET %s: status %d", url, resp.StatusCode)

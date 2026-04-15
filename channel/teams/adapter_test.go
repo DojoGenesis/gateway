@@ -105,7 +105,7 @@ func jwksServerFor(t *testing.T, kid string, pub *rsa.PublicKey) *httptest.Serve
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(body)
+		_, _ = w.Write(body)
 	}))
 }
 
@@ -377,9 +377,9 @@ func TestTeamsAdapter_VerifySignature(t *testing.T) {
 				http.Error(w, "proxy fetch failed", http.StatusInternalServerError)
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			w.Header().Set("Content-Type", "application/json")
-			io.Copy(w, resp.Body)
+			_, _ = io.Copy(w, resp.Body)
 		}))
 		defer proxySrv.Close()
 
@@ -483,7 +483,7 @@ func TestTeamsAdapter_Send(t *testing.T) {
 		capturedBody, _ = io.ReadAll(r.Body)
 		capturedAuth = r.Header.Get("Authorization")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":"reply-001"}`))
+		_, _ = w.Write([]byte(`{"id":"reply-001"}`))
 	}))
 	defer srv.Close()
 

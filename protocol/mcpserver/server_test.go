@@ -51,7 +51,7 @@ func TestStartStop(t *testing.T) {
 
 func TestRegisterTool(t *testing.T) {
 	srv := newTestServer(t)
-	defer srv.Stop(context.Background())
+	defer func() { _ = srv.Stop(context.Background()) }()
 
 	err := srv.RegisterTool(mcpserver.ToolRegistration{
 		Name:        "dojo.skill.list",
@@ -73,7 +73,7 @@ func TestRegisterTool(t *testing.T) {
 
 func TestRegisterToolEmptyName(t *testing.T) {
 	srv := newTestServer(t)
-	defer srv.Stop(context.Background())
+	defer func() { _ = srv.Stop(context.Background()) }()
 
 	err := srv.RegisterTool(mcpserver.ToolRegistration{Name: ""})
 	if err == nil {
@@ -83,7 +83,7 @@ func TestRegisterToolEmptyName(t *testing.T) {
 
 func TestRegisterResource(t *testing.T) {
 	srv := newTestServer(t)
-	defer srv.Stop(context.Background())
+	defer func() { _ = srv.Stop(context.Background()) }()
 
 	err := srv.RegisterResource(mcpserver.ResourceRegistration{
 		URI:         "dojo://skill/analyze",
@@ -107,7 +107,7 @@ func TestRegisterResource(t *testing.T) {
 
 func TestRegisterResourceEmptyURI(t *testing.T) {
 	srv := newTestServer(t)
-	defer srv.Stop(context.Background())
+	defer func() { _ = srv.Stop(context.Background()) }()
 
 	err := srv.RegisterResource(mcpserver.ResourceRegistration{URI: ""})
 	if err == nil {
@@ -149,7 +149,7 @@ func TestHandleMessageToolsList(t *testing.T) {
 	srv := newTestServer(t)
 	ctx := context.Background()
 
-	srv.RegisterTool(mcpserver.ToolRegistration{
+	_ = srv.RegisterTool(mcpserver.ToolRegistration{
 		Name:        "test-tool",
 		Description: "A test tool",
 	})
@@ -172,7 +172,7 @@ func TestHandleMessageToolsCall(t *testing.T) {
 	srv := newTestServer(t)
 	ctx := context.Background()
 
-	srv.RegisterTool(mcpserver.ToolRegistration{
+	_ = srv.RegisterTool(mcpserver.ToolRegistration{
 		Name: "echo",
 		Handler: func(_ context.Context, _ string, args map[string]interface{}) (interface{}, error) {
 			return map[string]interface{}{"echoed": args["msg"]}, nil
@@ -205,7 +205,7 @@ func TestHandleMessageToolsCallError(t *testing.T) {
 	srv := newTestServer(t)
 	ctx := context.Background()
 
-	srv.RegisterTool(mcpserver.ToolRegistration{
+	_ = srv.RegisterTool(mcpserver.ToolRegistration{
 		Name: "fail-tool",
 		Handler: func(_ context.Context, _ string, _ map[string]interface{}) (interface{}, error) {
 			return nil, fmt.Errorf("tool failed")
@@ -229,7 +229,7 @@ func TestHandleMessageResourcesRead(t *testing.T) {
 	srv := newTestServer(t)
 	ctx := context.Background()
 
-	srv.RegisterResource(mcpserver.ResourceRegistration{
+	_ = srv.RegisterResource(mcpserver.ResourceRegistration{
 		URI:      "dojo://test",
 		Name:     "test",
 		MimeType: "application/json",

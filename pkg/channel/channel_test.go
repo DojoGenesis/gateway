@@ -111,7 +111,7 @@ func TestRegistry_RegisterDuplicate(t *testing.T) {
 func TestRegistry_Get(t *testing.T) {
 	r := NewAdapterRegistry()
 	adapter := &mockAdapter{id: "discord", version: "1.0"}
-	r.Register(adapter)
+	_ = r.Register(adapter)
 
 	got, err := r.Get("discord")
 	if err != nil {
@@ -138,7 +138,7 @@ func TestRegistry_List(t *testing.T) {
 		{id: "email", version: "1.0"},
 	}
 	for _, a := range adapters {
-		r.Register(a)
+		_ = r.Register(a)
 	}
 
 	ids := r.List()

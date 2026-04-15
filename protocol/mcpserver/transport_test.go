@@ -35,9 +35,9 @@ func setupHTTPServer(t *testing.T) (mcpserver.Server, string) {
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}
-	srv.Start(context.Background())
+	_ = srv.Start(context.Background())
 
-	srv.RegisterTool(mcpserver.ToolRegistration{
+	_ = srv.RegisterTool(mcpserver.ToolRegistration{
 		Name:        "echo",
 		Description: "Echo tool",
 		Handler: func(_ context.Context, _ string, args map[string]interface{}) (interface{}, error) {
@@ -52,8 +52,8 @@ func setupHTTPServer(t *testing.T) (mcpserver.Server, string) {
 	}
 	addr := fmt.Sprintf("http://%s/mcp", ln.Addr().String())
 
-	go srv.ListenAndServeOnListener(ln)
-	t.Cleanup(func() { srv.Stop(context.Background()) })
+	go func() { _ = srv.ListenAndServeOnListener(ln) }()
+	t.Cleanup(func() { _ = srv.Stop(context.Background()) })
 
 	return srv, addr
 }
@@ -72,10 +72,10 @@ func TestHTTPTransport_Initialize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var rpcResp jsonRPCResponse
-	json.NewDecoder(resp.Body).Decode(&rpcResp)
+	_ = json.NewDecoder(resp.Body).Decode(&rpcResp)
 
 	if rpcResp.JSONRPC != "2.0" {
 		t.Errorf("jsonrpc: got %q", rpcResp.JSONRPC)
@@ -112,10 +112,10 @@ func TestHTTPTransport_ToolCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var rpcResp jsonRPCResponse
-	json.NewDecoder(resp.Body).Decode(&rpcResp)
+	_ = json.NewDecoder(resp.Body).Decode(&rpcResp)
 
 	if rpcResp.Error != nil {
 		t.Fatalf("unexpected error: %v", rpcResp.Error)
@@ -136,10 +136,10 @@ func TestHTTPTransport_UnknownMethod(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var rpcResp jsonRPCResponse
-	json.NewDecoder(resp.Body).Decode(&rpcResp)
+	_ = json.NewDecoder(resp.Body).Decode(&rpcResp)
 
 	if rpcResp.Error == nil {
 		t.Error("expected error for unknown method")
@@ -153,7 +153,7 @@ func TestHTTPTransport_MethodNotAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("status: got %d, want %d", resp.StatusCode, http.StatusMethodNotAllowed)
@@ -164,8 +164,8 @@ func TestHTTPTransport_MethodNotAllowed(t *testing.T) {
 
 func TestStdioTransport_Initialize(t *testing.T) {
 	srv, _ := mcpserver.NewServer(mcpserver.DefaultConfig())
-	srv.Start(context.Background())
-	defer srv.Stop(context.Background())
+	_ = srv.Start(context.Background())
+	defer func() { _ = srv.Stop(context.Background()) }()
 
 	req := `{"jsonrpc":"2.0","id":1,"method":"initialize"}` + "\n"
 	reader := strings.NewReader(req)
@@ -180,7 +180,7 @@ func TestStdioTransport_Initialize(t *testing.T) {
 	}
 
 	var rpcResp jsonRPCResponse
-	json.NewDecoder(&writer).Decode(&rpcResp)
+	_ = json.NewDecoder(&writer).Decode(&rpcResp)
 
 	if rpcResp.JSONRPC != "2.0" {
 		t.Errorf("jsonrpc: got %q", rpcResp.JSONRPC)
@@ -197,10 +197,10 @@ func TestStdioTransport_Initialize(t *testing.T) {
 
 func TestStdioTransport_ToolCall(t *testing.T) {
 	srv, _ := mcpserver.NewServer(mcpserver.DefaultConfig())
-	srv.Start(context.Background())
-	defer srv.Stop(context.Background())
+	_ = srv.Start(context.Background())
+	defer func() { _ = srv.Stop(context.Background()) }()
 
-	srv.RegisterTool(mcpserver.ToolRegistration{
+	_ = srv.RegisterTool(mcpserver.ToolRegistration{
 		Name: "echo",
 		Handler: func(_ context.Context, _ string, args map[string]interface{}) (interface{}, error) {
 			return map[string]interface{}{"echoed": args["msg"]}, nil
@@ -211,10 +211,10 @@ func TestStdioTransport_ToolCall(t *testing.T) {
 	reader := strings.NewReader(req)
 	var writer bytes.Buffer
 
-	srv.ServeStdio(context.Background(), reader, &writer)
+	_ = srv.ServeStdio(context.Background(), reader, &writer)
 
 	var rpcResp jsonRPCResponse
-	json.NewDecoder(&writer).Decode(&rpcResp)
+	_ = json.NewDecoder(&writer).Decode(&rpcResp)
 
 	if rpcResp.Error != nil {
 		t.Fatalf("unexpected error: %v", rpcResp.Error)
@@ -223,17 +223,17 @@ func TestStdioTransport_ToolCall(t *testing.T) {
 
 func TestStdioTransport_ParseError(t *testing.T) {
 	srv, _ := mcpserver.NewServer(mcpserver.DefaultConfig())
-	srv.Start(context.Background())
-	defer srv.Stop(context.Background())
+	_ = srv.Start(context.Background())
+	defer func() { _ = srv.Stop(context.Background()) }()
 
 	req := "not-json\n"
 	reader := strings.NewReader(req)
 	var writer bytes.Buffer
 
-	srv.ServeStdio(context.Background(), reader, &writer)
+	_ = srv.ServeStdio(context.Background(), reader, &writer)
 
 	var rpcResp jsonRPCResponse
-	json.NewDecoder(&writer).Decode(&rpcResp)
+	_ = json.NewDecoder(&writer).Decode(&rpcResp)
 
 	if rpcResp.Error == nil {
 		t.Error("expected parse error")

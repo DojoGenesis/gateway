@@ -22,7 +22,7 @@ func newTestStore(t *testing.T) cas.Store {
 	if err != nil {
 		t.Fatalf("failed to create test store: %v", err)
 	}
-	t.Cleanup(func() { store.Close() })
+	t.Cleanup(func() { _ = store.Close() })
 	return store
 }
 
@@ -176,7 +176,7 @@ func TestPackSkill_MissingSkillMd(t *testing.T) {
 
 func TestPackSkill_NoFrontmatter(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("# No frontmatter here"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("# No frontmatter here"), 0644)
 	_, _, _, err := PackSkill(dir)
 	if err == nil {
 		t.Error("expected error for missing frontmatter")
@@ -660,7 +660,7 @@ func TestManifest_OmitEmpty(t *testing.T) {
 
 	// Verify omitempty fields are absent.
 	var raw map[string]interface{}
-	json.Unmarshal(data, &raw)
+	_ = json.Unmarshal(data, &raw)
 
 	for _, key := range []string{"triggers", "dependencies", "license", "authors", "platform"} {
 		if _, found := raw[key]; found {
@@ -799,15 +799,15 @@ func TestListSkills_PrintsTable(t *testing.T) {
 	os.Stdout = w
 
 	if err := ListSkills(ctx, ss); err != nil {
-		w.Close()
+		_ = w.Close()
 		os.Stdout = old
 		t.Fatalf("ListSkills failed: %v", err)
 	}
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	if !strings.Contains(output, "list-test-skill") {
@@ -831,15 +831,15 @@ func TestListSkills_EmptyStore(t *testing.T) {
 	os.Stdout = w
 
 	if err := ListSkills(ctx, ss); err != nil {
-		w.Close()
+		_ = w.Close()
 		os.Stdout = old
 		t.Fatalf("ListSkills failed: %v", err)
 	}
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	if !strings.Contains(output, "No skills installed") {
@@ -863,15 +863,15 @@ description: Test publish end-to-end`, "# Publish Test Skill")
 	os.Stdout = w
 
 	if err := PublishSkill(ctx, ss, dir); err != nil {
-		w.Close()
+		_ = w.Close()
 		os.Stdout = old
 		t.Fatalf("PublishSkill failed: %v", err)
 	}
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	if !strings.Contains(output, "publish-test@2.0.0") {
@@ -914,7 +914,7 @@ func TestSkillInfo_PrintsMetadata(t *testing.T) {
 	os.Stdout = w
 
 	got, err := SkillInfo(ctx, ss, "info-test-skill", "3.0.0")
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	if err != nil {
@@ -922,7 +922,7 @@ func TestSkillInfo_PrintsMetadata(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	// Verify printed output.
@@ -953,15 +953,15 @@ description: Test local directory install`, "# Local Install")
 	os.Stdout = w
 
 	if err := InstallSkill(ctx, ss, dir, false, false); err != nil {
-		w.Close()
+		_ = w.Close()
 		os.Stdout = old
 		t.Fatalf("InstallSkill failed: %v", err)
 	}
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 
 	// Verify the skill was installed.
 	got, err := ss.Get(ctx, "local-install-test", "1.2.3")

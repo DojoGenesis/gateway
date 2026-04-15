@@ -359,7 +359,7 @@ func TestToolUse_JSONOmitEmpty(t *testing.T) {
 	}
 
 	var raw map[string]json.RawMessage
-	json.Unmarshal(data, &raw)
+	_ = json.Unmarshal(data, &raw)
 
 	if _, exists := raw["tool_calls"]; exists {
 		t.Error("expected tool_calls to be omitted when empty")

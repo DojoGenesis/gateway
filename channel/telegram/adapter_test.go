@@ -381,7 +381,7 @@ func TestTelegramAdapter_Send_WithReply(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	defer srv.Close()
 
@@ -420,7 +420,7 @@ func TestTelegramAdapter_Send_WithReply(t *testing.T) {
 func TestTelegramAdapter_Send_APIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"ok":false,"description":"Bad Request"}`))
+		_, _ = w.Write([]byte(`{"ok":false,"description":"Bad Request"}`))
 	}))
 	defer srv.Close()
 

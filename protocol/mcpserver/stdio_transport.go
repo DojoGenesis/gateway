@@ -82,8 +82,8 @@ func writeResponse(w io.Writer, resp jsonRPCResponse) {
 	data, err := json.Marshal(resp)
 	if err != nil {
 		// Last-resort fallback: write a minimal error response.
-		fmt.Fprintf(w, `{"jsonrpc":"2.0","error":{"code":-32603,"message":"internal: marshal error"}}`+"\n")
+		_, _ = fmt.Fprintf(w, `{"jsonrpc":"2.0","error":{"code":-32603,"message":"internal: marshal error"}}`+"\n")
 		return
 	}
-	fmt.Fprintln(w, string(data))
+	_, _ = fmt.Fprintln(w, string(data))
 }

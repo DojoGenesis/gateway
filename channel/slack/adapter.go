@@ -161,7 +161,7 @@ func (a *SlackAdapter) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		resp, _ := json.Marshal(map[string]string{"challenge": envelope.Challenge})
-		w.Write(resp)
+		_, _ = w.Write(resp)
 
 	case "event_callback":
 		// Normalize to ChannelMessage. The caller is responsible for

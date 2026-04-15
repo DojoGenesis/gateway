@@ -212,7 +212,7 @@ func addFileToTar(tw *tar.Writer, path string, relPath string, info os.FileInfo)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	header := &tar.Header{
 		Name: filepath.ToSlash(relPath),
@@ -286,7 +286,7 @@ func createTar(dirPath string) ([]byte, error) {
 		return addFileToTar(tw, path, relPath, info)
 	})
 	if err != nil {
-		tw.Close()
+		_ = tw.Close()
 		return nil, err
 	}
 

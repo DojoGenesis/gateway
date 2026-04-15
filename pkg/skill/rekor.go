@@ -71,7 +71,7 @@ func (c *RekorClient) LookupByHash(ctx context.Context, hash string) ([]string, 
 	if err != nil {
 		return nil, fmt.Errorf("rekor: lookup: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -104,7 +104,7 @@ func (c *RekorClient) GetEntry(ctx context.Context, uuid string) (*RekorLogEntry
 	if err != nil {
 		return nil, fmt.Errorf("rekor: get entry: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -17,7 +17,7 @@ func newTestLog(t *testing.T) audit.AuditLog {
 	if err != nil {
 		t.Fatalf("NewSQLiteAuditLog: %v", err)
 	}
-	t.Cleanup(func() { log.Close() })
+	t.Cleanup(func() { _ = log.Close() })
 	return log
 }
 
@@ -71,9 +71,9 @@ func TestQueryByAction(t *testing.T) {
 	log := newTestLog(t)
 	ctx := context.Background()
 
-	log.Record(ctx, audit.AuditEntry{ID: "1", Timestamp: time.Now().UTC(), AgentID: "a", Action: audit.ActionToolExecution, Tool: "t1"})
-	log.Record(ctx, audit.AuditEntry{ID: "2", Timestamp: time.Now().UTC(), AgentID: "a", Action: audit.ActionAgentSpawn})
-	log.Record(ctx, audit.AuditEntry{ID: "3", Timestamp: time.Now().UTC(), AgentID: "a", Action: audit.ActionToolExecution, Tool: "t2"})
+	_ = log.Record(ctx, audit.AuditEntry{ID: "1", Timestamp: time.Now().UTC(), AgentID: "a", Action: audit.ActionToolExecution, Tool: "t1"})
+	_ = log.Record(ctx, audit.AuditEntry{ID: "2", Timestamp: time.Now().UTC(), AgentID: "a", Action: audit.ActionAgentSpawn})
+	_ = log.Record(ctx, audit.AuditEntry{ID: "3", Timestamp: time.Now().UTC(), AgentID: "a", Action: audit.ActionToolExecution, Tool: "t2"})
 
 	entries, err := log.Query(ctx, audit.AuditFilter{Actions: []audit.Action{audit.ActionToolExecution}})
 	if err != nil {
@@ -88,8 +88,8 @@ func TestQueryByTool(t *testing.T) {
 	log := newTestLog(t)
 	ctx := context.Background()
 
-	log.Record(ctx, audit.AuditEntry{ID: "1", Timestamp: time.Now().UTC(), AgentID: "a", Action: audit.ActionToolExecution, Tool: "web_search"})
-	log.Record(ctx, audit.AuditEntry{ID: "2", Timestamp: time.Now().UTC(), AgentID: "a", Action: audit.ActionToolExecution, Tool: "file_read"})
+	_ = log.Record(ctx, audit.AuditEntry{ID: "1", Timestamp: time.Now().UTC(), AgentID: "a", Action: audit.ActionToolExecution, Tool: "web_search"})
+	_ = log.Record(ctx, audit.AuditEntry{ID: "2", Timestamp: time.Now().UTC(), AgentID: "a", Action: audit.ActionToolExecution, Tool: "file_read"})
 
 	entries, err := log.Query(ctx, audit.AuditFilter{Tool: "web_search"})
 	if err != nil {
@@ -105,7 +105,7 @@ func TestQueryWithLimit(t *testing.T) {
 	ctx := context.Background()
 
 	for i := 0; i < 10; i++ {
-		log.Record(ctx, audit.AuditEntry{
+		_ = log.Record(ctx, audit.AuditEntry{
 			ID:        "entry-" + string(rune('0'+i)),
 			Timestamp: time.Now().UTC(),
 			AgentID:   "a",
@@ -126,7 +126,7 @@ func TestExportJSON(t *testing.T) {
 	log := newTestLog(t)
 	ctx := context.Background()
 
-	log.Record(ctx, audit.AuditEntry{
+	_ = log.Record(ctx, audit.AuditEntry{
 		ID:        "export-1",
 		Timestamp: time.Now().UTC(),
 		AgentID:   "agent-1",
@@ -152,7 +152,7 @@ func TestExportCSV(t *testing.T) {
 	log := newTestLog(t)
 	ctx := context.Background()
 
-	log.Record(ctx, audit.AuditEntry{
+	_ = log.Record(ctx, audit.AuditEntry{
 		ID:        "export-1",
 		Timestamp: time.Now().UTC(),
 		AgentID:   "agent-1",

@@ -31,7 +31,7 @@ func TestServeNilHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStreamableHTTP: %v", err)
 	}
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 
 	err = tr.Serve(context.Background(), nil)
 	if err == nil {
@@ -44,7 +44,7 @@ func TestServeHTTPPost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStreamableHTTP: %v", err)
 	}
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 
 	// Create test request.
 	reqMsg := transport.Message{
@@ -67,7 +67,7 @@ func TestServeHTTPPost(t *testing.T) {
 
 	// Use ServeHTTP directly for testing.
 	go func() {
-		tr.Serve(ctx, handler)
+		_ = tr.Serve(ctx, handler)
 	}()
 	time.Sleep(50 * time.Millisecond)
 
@@ -95,7 +95,7 @@ func TestServeHTTPMethodNotAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStreamableHTTP: %v", err)
 	}
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
@@ -111,7 +111,7 @@ func TestServeHTTPInvalidJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStreamableHTTP: %v", err)
 	}
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader("not json"))
@@ -134,7 +134,7 @@ func TestServeHTTPNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStreamableHTTP: %v", err)
 	}
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
@@ -150,7 +150,7 @@ func TestSendSSENoSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStreamableHTTP: %v", err)
 	}
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 
 	err = tr.SendSSE(context.Background(), "nonexistent", strings.NewReader("data"))
 	if err == nil {
