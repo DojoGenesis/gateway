@@ -15,6 +15,15 @@ func (s *Server) setupRoutes() {
 	// Initialize all handler structs with injected dependencies
 	modelHandler := handlers.NewModelHandler(s.pluginManager)
 	chatHandler := handlers.NewChatHandler(s.intentClassifier, s.primaryAgent, s.userRouter, s.pluginManager)
+	if s.semanticRouter != nil {
+		chatHandler.SetSemanticRouter(s.semanticRouter)
+	}
+	if s.specialistRouter != nil {
+		chatHandler.SetSpecialistRouter(&handlers.SpecialistRouterAdapter{Router: s.specialistRouter})
+	}
+	if s.planner != nil {
+		chatHandler.SetOrchestrator(&handlers.OrchestratorAdapter{Planner: s.planner})
+	}
 	memoryHandler := handlers.NewMemoryHandler(s.memoryManager, s.gardenManager, s.memoryMaintenance)
 
 	// ─── Auth (Portal v1.0) ──────────────────────────────────────────────────────
@@ -235,6 +244,11 @@ func (s *Server) setupRoutes() {
 
 		// Cost aggregation
 		admin.GET("/costs", s.handleAdminCosts)
+
+		// Routing mode control (semantic router hot-switching)
+		admin.GET("/routing/mode", s.handleAdminRoutingMode)
+		admin.POST("/routing/mode", s.handleAdminSetRoutingMode)
+		admin.GET("/routing/stats", s.handleAdminRoutingStats)
 
 		// User management (Wave 1)
 		admin.GET("/users", s.handleAdminListUsers)

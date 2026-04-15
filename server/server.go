@@ -141,6 +141,11 @@ type Server struct {
 	// WebSocket hub for real-time workflow execution events (Era 3)
 	wsHub *WorkflowWSHub
 
+	// SemanticRouter replaces the deprecated IntentClassifier with embedding-based
+	// routing. When non-nil, the chat handler delegates to it instead of the
+	// keyword-based classifier. Hot-switchable between cascade/llm/embedding modes.
+	semanticRouter *agent.SemanticRouter
+
 	// Specialist dispatch (Phase 2): routes requests to specialist agents
 	// based on intent classification. Nil means specialist dispatch is disabled.
 	specialistRouter *specialist.Router
@@ -205,6 +210,7 @@ func New(deps ServerDeps) *Server {
 		agents:                make(map[string]*AgentRuntime),
 		workflowCAS:           deps.WorkflowCAS,
 		d1Syncer:              deps.D1Syncer,
+		semanticRouter:        deps.SemanticRouter,
 		specialistRouter:      deps.SpecialistRouter,
 		execBus:               newExecutionBus(),
 		latencyTracker:        services.NewProviderLatencyTracker(60),

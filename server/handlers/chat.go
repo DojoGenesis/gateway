@@ -34,13 +34,19 @@ var localProviders = []string{"ollama"}
 
 // ChatHandler handles chat-related HTTP requests.
 type ChatHandler struct {
-	classifier *agent.IntentClassifier
-	agent      *agent.PrimaryAgent
-	router     *services.UserRouter
-	cache      *agent.ResponseCache
-	streaming  *streaming.StreamingAgentWithEvents
-	pluginMgr  *provider.PluginManager
-	db         database.DatabaseAdapter
+	classifier     *agent.IntentClassifier
+	semanticRouter *agent.SemanticRouter
+	agent          *agent.PrimaryAgent
+	router         *services.UserRouter
+	cache          *agent.ResponseCache
+	streaming      *streaming.StreamingAgentWithEvents
+	pluginMgr      *provider.PluginManager
+	db             database.DatabaseAdapter
+
+	// specialistRouter dispatches to specialist agents. Nil disables specialist routing.
+	specialistRouter SpecialistRouter
+	// orchestrator decomposes multi-step queries into plan DAGs. Nil disables orchestrate routing.
+	orchestrator Orchestrator
 }
 
 // NewChatHandler creates a new ChatHandler with the specified dependencies.
@@ -54,6 +60,41 @@ func NewChatHandler(ic *agent.IntentClassifier, pa *agent.PrimaryAgent, ur *serv
 		streaming:  streaming.NewStreamingAgentWithEvents(pa),
 		pluginMgr:  pm,
 	}
+}
+
+// SpecialistRouter is the interface the chat handler uses to dispatch to specialist agents.
+// Satisfied by *specialist.Router.
+type SpecialistRouter interface {
+	Route(decision agent.RoutingDecision) SpecialistRoutingResult
+}
+
+// SpecialistRoutingResult captures the outcome of a specialist routing decision.
+type SpecialistRoutingResult struct {
+	Routed       bool
+	SpecialistID string
+	Reason       string
+}
+
+// Orchestrator is the interface the chat handler uses for multi-step plan generation.
+// Satisfied by the orchestration planner in server/orchestration.
+type Orchestrator interface {
+	GeneratePlanForChat(ctx context.Context, userID, query string) (planSummary string, err error)
+}
+
+// SetSemanticRouter injects the semantic router. When set, the chat handler
+// uses it instead of the keyword-based IntentClassifier.
+func (h *ChatHandler) SetSemanticRouter(sr *agent.SemanticRouter) {
+	h.semanticRouter = sr
+}
+
+// SetSpecialistRouter injects the specialist router for domain-specific dispatch.
+func (h *ChatHandler) SetSpecialistRouter(sr SpecialistRouter) {
+	h.specialistRouter = sr
+}
+
+// SetOrchestrator injects the orchestration planner for multi-step queries.
+func (h *ChatHandler) SetOrchestrator(o Orchestrator) {
+	h.orchestrator = o
 }
 
 // SetDB sets the database adapter for user tier lookups.
@@ -121,8 +162,18 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 	// Store user ID in context for budget middleware
 	c.Set("user_id", req.UserID)
 
-	// Use new routing system
-	decision := h.classifier.Route(req.Message)
+	// Route using semantic router when available, falling back to legacy classifier.
+	var decision agent.RoutingDecision
+	if h.semanticRouter != nil {
+		var err error
+		decision, err = h.semanticRouter.Route(c.Request.Context(), req.Message)
+		if err != nil {
+			slog.Warn("semantic router error, falling back to legacy classifier", "error", err)
+			decision = h.classifier.Route(req.Message)
+		}
+	} else {
+		decision = h.classifier.Route(req.Message)
+	}
 
 	// If the request explicitly specifies a provider, honour it — this overrides the
 	// intent classifier's provider selection while preserving its handler/category logic.
@@ -146,6 +197,70 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 	case "template":
 		h.handleTemplateQuery(c, &req, decision)
 	case "llm-fast", "llm-reasoning":
+		if req.Stream {
+			h.handleStreamingQuery(c, &req, decision)
+		} else {
+			h.handleNonStreamingQuery(c, &req, decision)
+		}
+	case "specialist":
+		// Try specialist router; degrade to llm-reasoning if no match or router not wired.
+		if h.specialistRouter != nil {
+			result := h.specialistRouter.Route(decision)
+			if result.Routed {
+				slog.Info("specialist dispatch",
+					"specialist_id", result.SpecialistID,
+					"reason", result.Reason,
+				)
+				c.Header("X-Specialist-ID", result.SpecialistID)
+				decision.SpecialistAgentID = result.SpecialistID
+				decision.Handler = "llm-reasoning"
+				decision.Provider = "llm-reasoning"
+			} else {
+				slog.Info("specialist routing: no match, degrading to llm-reasoning",
+					"reason", result.Reason,
+				)
+				c.Header("X-Route-Degraded", "specialist->llm-reasoning")
+				decision.Handler = "llm-reasoning"
+				decision.Provider = "llm-reasoning"
+			}
+		} else {
+			slog.Warn("specialist router not configured, degrading to llm-reasoning")
+			c.Header("X-Route-Degraded", "specialist->llm-reasoning")
+			decision.Handler = "llm-reasoning"
+			decision.Provider = "llm-reasoning"
+		}
+		if req.Stream {
+			h.handleStreamingQuery(c, &req, decision)
+		} else {
+			h.handleNonStreamingQuery(c, &req, decision)
+		}
+	case "orchestrate":
+		// Try orchestration planner; degrade to llm-reasoning if not wired or plan fails.
+		if h.orchestrator != nil {
+			planCtx, planCancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+			planSummary, err := h.orchestrator.GeneratePlanForChat(planCtx, req.UserID, req.Message)
+			planCancel()
+			if err != nil {
+				slog.Warn("orchestration planning failed, degrading to llm-reasoning",
+					"error", err,
+				)
+				c.Header("X-Route-Degraded", "orchestrate->llm-reasoning")
+				decision.Handler = "llm-reasoning"
+				decision.Provider = "llm-reasoning"
+			} else {
+				slog.Info("orchestration plan generated", "summary_len", len(planSummary))
+				c.Header("X-Orchestrated", "true")
+				// Prepend the plan context to the query so the LLM can execute it
+				decision.Handler = "llm-reasoning"
+				decision.Provider = "llm-reasoning"
+				req.Message = fmt.Sprintf("[Orchestration Plan]\n%s\n\n[Original Query]\n%s", planSummary, req.Message)
+			}
+		} else {
+			slog.Warn("orchestrator not configured, degrading to llm-reasoning")
+			c.Header("X-Route-Degraded", "orchestrate->llm-reasoning")
+			decision.Handler = "llm-reasoning"
+			decision.Provider = "llm-reasoning"
+		}
 		if req.Stream {
 			h.handleStreamingQuery(c, &req, decision)
 		} else {

@@ -40,6 +40,10 @@ type ServerDeps struct {
 	AppManager          *apps.AppManager
 	AuthDB              *sql.DB
 
+	// SemanticRouter is the embedding-based router that replaces the keyword
+	// classifier. If nil, the server falls back to IntentClassifier.
+	SemanticRouter *agent.SemanticRouter
+
 	// SpecialistRouter dispatches requests to specialist agents based on
 	// intent classification. If nil, specialist dispatch is disabled.
 	SpecialistRouter *specialist.Router

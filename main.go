@@ -307,6 +307,59 @@ func main() {
 		"guest_provider", cfg.Routing.GuestProvider,
 		"auth_provider", cfg.Routing.AuthenticatedProvider)
 
+	// ─── Initialize Semantic Router ─────────────────────────────────
+	// The semantic router replaces the keyword-based IntentClassifier with
+	// embedding-based cosine similarity routing. Activation requires an
+	// embedding-capable provider. When no provider is available, the
+	// gateway falls back to the legacy classifier.
+	embeddingProvider := getEnv("DOJO_EMBEDDING_PROVIDER", cfg.Routing.DefaultProvider)
+	llmRouterProvider := getEnv("DOJO_ROUTER_PROVIDER", embeddingProvider)
+	llmRouterModel := getEnv("DOJO_ROUTER_MODEL", "")
+
+	embedBackend := &agent.ProviderEmbeddingBackend{
+		Manager:           pluginManager,
+		EmbeddingProvider: embeddingProvider,
+	}
+
+	llmRouter := agent.NewDefaultLLMRouter(pluginManager, agent.LLMRouterOptions{
+		ProviderName: llmRouterProvider,
+		Model:        llmRouterModel,
+	})
+
+	semanticRouter := agent.NewSemanticRouter(embedBackend, llmRouter)
+	for _, route := range agent.DefaultRouteDefinitions() {
+		semanticRouter.AddRoute(route)
+	}
+	slog.Info("semantic router created",
+		"routes", len(agent.DefaultRouteDefinitions()),
+		"embedding_provider", embeddingProvider,
+		"llm_router_provider", llmRouterProvider)
+
+	// Initialization embeds all route utterances — this requires a live provider
+	// with embedding support. If the provider isn't loaded yet (keys pushed later
+	// by CLI), initialization is deferred and the legacy classifier handles traffic
+	// until the admin triggers re-init or the provider becomes available.
+	if _, err := pluginManager.GetProvider(embeddingProvider); err == nil {
+		initCtx, initCancel := context.WithTimeout(context.Background(), 60*time.Second)
+		if err := semanticRouter.Initialize(initCtx); err != nil {
+			slog.Warn("semantic router initialization failed — falling back to legacy classifier",
+				"error", err,
+				"embedding_provider", embeddingProvider)
+			semanticRouter = nil
+		} else {
+			slog.Info("semantic router initialized — embedding-based routing active")
+		}
+		initCancel()
+	} else {
+		slog.Info("semantic router deferred — embedding provider not yet loaded, using legacy classifier",
+			"provider", embeddingProvider)
+		// Keep semanticRouter non-nil but uninitialized. The chat handler's
+		// fallback to the legacy classifier handles this safely because
+		// tier2Embedding will fail and cascade through to tier3 or degrade.
+		// Set to nil to use legacy classifier cleanly until provider is available.
+		semanticRouter = nil
+	}
+
 	// ─── Initialize Orchestration ────────────────────────────────────
 	providerName := getEnv("ORCHESTRATION_PROVIDER", cfg.Routing.DefaultProvider)
 	modelID := getEnv("ORCHESTRATION_MODEL", "")
@@ -521,6 +574,7 @@ func main() {
 		GardenManager:       gardenManager,
 		PrimaryAgent:        primaryAgent,
 		IntentClassifier:    intentClassifier,
+		SemanticRouter:      semanticRouter,
 		UserRouter:          userRouter,
 		TraceLogger:         traceLogger,
 		CostTracker:         costTracker,
