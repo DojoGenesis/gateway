@@ -177,6 +177,60 @@ func (m *mockDatabaseAdapter) Close() error {
 	return nil
 }
 
+// PromptTemplate stubs — not exercised by api_keys tests, satisfy interface.
+func (m *mockDatabaseAdapter) CreatePromptTemplate(ctx context.Context, tmpl *database.PromptTemplate) error {
+	return nil
+}
+
+func (m *mockDatabaseAdapter) GetPromptTemplate(ctx context.Context, id string) (*database.PromptTemplate, error) {
+	return nil, nil
+}
+
+func (m *mockDatabaseAdapter) ListPromptTemplates(ctx context.Context, userID string, includePublic bool) ([]*database.PromptTemplate, error) {
+	return []*database.PromptTemplate{}, nil
+}
+
+func (m *mockDatabaseAdapter) UpdatePromptTemplate(ctx context.Context, tmpl *database.PromptTemplate) error {
+	return nil
+}
+
+func (m *mockDatabaseAdapter) DeletePromptTemplate(ctx context.Context, id string) error {
+	return nil
+}
+
+// Document / RAG stubs — not exercised by api_keys tests, satisfy interface.
+func (m *mockDatabaseAdapter) CreateDocument(ctx context.Context, doc *database.Document) error {
+	return nil
+}
+
+func (m *mockDatabaseAdapter) GetDocument(ctx context.Context, id string) (*database.Document, error) {
+	return nil, nil
+}
+
+func (m *mockDatabaseAdapter) ListDocuments(ctx context.Context, userID string) ([]*database.Document, error) {
+	return []*database.Document{}, nil
+}
+
+func (m *mockDatabaseAdapter) DeleteDocument(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *mockDatabaseAdapter) UpdateDocumentStatus(ctx context.Context, id string, status string, chunkCount int) error {
+	return nil
+}
+
+func (m *mockDatabaseAdapter) CreateDocumentChunks(ctx context.Context, chunks []*database.DocumentChunk) error {
+	return nil
+}
+
+func (m *mockDatabaseAdapter) SearchDocumentChunks(ctx context.Context, userID string, query string, limit int) ([]*database.DocumentChunk, error) {
+	return []*database.DocumentChunk{}, nil
+}
+
+func (m *mockDatabaseAdapter) GetDocumentChunks(ctx context.Context, documentID string) ([]*database.DocumentChunk, error) {
+	return []*database.DocumentChunk{}, nil
+}
+
 type mockSecureStorage struct {
 	storage   map[string]map[string]string
 	available bool

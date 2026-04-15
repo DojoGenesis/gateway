@@ -464,6 +464,43 @@ func (m *mockDBAdapter) GetMessage(_ context.Context, _ string) (*database.Messa
 func (m *mockDBAdapter) Ping(_ context.Context) error { return nil }
 func (m *mockDBAdapter) Close() error                 { return nil }
 
+// PromptTemplate stubs — not exercised by streaming tests, satisfy interface.
+func (m *mockDBAdapter) CreatePromptTemplate(_ context.Context, _ *database.PromptTemplate) error {
+	return nil
+}
+func (m *mockDBAdapter) GetPromptTemplate(_ context.Context, _ string) (*database.PromptTemplate, error) {
+	return nil, nil
+}
+func (m *mockDBAdapter) ListPromptTemplates(_ context.Context, _ string, _ bool) ([]*database.PromptTemplate, error) {
+	return []*database.PromptTemplate{}, nil
+}
+func (m *mockDBAdapter) UpdatePromptTemplate(_ context.Context, _ *database.PromptTemplate) error {
+	return nil
+}
+func (m *mockDBAdapter) DeletePromptTemplate(_ context.Context, _ string) error { return nil }
+
+// Document / RAG stubs — not exercised by streaming tests, satisfy interface.
+func (m *mockDBAdapter) CreateDocument(_ context.Context, _ *database.Document) error { return nil }
+func (m *mockDBAdapter) GetDocument(_ context.Context, _ string) (*database.Document, error) {
+	return nil, nil
+}
+func (m *mockDBAdapter) ListDocuments(_ context.Context, _ string) ([]*database.Document, error) {
+	return []*database.Document{}, nil
+}
+func (m *mockDBAdapter) DeleteDocument(_ context.Context, _ string) error { return nil }
+func (m *mockDBAdapter) UpdateDocumentStatus(_ context.Context, _ string, _ string, _ int) error {
+	return nil
+}
+func (m *mockDBAdapter) CreateDocumentChunks(_ context.Context, _ []*database.DocumentChunk) error {
+	return nil
+}
+func (m *mockDBAdapter) SearchDocumentChunks(_ context.Context, _ string, _ string, _ int) ([]*database.DocumentChunk, error) {
+	return []*database.DocumentChunk{}, nil
+}
+func (m *mockDBAdapter) GetDocumentChunks(_ context.Context, _ string) ([]*database.DocumentChunk, error) {
+	return []*database.DocumentChunk{}, nil
+}
+
 // TestMockProvider for testing with streaming support
 type TestMockProvider struct {
 	name        string
