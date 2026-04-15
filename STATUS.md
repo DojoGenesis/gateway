@@ -25,7 +25,7 @@ A modular Go framework for building agentic AI systems with pluggable providers,
 |------|--------|-------|
 | **Server Layer** | ✅ Complete | 188 production files, ~39K LOC, OpenAI-compatible API, admin endpoints, SSE streaming |
 | **Orchestration Engine** | ✅ Complete | Standalone module, DAG planning, auto-replanning, execution tracking with Cancel/Status |
-| **Skill System** | ✅ Complete | 44 skills (Tiers 0-3), meta-skill invocation, hard dependency validation |
+| **Skill System** | ✅ Complete | 89 skills (Tiers 0-3), meta-skill invocation, hard dependency validation |
 | **MCP Integration** | ✅ Complete | Host manager, stdio + SSE + streamable_http transports, 14 Dojo tools registered |
 | **Tool Registry** | ✅ Complete | 33 registered tools, 9 categories |
 | **Memory System** | ✅ Complete | SQLite-backed, embeddings, tiered context, compression, file tracking |
@@ -56,7 +56,7 @@ AgenticGatewayByDojoGenesis/
 ├── 🌐 mcp/                             # MCP host integration (stdio, SSE, streamable_http)
 ├── 🎯 orchestration/                   # Standalone DAG engine
 ├── 🎭 disposition/                     # Agent personality (ADA Contract v1.0.0)
-├── 🎓 skill/                           # Tiered skill executor (44 skills)
+├── 🎓 skill/                           # Tiered skill executor (89 skills)
 │
 ├── 🖥️  server/                         # HTTP server, agent logic, handlers (~23K LOC)
 │   ├── agent/                         # Primary agent, intent classifier, delegation
@@ -86,7 +86,7 @@ AgenticGatewayByDojoGenesis/
 │
 ├── 🚀 deployments/                     # Deployment configs
 ├── 📜 contracts/                       # Interface contracts
-└── 🧪 plugins/                         # Skill plugin directories (7 plugins, 44 skills)
+└── 🧪 plugins/                         # Skill plugin directories (8 plugins, 89 skills)
 ```
 
 ---
@@ -147,10 +147,8 @@ AgenticGatewayByDojoGenesis/
 | Meta-Skill Invocation | `skill/executor.go` (ExecuteAsSubtask) | ✅ Active | ~100 |
 | Web Tool Adapter | `skill/adapters/web_tools.go` | ✅ Active | 192 |
 
-**Skills Registered:** 44 skills across 7 plugins
-- **Tier 1 (portable, file_system only):** 26 skills
-- **Tier 2 (requires web_tools):** 13 skills
-- **Tier 3 (meta-skills):** 5 skills
+**Skills Registered:** 89 skills across 8 plugins
+- **Tier 1 (portable, file_system only):** 89 skills (all ported at Tier 1)
 
 **Health:** ✅ Production-ready. Hard dependency validation (errors on unmet deps), meta-skill call depth enforcement (max=3), budget tracking, OTEL tracing.
 

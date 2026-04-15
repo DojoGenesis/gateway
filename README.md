@@ -49,7 +49,7 @@ curl -X POST http://localhost:7340/v1/chat/completions \
           │           │           │         │           │           │
      ┌────▼───┐  ┌────▼───┐ ┌────▼───┐ ┌───▼────┐ ┌───▼────┐ ┌───▼────┐
      │provider│  │  tools │ │ memory │ │  mcp   │ │  skill │ │  apps  │
-     │8 provs │  │33 tools│ │semantic│ │3 trans-│ │84 skills│ │MCP Apps│
+     │8 provs │  │33 tools│ │semantic│ │3 trans-│ │89 skills│ │MCP Apps│
      │gRPC    │  │registry│ │compress│ │ports   │ │Tiers 0-3│ │host    │
      └────────┘  └────────┘ └────────┘ └────────┘ └────────┘ └────────┘
           │           │           │         │           │
@@ -97,7 +97,7 @@ Explicit `provider/model` in the request always overrides the intent classifier.
 | `mcp` | MCP host integration -- stdio, SSE, and streamable_http transports |
 | `orchestration` | Standalone DAG-based task planning and execution |
 | `disposition` | ADA agent personality and behavior config (v1.0.0 contract) |
-| `skill` | Tiered skill executor (84 skills across Tiers 0-3) |
+| `skill` | Tiered skill executor (89 skills across Tiers 0-3) |
 | `apps` | MCP Apps host infrastructure -- resource serving, tool proxy |
 | `workflow` | Durable workflow execution engine |
 | `integration` | Integration testing harness |
@@ -219,7 +219,7 @@ gateway-config.yaml     Runtime config (feature flags, MCP, routing)
 ├── mcp/                MCP host (stdio + SSE + streamable_http)
 ├── orchestration/      DAG planning and execution engine
 ├── disposition/        ADA personality system
-├── skill/              Tiered skill executor (84 skills)
+├── skill/              Tiered skill executor (89 skills)
 ├── apps/               MCP Apps host
 ├── workflow/           Durable workflow engine
 ├── workflow-builder/   Svelte 5 SPA (workflow canvas UI)
