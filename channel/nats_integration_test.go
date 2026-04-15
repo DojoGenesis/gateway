@@ -223,7 +223,7 @@ func TestIntegration_AdapterRegistry_CredentialInjection(t *testing.T) {
 
 	// Create a credential store with test credentials.
 	creds := NewEnvCredentialStore()
-	creds.Set(ctx, "slack", "BOT_TOKEN", "xoxb-registry-test")
+	_ = creds.Set(ctx, "slack", "BOT_TOKEN", "xoxb-registry-test")
 	creds.Set(ctx, "slack", "SIGNING_SECRET", "signing-secret-test")
 	creds.Set(ctx, "discord", "TOKEN", "discord-token-test")
 

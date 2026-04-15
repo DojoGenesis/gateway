@@ -46,7 +46,7 @@ func buildMultipartRequest(fields map[string]string, secret string) *http.Reques
 	for k, v := range fields {
 		_ = w.WriteField(k, v)
 	}
-	w.Close()
+	_ = w.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook/email", body)
 	req.Header.Set("Content-Type", w.FormDataContentType())

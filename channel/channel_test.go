@@ -196,8 +196,8 @@ func TestEnvCredentialStore_GetFromEnv(t *testing.T) {
 	ctx := context.Background()
 
 	key := "DOJO_TESTPLATFORM_SECRET"
-	os.Setenv(key, "env-secret-value")
-	defer os.Unsetenv(key)
+	_ = os.Setenv(key, "env-secret-value")
+	defer func() { _ = os.Unsetenv(key) }()
 
 	val, err := store.Get(ctx, "testplatform", "SECRET")
 	if err != nil {
@@ -322,7 +322,7 @@ func TestTokenBucketLimiter_Wait_ContextCancel(t *testing.T) {
 	ctx := context.Background()
 
 	// Exhaust the token.
-	limiter.Allow(ctx, "cancel-test")
+	_, _ = limiter.Allow(ctx, "cancel-test")
 
 	// Cancel immediately.
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Millisecond)

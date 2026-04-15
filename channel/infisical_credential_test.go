@@ -65,7 +65,7 @@ func TestInfisicalCredentialStore_GetCached(t *testing.T) {
 	ctx := context.Background()
 
 	// First call populates cache.
-	store.Get(ctx, "slack", "TOKEN")
+	_, _ = store.Get(ctx, "slack", "TOKEN")
 
 	// Change the underlying secret.
 	mock.secrets["SLACK_TOKEN"] = "rotated"
@@ -128,7 +128,7 @@ func TestInfisicalCredentialStore_SetOverridesRemote(t *testing.T) {
 	ctx := context.Background()
 
 	// Set a local override for the same key.
-	store.Set(ctx, "slack", "TOKEN", "local-value")
+	_ = store.Set(ctx, "slack", "TOKEN", "local-value")
 
 	// Local override takes precedence.
 	val, err := store.Get(ctx, "slack", "TOKEN")
@@ -174,7 +174,7 @@ func TestInfisicalCredentialStore_ListIncludesCache(t *testing.T) {
 	ctx := context.Background()
 
 	// Add a cached-only key.
-	store.Set(ctx, "slack", "APP_TOKEN", "cached-only")
+	_ = store.Set(ctx, "slack", "APP_TOKEN", "cached-only")
 
 	keys, err := store.List(ctx, "slack")
 	if err != nil {
@@ -210,7 +210,7 @@ func TestInfisicalCredentialStore_InvalidateCache(t *testing.T) {
 	ctx := context.Background()
 
 	// Populate cache.
-	store.Get(ctx, "slack", "TOKEN")
+	_, _ = store.Get(ctx, "slack", "TOKEN")
 
 	// Verify cache is populated.
 	store.mu.RLock()

@@ -230,7 +230,7 @@ func (a *EmailAdapter) Send(ctx context.Context, msg *channel.ChannelMessage) er
 	if err != nil {
 		return fmt.Errorf("email: send: http request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
