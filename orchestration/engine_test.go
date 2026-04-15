@@ -131,7 +131,7 @@ func TestEngine_Execute_ThreeNodeDAGWithParallelPair(t *testing.T) {
 	task := NewTask("user1", "test dag execution")
 
 	start := time.Now()
-	err := engine.Execute(ctx, plan, task, "user1")
+	err := engine.Execute(ctx, plan, task, "user1", nil)
 	duration := time.Since(start)
 
 	require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestEngine_Execute_AutoReplanning(t *testing.T) {
 
 	task := NewTask("user1", "test replanning")
 
-	err := engine.Execute(ctx, plan, task, "user1")
+	err := engine.Execute(ctx, plan, task, "user1", nil)
 	require.NoError(t, err)
 
 	// Planner should have been called for regeneration
@@ -279,7 +279,7 @@ func TestEngine_CircuitBreaker(t *testing.T) {
 			State:        NodeStatePending,
 		})
 		task := NewTask("user1", "test")
-		_ = engine.Execute(ctx, plan, task, "user1")
+		_ = engine.Execute(ctx, plan, task, "user1", nil)
 	}
 
 	// Circuit breaker should now be open
@@ -357,7 +357,7 @@ func TestEngine_BudgetEnforcement(t *testing.T) {
 	}
 
 	task := NewTask("user1", "test budget")
-	err := engine.Execute(ctx, plan, task, "user1")
+	err := engine.Execute(ctx, plan, task, "user1", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "budget")
 }
@@ -380,7 +380,7 @@ func TestEngine_BudgetEnforcement_NilTracker(t *testing.T) {
 	}
 
 	task := NewTask("user1", "test")
-	err := engine.Execute(ctx, plan, task, "user1")
+	err := engine.Execute(ctx, plan, task, "user1", nil)
 	assert.NoError(t, err) // Should succeed without budget tracker
 }
 
@@ -403,7 +403,7 @@ func TestEngine_EventEmission(t *testing.T) {
 	}
 
 	task := NewTask("user1", "test events")
-	err := engine.Execute(ctx, plan, task, "user1")
+	err := engine.Execute(ctx, plan, task, "user1", emitter)
 	require.NoError(t, err)
 
 	// Should have emitted start and end events
@@ -448,7 +448,7 @@ func TestEngine_ContextCancellation(t *testing.T) {
 	}
 
 	task := NewTask("user1", "test cancel")
-	err := engine.Execute(ctx, plan, task, "user1")
+	err := engine.Execute(ctx, plan, task, "user1", nil)
 	// Should either succeed (if n1 completed before cancel was noticed) or fail with context error
 	if err != nil {
 		assert.ErrorIs(t, err, context.Canceled)
@@ -514,7 +514,7 @@ func TestEngine_Execute_FatalError_NoReplan(t *testing.T) {
 	}
 
 	task := NewTask("user1", "test fatal")
-	err := engine.Execute(ctx, plan, task, "user1")
+	err := engine.Execute(ctx, plan, task, "user1", nil)
 	assert.Error(t, err)
 	// Should NOT have attempted replanning for fatal errors
 	assert.Equal(t, int32(0), planner.regenerateCount.Load())
@@ -533,12 +533,10 @@ func TestEngine_SetEventEmitter_WiresEvents(t *testing.T) {
 	planner := &mockPlanner{}
 	rapidDisp := &disposition.DispositionConfig{Pacing: "rapid"}
 
-	// Start with nil emitter
 	engine := NewEngine(config, planner, invoker, nil, nil, nil, WithDisposition(rapidDisp))
 
-	// Create a mock emitter and set it
+	// Pass emitter directly to Execute instead of using SetEventEmitter
 	emitter := &mockEventEmitter{}
-	engine.SetEventEmitter(emitter)
 
 	plan := &Plan{
 		ID:     "test-events-1",
@@ -549,7 +547,7 @@ func TestEngine_SetEventEmitter_WiresEvents(t *testing.T) {
 	}
 
 	task := NewTask("user1", "test events")
-	err := engine.Execute(ctx, plan, task, "user1")
+	err := engine.Execute(ctx, plan, task, "user1", emitter)
 	assert.NoError(t, err)
 
 	// Verify events were emitted
@@ -583,10 +581,7 @@ func TestEngine_SetEventEmitter_NilClearsEmitter(t *testing.T) {
 	rapidDisp := &disposition.DispositionConfig{Pacing: "rapid"}
 
 	emitter := &mockEventEmitter{}
-	engine := NewEngine(config, planner, invoker, nil, emitter, nil, WithDisposition(rapidDisp))
-
-	// Clear emitter
-	engine.SetEventEmitter(nil)
+	engine := NewEngine(config, planner, invoker, nil, nil, nil, WithDisposition(rapidDisp))
 
 	plan := &Plan{
 		ID:     "test-nil-emitter",
@@ -597,9 +592,10 @@ func TestEngine_SetEventEmitter_NilClearsEmitter(t *testing.T) {
 	}
 
 	task := NewTask("user1", "test nil emitter")
-	err := engine.Execute(ctx, plan, task, "user1")
+	// Pass nil emitter — the emitter variable above should receive no events
+	err := engine.Execute(ctx, plan, task, "user1", nil)
 	assert.NoError(t, err)
 
-	// Original emitter should have NO events since we cleared it
-	assert.Empty(t, emitter.events, "cleared emitter should not receive events")
+	// Original emitter should have NO events since nil was passed to Execute
+	assert.Empty(t, emitter.events, "unconnected emitter should not receive events")
 }

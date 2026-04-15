@@ -804,7 +804,7 @@ func (s *Server) handleGatewayOrchestrate(c *gin.Context) {
 		orchState.Status = "executing"
 		orchState.mu.Unlock()
 
-		execErr := s.orchestrationEngine.Execute(c.Request.Context(), orchPlan, task, userID)
+		execErr := s.orchestrationEngine.Execute(c.Request.Context(), orchPlan, task, userID, nil)
 
 		orchState.mu.Lock()
 		if execErr != nil {

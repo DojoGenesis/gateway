@@ -18,6 +18,7 @@ import (
 	"github.com/DojoGenesis/gateway/disposition"
 	"github.com/DojoGenesis/gateway/mcp"
 	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/runtime/mesh"
 	"github.com/DojoGenesis/gateway/specialist"
 	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 	pkgdisposition "github.com/DojoGenesis/gateway/pkg/disposition"
@@ -543,6 +544,18 @@ func main() {
 		}
 	}
 
+	// ─── Initialize Federated Mesh (optional) ──────────────────────
+	var gatewayMesh *mesh.Mesh
+	if hostname := os.Getenv("DOJO_MESH_HOSTNAME"); hostname != "" {
+		identity, meshErr := mesh.GenerateIdentity(hostname)
+		if meshErr != nil {
+			slog.Warn("mesh identity generation failed — mesh disabled", "error", meshErr)
+		} else {
+			gatewayMesh = mesh.New(identity, 5*time.Minute)
+			slog.Info("mesh initialized", "did", identity.DID())
+		}
+	}
+
 	// ─── Create and Start Server ─────────────────────────────────────
 	// Guard against the Go interface nil trap: assigning a typed nil (*mcp.MCPHostManager)(nil)
 	// to MCPStatusProvider produces a non-nil interface, breaking the nil check inside the server.
@@ -584,6 +597,7 @@ func main() {
 		SpecialistRouter:    specialistRouter,
 		WorkflowCAS:         workflowCAS,
 		D1Syncer:            d1Syncer,
+		Mesh:                gatewayMesh,
 	})
 
 	// Load provider keys that were persisted by a previous run (or by the CLI).

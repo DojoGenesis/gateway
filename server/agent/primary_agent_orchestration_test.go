@@ -83,12 +83,12 @@ func (m *mockPlanner) RegeneratePlan(ctx context.Context, task *orchestrationpkg
 }
 
 type mockEngine struct {
-	executeFunc func(ctx context.Context, plan *orchestrationpkg.Plan, task *orchestrationpkg.Task, userID string) error
+	executeFunc func(ctx context.Context, plan *orchestrationpkg.Plan, task *orchestrationpkg.Task, userID string, emitter orchestrationpkg.EventEmitterInterface) error
 }
 
-func (m *mockEngine) Execute(ctx context.Context, plan *orchestrationpkg.Plan, task *orchestrationpkg.Task, userID string) error {
+func (m *mockEngine) Execute(ctx context.Context, plan *orchestrationpkg.Plan, task *orchestrationpkg.Task, userID string, emitter orchestrationpkg.EventEmitterInterface) error {
 	if m.executeFunc != nil {
-		return m.executeFunc(ctx, plan, task, userID)
+		return m.executeFunc(ctx, plan, task, userID, emitter)
 	}
 	for _, node := range plan.Nodes {
 		node.State = orchestrationpkg.NodeStateSuccess

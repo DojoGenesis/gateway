@@ -78,12 +78,16 @@ type SpecialistRoutingResult struct {
 	Routed       bool
 	SpecialistID string
 	Reason       string
+	Plugin       string
+	Disposition  string
+	Skills       []string
 }
 
 // Orchestrator is the interface the chat handler uses for multi-step plan generation.
-// Satisfied by the orchestration planner in server/orchestration.
+// Satisfied by OrchestratorAdapter in adapters.go.
 type Orchestrator interface {
 	GeneratePlanForChat(ctx context.Context, userID, query string) (planSummary string, err error)
+	StartOrchestrationForChat(userID, query string, timeout time.Duration) (orchID string, err error)
 }
 
 // SetSemanticRouter injects the semantic router. When set, the chat handler
@@ -225,6 +229,7 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 				decision.SpecialistAgentID = result.SpecialistID
 				decision.Handler = "llm-reasoning"
 				decision.Provider = "llm-reasoning"
+				decision.SystemPromptOverride = buildSpecialistPrompt(result.Plugin, result.Disposition, result.Skills)
 			} else {
 				slog.Info("specialist routing: no match, degrading to llm-reasoning",
 					"reason", result.Reason,
@@ -245,25 +250,27 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 			h.handleNonStreamingQuery(c, &req, decision)
 		}
 	case "orchestrate":
-		// Try orchestration planner; degrade to llm-reasoning if not wired or plan fails.
+		// Start async DAG execution and return 202 Accepted with orchestration ID.
+		// Client polls /v1/orchestrate/:id/events for progress.
+		// Degrades to llm-reasoning if orchestrator not wired or start fails.
 		if h.orchestrator != nil {
-			planCtx, planCancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
-			planSummary, err := h.orchestrator.GeneratePlanForChat(planCtx, req.UserID, req.Message)
-			planCancel()
+			orchID, err := h.orchestrator.StartOrchestrationForChat(req.UserID, req.Message, 5*time.Minute)
 			if err != nil {
-				slog.Warn("orchestration planning failed, degrading to llm-reasoning",
-					"error", err,
-				)
+				slog.Warn("orchestration start failed, degrading to llm-reasoning", "error", err)
 				c.Header("X-Route-Degraded", "orchestrate->llm-reasoning")
 				decision.Handler = "llm-reasoning"
 				decision.Provider = "llm-reasoning"
 			} else {
-				slog.Info("orchestration plan generated", "summary_len", len(planSummary))
 				c.Header("X-Orchestrated", "true")
-				// Prepend the plan context to the query so the LLM can execute it
-				decision.Handler = "llm-reasoning"
-				decision.Provider = "llm-reasoning"
-				req.Message = fmt.Sprintf("[Orchestration Plan]\n%s\n\n[Original Query]\n%s", planSummary, req.Message)
+				c.Header("X-Orchestration-ID", orchID)
+				c.JSON(http.StatusAccepted, gin.H{
+					"type":             "orchestration_accepted",
+					"orchestration_id": orchID,
+					"status":           "planning",
+					"events_url":       "/v1/orchestrate/" + orchID + "/events",
+					"created_at":       time.Now().Format(time.RFC3339),
+				})
+				return
 			}
 		} else {
 			slog.Warn("orchestrator not configured, degrading to llm-reasoning")
@@ -400,16 +407,17 @@ func (h *ChatHandler) handleStreamingQuery(c *gin.Context, req *ChatRequest, dec
 
 	// Build query request for streaming agent
 	queryReq := agent.QueryRequest{
-		Query:         req.Message,
-		ProviderName:  providerName,
-		ModelID:       resolvedModel,
-		UserID:        req.UserID,
-		UserTier:      h.getUserTier(req.UserID),
-		UseMemory:     false,
-		Temperature:   agent.DefaultTemperature,
-		MaxTokens:     agent.DefaultMaxTokens,
-		ProjectID:     req.ProjectID,
-		WorkspaceRoot: req.WorkspaceRoot,
+		Query:                req.Message,
+		ProviderName:         providerName,
+		ModelID:              resolvedModel,
+		UserID:               req.UserID,
+		UserTier:             h.getUserTier(req.UserID),
+		UseMemory:            false,
+		Temperature:          agent.DefaultTemperature,
+		MaxTokens:            agent.DefaultMaxTokens,
+		ProjectID:            req.ProjectID,
+		WorkspaceRoot:        req.WorkspaceRoot,
+		SystemPromptOverride: decision.SystemPromptOverride,
 	}
 
 	// Use StreamingAgent with detailed events
@@ -740,6 +748,23 @@ func (h *ChatHandler) lookupUserTier(ctx context.Context, userID string) string 
 	}
 
 	return ""
+}
+
+// buildSpecialistPrompt generates a system prompt overlay for a specialist agent.
+func buildSpecialistPrompt(plugin, disposition string, skills []string) string {
+	var b strings.Builder
+	b.WriteString("You are a specialist agent")
+	if plugin != "" {
+		b.WriteString(fmt.Sprintf(" operating via the %s plugin", plugin))
+	}
+	b.WriteString(".")
+	if disposition != "" {
+		b.WriteString(fmt.Sprintf(" Disposition: %s.", disposition))
+	}
+	if len(skills) > 0 {
+		b.WriteString(fmt.Sprintf(" Prioritize these skills: %s.", strings.Join(skills, ", ")))
+	}
+	return b.String()
 }
 
 // formatRouteScores produces a compact "route=score" string for the top-3

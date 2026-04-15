@@ -77,7 +77,7 @@ func (e *GatewayOrchestrationExecutor) Execute(ctx context.Context, plan *gatewa
 
 	// Execute the plan
 	// Note: Using "system" as userID since gateway interface doesn't provide it
-	err := e.engine.Execute(execCtx, orchPlan, task, "system")
+	err := e.engine.Execute(execCtx, orchPlan, task, "system", nil)
 
 	duration := time.Since(startTime).Milliseconds()
 

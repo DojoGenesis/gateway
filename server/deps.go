@@ -9,6 +9,7 @@ import (
 	"github.com/DojoGenesis/gateway/pkg/gateway"
 	"github.com/DojoGenesis/gateway/provider"
 	"github.com/DojoGenesis/gateway/runtime/cas"
+	"github.com/DojoGenesis/gateway/runtime/mesh"
 	"github.com/DojoGenesis/gateway/server/agent"
 	"github.com/DojoGenesis/gateway/server/maintenance"
 	"github.com/DojoGenesis/gateway/server/services"
@@ -55,4 +56,7 @@ type ServerDeps struct {
 	// D1Syncer is the optional local-to-D1 CAS sync loop (Era 4).
 	// If nil, GET /api/cas/status reports sync as disabled.
 	D1Syncer *cas.D1Syncer
+
+	// Mesh is the federated agent mesh. Nil means mesh is disabled.
+	Mesh *mesh.Mesh
 }

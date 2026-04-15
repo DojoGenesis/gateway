@@ -221,7 +221,37 @@ func (p *GoogleProvider) CallTool(ctx context.Context, req *provider.ToolCallReq
 }
 
 func (p *GoogleProvider) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	return nil, fmt.Errorf("Google Gemini embedding not implemented in this provider")
+	reqBody := map[string]interface{}{
+		"content": map[string]interface{}{
+			"parts": []map[string]interface{}{
+				{"text": text},
+			},
+		},
+	}
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("google: marshal embedding request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/models/gemini-embedding-001:embedContent", p.BaseURL)
+	resp, err := p.doGeminiRequest(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("google: embedding request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Embedding struct {
+			Values []float32 `json:"values"`
+		} `json:"embedding"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("google: decode embedding response: %w", err)
+	}
+	if len(result.Embedding.Values) == 0 {
+		return nil, fmt.Errorf("google: empty embedding response")
+	}
+	return result.Embedding.Values, nil
 }
 
 // buildGeminiRequest converts a Gateway CompletionRequest to a Gemini API request.

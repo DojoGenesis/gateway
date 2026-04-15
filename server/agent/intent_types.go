@@ -71,4 +71,7 @@ type RoutingDecision struct {
 	Reasoning         []string
 	SpecialistAgentID string            // bridges category → specialist agent
 	Scores            map[string]float64 `json:"scores,omitempty"` // per-route similarity scores from Tier 2; empty for Tier 1/3 decisions
+	// SystemPromptOverride replaces the default system prompt when set.
+	// Used by specialist dispatch to inject specialist-specific identity.
+	SystemPromptOverride string
 }

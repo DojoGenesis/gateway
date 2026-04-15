@@ -94,9 +94,9 @@ func WithDisposition(disp *disposition.DispositionConfig) EngineOption {
 }
 
 // SetEventEmitter replaces the engine's event emitter at runtime.
-// This enables per-execution event routing by setting an emitter before
-// Execute() and clearing it after. Pass nil to disable event emission.
-// Thread-safe: uses the engine's write lock.
+// Deprecated: Pass the emitter directly to Execute() instead.
+// Kept for backward compatibility only. Not safe for concurrent Execute calls
+// on the same engine instance.
 func (e *Engine) SetEventEmitter(emitter EventEmitterInterface) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -139,7 +139,9 @@ func NewEngine(
 }
 
 // Execute runs a plan to completion with auto-replanning on failure.
-func (e *Engine) Execute(ctx context.Context, plan *Plan, task *Task, userID string) error {
+// emitter receives node start/end and replanning events during execution.
+// Pass nil to disable event emission. Safe for concurrent calls on the same engine.
+func (e *Engine) Execute(ctx context.Context, plan *Plan, task *Task, userID string, emitter EventEmitterInterface) error {
 	estimatedCost, err := e.EstimatePlanCost(plan)
 	if err != nil {
 		return fmt.Errorf("failed to estimate plan cost: %w", err)
@@ -182,7 +184,7 @@ func (e *Engine) Execute(ctx context.Context, plan *Plan, task *Task, userID str
 	currentPlan := plan
 
 	for {
-		execErr := e.executePlan(ctx, currentPlan, task)
+		execErr := e.executePlan(ctx, currentPlan, task, emitter)
 		if execErr == nil {
 			return nil
 		}
@@ -210,7 +212,7 @@ func (e *Engine) Execute(ctx context.Context, plan *Plan, task *Task, userID str
 			return fmt.Errorf("fatal error in node %s: %s", failedNode.ID, failedNode.Error)
 		}
 
-		newPlan, replanErr := e.handlePersistentFailure(ctx, currentPlan, task, failedNode)
+		newPlan, replanErr := e.handlePersistentFailure(ctx, currentPlan, task, failedNode, emitter)
 		if replanErr != nil {
 			return fmt.Errorf("replanning failed: %w", replanErr)
 		}
@@ -227,7 +229,7 @@ func (e *Engine) Execute(ctx context.Context, plan *Plan, task *Task, userID str
 	}
 }
 
-func (e *Engine) executePlan(ctx context.Context, plan *Plan, task *Task) error {
+func (e *Engine) executePlan(ctx context.Context, plan *Plan, task *Task, emitter EventEmitterInterface) error {
 	maxIterations := 1000
 	iteration := 0
 
@@ -245,7 +247,7 @@ func (e *Engine) executePlan(ctx context.Context, plan *Plan, task *Task) error 
 			break
 		}
 
-		if err := e.executeNodesInParallel(ctx, executableNodes, plan, task.ID); err != nil {
+		if err := e.executeNodesInParallel(ctx, executableNodes, plan, task.ID, emitter); err != nil {
 			return err
 		}
 
@@ -267,7 +269,7 @@ func (e *Engine) executePlan(ctx context.Context, plan *Plan, task *Task) error 
 	return nil
 }
 
-func (e *Engine) executeNodesInParallel(ctx context.Context, nodes []*PlanNode, plan *Plan, traceID string) error {
+func (e *Engine) executeNodesInParallel(ctx context.Context, nodes []*PlanNode, plan *Plan, traceID string, emitter EventEmitterInterface) error {
 	parallelBatchSize := e.config.MaxParallelNodes
 
 	for i := 0; i < len(nodes); i += parallelBatchSize {
@@ -284,7 +286,7 @@ func (e *Engine) executeNodesInParallel(ctx context.Context, nodes []*PlanNode, 
 			wg.Add(1)
 			go func(n *PlanNode) {
 				defer wg.Done()
-				if err := e.executeNode(ctx, n, plan, traceID); err != nil {
+				if err := e.executeNode(ctx, n, plan, traceID, emitter); err != nil {
 					errChan <- err
 				}
 			}(node)
@@ -303,7 +305,7 @@ func (e *Engine) executeNodesInParallel(ctx context.Context, nodes []*PlanNode, 
 	return nil
 }
 
-func (e *Engine) executeNode(ctx context.Context, node *PlanNode, plan *Plan, traceID string) error {
+func (e *Engine) executeNode(ctx context.Context, node *PlanNode, plan *Plan, traceID string, emitter EventEmitterInterface) error {
 	// Apply pacing delay before executing node (per Gateway-ADA Contract §3.1)
 	if err := e.applyPacingDelay(ctx); err != nil {
 		return err
@@ -315,8 +317,8 @@ func (e *Engine) executeNode(ctx context.Context, node *PlanNode, plan *Plan, tr
 	node.StartTime = &now
 	e.mu.Unlock()
 
-	if e.eventEmitter != nil {
-		e.sendNodeStartEvent(node, plan.ID)
+	if emitter != nil {
+		e.sendNodeStartEvent(node, plan.ID, emitter)
 	}
 
 	var nodeSpan SpanHandle
@@ -356,8 +358,8 @@ func (e *Engine) executeNode(ctx context.Context, node *PlanNode, plan *Plan, tr
 	}
 	e.mu.Unlock()
 
-	if e.eventEmitter != nil {
-		e.sendNodeEndEvent(node, plan.ID)
+	if emitter != nil {
+		e.sendNodeEndEvent(node, plan.ID, emitter)
 	}
 
 	return execErr
@@ -483,12 +485,12 @@ func (e *Engine) retryWithBackoff(ctx context.Context, backoffDuration time.Dura
 	}
 }
 
-func (e *Engine) sendNodeStartEvent(node *PlanNode, planID string) {
-	if e.eventEmitter == nil {
+func (e *Engine) sendNodeStartEvent(node *PlanNode, planID string, emitter EventEmitterInterface) {
+	if emitter == nil {
 		return
 	}
 
-	e.eventEmitter.Emit(StreamEvent{
+	emitter.Emit(StreamEvent{
 		Type: "orchestration.node.start",
 		Data: map[string]interface{}{
 			"node_id":    node.ID,
@@ -500,8 +502,8 @@ func (e *Engine) sendNodeStartEvent(node *PlanNode, planID string) {
 	})
 }
 
-func (e *Engine) sendNodeEndEvent(node *PlanNode, planID string) {
-	if e.eventEmitter == nil {
+func (e *Engine) sendNodeEndEvent(node *PlanNode, planID string, emitter EventEmitterInterface) {
+	if emitter == nil {
 		return
 	}
 
@@ -510,7 +512,7 @@ func (e *Engine) sendNodeEndEvent(node *PlanNode, planID string) {
 		durationMs = node.EndTime.Sub(*node.StartTime).Milliseconds()
 	}
 
-	e.eventEmitter.Emit(StreamEvent{
+	emitter.Emit(StreamEvent{
 		Type: "orchestration.node.end",
 		Data: map[string]interface{}{
 			"node_id":     node.ID,
@@ -602,7 +604,7 @@ func (e *Engine) findFirstFailedNode(plan *Plan) *PlanNode {
 	return nil
 }
 
-func (e *Engine) handlePersistentFailure(ctx context.Context, plan *Plan, task *Task, failedNode *PlanNode) (*Plan, error) {
+func (e *Engine) handlePersistentFailure(ctx context.Context, plan *Plan, task *Task, failedNode *PlanNode, emitter EventEmitterInterface) (*Plan, error) {
 	if !e.config.EnableAutoReplanning {
 		return nil, fmt.Errorf("auto-replanning is disabled")
 	}
@@ -627,8 +629,8 @@ func (e *Engine) handlePersistentFailure(ctx context.Context, plan *Plan, task *
 		len(plan.Nodes),
 	)
 
-	if e.eventEmitter != nil {
-		e.eventEmitter.Emit(StreamEvent{
+	if emitter != nil {
+		emitter.Emit(StreamEvent{
 			Type: "orchestration.replanning",
 			Data: map[string]interface{}{
 				"plan_id":      plan.ID,

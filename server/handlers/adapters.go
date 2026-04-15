@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 	"github.com/DojoGenesis/gateway/server/agent"
@@ -20,17 +21,24 @@ type SpecialistRouterAdapter struct {
 // chat handler's SpecialistRoutingResult type.
 func (a *SpecialistRouterAdapter) Route(decision agent.RoutingDecision) SpecialistRoutingResult {
 	result := a.Router.Route(decision)
-	return SpecialistRoutingResult{
+	out := SpecialistRoutingResult{
 		Routed:       result.Routed,
 		SpecialistID: result.SpecialistID,
 		Reason:       result.Reason,
 	}
+	if result.Routed && result.Specialist != nil && result.Specialist.Config != nil {
+		out.Plugin = result.Specialist.Config.Plugin
+		out.Disposition = result.Specialist.Config.Disposition
+		out.Skills = result.Specialist.Config.Skills
+	}
+	return out
 }
 
 // OrchestratorAdapter wraps the orchestration planner and engine to satisfy
 // the ChatHandler's Orchestrator interface.
 type OrchestratorAdapter struct {
-	Planner orchestrationpkg.PlannerInterface
+	Planner     orchestrationpkg.PlannerInterface
+	StartOrchFn func(userID, query string, timeout time.Duration) (string, error)
 }
 
 // GeneratePlanForChat creates a Task from the user's query, generates a plan,
@@ -58,4 +66,13 @@ func (a *OrchestratorAdapter) GeneratePlanForChat(ctx context.Context, userID, q
 	}
 
 	return summary, nil
+}
+
+// StartOrchestrationForChat delegates async orchestration start to the server via StartOrchFn.
+// Returns the orchestration ID on success, or an error if the function is not configured.
+func (a *OrchestratorAdapter) StartOrchestrationForChat(userID, query string, timeout time.Duration) (string, error) {
+	if a.StartOrchFn == nil {
+		return "", fmt.Errorf("orchestration start function not configured")
+	}
+	return a.StartOrchFn(userID, query, timeout)
 }

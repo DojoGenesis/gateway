@@ -22,7 +22,10 @@ func (s *Server) setupRoutes() {
 		chatHandler.SetSpecialistRouter(&handlers.SpecialistRouterAdapter{Router: s.specialistRouter})
 	}
 	if s.planner != nil {
-		chatHandler.SetOrchestrator(&handlers.OrchestratorAdapter{Planner: s.planner})
+		chatHandler.SetOrchestrator(&handlers.OrchestratorAdapter{
+			Planner:     s.planner,
+			StartOrchFn: s.StartOrchestrationForChat,
+		})
 	}
 	memoryHandler := handlers.NewMemoryHandler(s.memoryManager, s.gardenManager, s.memoryMaintenance)
 

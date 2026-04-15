@@ -216,6 +216,7 @@ func New(deps ServerDeps) *Server {
 		d1Syncer:              deps.D1Syncer,
 		semanticRouter:        deps.SemanticRouter,
 		specialistRouter:      deps.SpecialistRouter,
+		mesh:                  deps.Mesh,
 		execBus:               newExecutionBus(),
 		latencyTracker:        services.NewProviderLatencyTracker(60),
 		wsHub:                 NewWorkflowWSHub(),

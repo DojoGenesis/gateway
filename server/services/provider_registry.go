@@ -43,6 +43,7 @@ func RegisterProviders(
 		{"mistral", func(k string) provider.ModelProvider { return providers.NewMistralProvider(k) }, "MISTRAL_API_KEY"},
 		{"deepseek-api", func(k string) provider.ModelProvider { return providers.NewDeepSeekProvider(k) }, "DEEPSEEK_API_KEY"},
 		{"kimi", func(k string) provider.ModelProvider { return providers.NewKimiProvider(k) }, "KIMI_API_KEY"},
+		{"voyage", func(k string) provider.ModelProvider { return providers.NewVoyageProvider(k) }, "VOYAGE_API_KEY"},
 	}
 
 	for _, cp := range cloudProviders {

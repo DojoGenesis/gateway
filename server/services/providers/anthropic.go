@@ -256,7 +256,7 @@ func (p *AnthropicProvider) CallTool(ctx context.Context, req *provider.ToolCall
 }
 
 func (p *AnthropicProvider) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	return nil, fmt.Errorf("Anthropic does not provide an embeddings endpoint")
+	return nil, fmt.Errorf("%s: Anthropic does not offer an embeddings API; set DOJO_EMBEDDING_PROVIDER to openai, google, voyage, or ollama", p.Name)
 }
 
 // convertToAnthropicMessages converts provider messages into Anthropic API format.

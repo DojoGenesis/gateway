@@ -129,6 +129,36 @@ func (s *Server) handleOrchestrate(c *gin.Context) {
 	})
 }
 
+// StartOrchestrationForChat creates an orchestration task and kicks off async
+// DAG execution. Returns the orchestration ID immediately (non-blocking).
+// The caller can poll /v1/orchestrate/:id/events for progress.
+func (s *Server) StartOrchestrationForChat(userID, taskDescription string, timeout time.Duration) (string, error) {
+	if s.orchestrationEngine == nil || s.planner == nil {
+		return "", fmt.Errorf("orchestration engine not initialized")
+	}
+
+	task := orchestrationpkg.NewTask(userID, taskDescription)
+
+	orchID := "orch-" + uuid.New().String()[:12]
+	now := time.Now()
+
+	eventChan := make(chan events.StreamEvent, 100)
+
+	state := &OrchestrationState{
+		ID:        orchID,
+		TaskID:    task.ID,
+		Status:    "planning",
+		CreatedAt: now,
+		Events:    make([]events.StreamEvent, 0),
+		EventChan: eventChan,
+	}
+	s.orchestrations.Store(state)
+
+	go s.executeOrchestration(state, task, eventChan, timeout)
+
+	return orchID, nil
+}
+
 func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestrationpkg.Task, eventChan chan events.StreamEvent, timeout time.Duration) {
 	defer close(eventChan)
 
@@ -209,14 +239,10 @@ func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestra
 		}
 	}()
 
-	// Set the event emitter for this execution, clear after
-	s.orchestrationEngine.SetEventEmitter(emitter)
+	// Execute plan — pass emitter directly to avoid shared-engine race.
+	execErr := s.orchestrationEngine.Execute(ctx, plan, task, task.UserID, emitter)
 
-	// Execute plan
-	execErr := s.orchestrationEngine.Execute(ctx, plan, task, task.UserID)
-
-	// Clear emitter and close channel
-	s.orchestrationEngine.SetEventEmitter(nil)
+	// Close emitter channel; the forwarding goroutine drains and exits.
 	close(orchEventChan)
 
 	if execErr != nil {
