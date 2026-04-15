@@ -1,15 +1,5 @@
 package server
 
-// Registration (add to setupRoutes in router.go under the admin group):
-//   admin.GET("/routing/mode", s.handleAdminRoutingMode)
-//   admin.POST("/routing/mode", s.handleAdminSetRoutingMode)
-//   admin.GET("/routing/stats", s.handleAdminRoutingStats)
-//
-// Server struct field (add to the Server struct in server.go):
-//   // semanticRouter provides hot-switchable routing mode control.
-//   // Nil when the semantic routing feature is not enabled.
-//   semanticRouter *agent.SemanticRouter
-
 import (
 	"log/slog"
 	"net/http"
@@ -175,8 +165,8 @@ func (s *Server) handleAdminSetRouteThreshold(c *gin.Context) {
 	}
 
 	var req struct {
-		Route     string  `json:"route"     binding:"required"`
-		Threshold float64 `json:"threshold" binding:"required"`
+		Route     string   `json:"route"     binding:"required"`
+		Threshold *float64 `json:"threshold"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("handleAdminSetRouteThreshold: invalid request body", "error", err)
@@ -186,14 +176,19 @@ func (s *Server) handleAdminSetRouteThreshold(c *gin.Context) {
 		return
 	}
 
-	if req.Threshold < 0.0 || req.Threshold > 1.0 {
+	if req.Threshold == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "request body must contain 'threshold' field"})
+		return
+	}
+	threshold := *req.Threshold
+	if threshold < 0.0 || threshold > 1.0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "threshold must be in [0.0, 1.0]",
 		})
 		return
 	}
 
-	if err := s.semanticRouter.SetRouteThreshold(req.Route, req.Threshold); err != nil {
+	if err := s.semanticRouter.SetRouteThreshold(req.Route, threshold); err != nil {
 		slog.Warn("handleAdminSetRouteThreshold: route not found", "route", req.Route)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
@@ -201,11 +196,11 @@ func (s *Server) handleAdminSetRouteThreshold(c *gin.Context) {
 		return
 	}
 
-	slog.Info("admin: route threshold updated", "route", req.Route, "threshold", req.Threshold)
+	slog.Info("admin: route threshold updated", "route", req.Route, "threshold", threshold)
 	summaries := buildRouteSummaries(s.semanticRouter.GetRoutes())
 	c.JSON(http.StatusOK, gin.H{
 		"route":     req.Route,
-		"threshold": req.Threshold,
+		"threshold": threshold,
 		"routes":    summaries,
 	})
 }

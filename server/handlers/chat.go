@@ -25,6 +25,10 @@ const (
 	ResponseTypeError    = "error"
 )
 
+// defaultTemplateResponse is the response used when no template matches.
+// Comparing against it detects a cache miss and triggers the LLM fallback.
+const defaultTemplateResponse = "I'm here to help! Could you please provide more details about what you'd like to work on?"
+
 // cloudProviders lists provider names considered "cloud" (API-based, higher quality).
 // Order determines preference — first loaded wins for reasoning tasks.
 var cloudProviders = []string{"deepseek-api", "openai", "anthropic", "google", "groq", "mistral"}
@@ -306,7 +310,7 @@ func (h *ChatHandler) handleTemplateQuery(c *gin.Context, req *ChatRequest, deci
 	c.Header("X-Intent-Confidence", fmt.Sprintf("%.2f", decision.Confidence))
 
 	// If template fallback is configured and response is empty, fallback to LLM
-	if decision.Fallback == "llm-fast" && response == "I'm here to help! Could you please provide more details about what you'd like to work on?" {
+	if decision.Fallback == "llm-fast" && response == defaultTemplateResponse {
 		slog.Info("template response not found, falling back", "fallback", decision.Fallback)
 		// Update decision for fallback
 		decision.Handler = decision.Fallback
@@ -555,7 +559,7 @@ func getTemplateResponse(message string) string {
 		}
 	}
 
-	return "I'm here to help! Could you please provide more details about what you'd like to work on?"
+	return defaultTemplateResponse
 }
 
 func normalizeQuery(query string) string {

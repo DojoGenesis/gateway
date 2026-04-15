@@ -182,6 +182,13 @@ func (r *DefaultLLMRouter) ClassifyWithLLM(ctx context.Context, query string) (R
 
 // buildPrompt constructs the classification prompt for the LLM.
 func (r *DefaultLLMRouter) buildPrompt(query string) string {
+	// Truncate query to prevent oversized classification prompts.
+	// The classification task needs only the first ~500 chars to identify intent.
+	const maxQueryLen = 500
+	if len(query) > maxQueryLen {
+		query = query[:maxQueryLen] + "…"
+	}
+
 	var sb strings.Builder
 
 	sb.WriteString("You are a query router for an AI agent gateway. ")

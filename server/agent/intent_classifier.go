@@ -10,20 +10,6 @@ import (
 	"sync"
 )
 
-const (
-	// complexWordCountThreshold is the minimum word count for a query to be
-	// classified as Complex in the absence of other signals.
-	// Rationale: Queries with 10+ words typically require more sophisticated
-	// reasoning than simple template responses can provide.
-	complexWordCountThreshold = 10
-
-	// veryLongQueryThreshold is the word count threshold above which all queries
-	// are classified as Complex regardless of content.
-	// Rationale: Very long queries (100+ words) almost always require detailed
-	// analysis and are unlikely to be simple greetings or factual questions.
-	veryLongQueryThreshold = 100
-)
-
 // IntentClassifier performs lightweight, rule-based classification of user queries
 // into Simple or Complex categories to optimize routing and response latency.
 //
@@ -223,29 +209,6 @@ func (ic *IntentClassifier) isMetaQuery(query string) bool {
 			return true
 		}
 	}
-	return false
-}
-
-func (ic *IntentClassifier) containsSimpleKeyword(query string) bool {
-	words := strings.Fields(query)
-	wordSet := make(map[string]bool)
-	for _, word := range words {
-		word = strings.Trim(word, ".,!?;:")
-		wordSet[word] = true
-	}
-
-	for _, keyword := range ic.simpleKeywords {
-		if strings.Contains(keyword, " ") {
-			if strings.Contains(query, keyword) {
-				return true
-			}
-		} else {
-			if wordSet[keyword] {
-				return true
-			}
-		}
-	}
-
 	return false
 }
 

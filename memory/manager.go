@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -24,7 +25,7 @@ type MemoryManager struct {
 func NewMemoryManager(dbPath string) (*MemoryManager, error) {
 	dir := filepath.Dir(dbPath)
 	if dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return nil, fmt.Errorf("failed to create database directory %s: %w", dir, err)
 		}
 	}
@@ -167,7 +168,7 @@ func (m *MemoryManager) GetMemory(ctx context.Context, id string) (*Memory, erro
 		&memory.UpdatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrMemoryNotFound
 	}
 	if err != nil {

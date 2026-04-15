@@ -1095,16 +1095,19 @@ func (s *Server) handleSetProviderKey(c *gin.Context) {
 
 		// If the semantic router exists but hasn't been initialized yet,
 		// attempt lazy initialization now that a new provider is available.
+		// sync.Once ensures only one goroutine is spawned even on rapid concurrent POSTs.
 		if s.semanticRouter != nil && !s.semanticRouter.IsInitialized() {
-			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-				defer cancel()
-				if ok, err := s.semanticRouter.TryInitialize(ctx); err != nil {
-					slog.Warn("semantic router auto-init failed", "error", err)
-				} else if ok {
-					slog.Info("semantic router auto-initialized after provider registration")
-				}
-			}()
+			s.semanticRouterInitOnce.Do(func() {
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+					defer cancel()
+					if ok, err := s.semanticRouter.TryInitialize(ctx); err != nil {
+						slog.Warn("semantic router auto-init failed", "error", err)
+					} else if ok {
+						slog.Info("semantic router auto-initialized after provider registration")
+					}
+				}()
+			})
 		}
 	}
 

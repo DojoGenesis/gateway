@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 	"github.com/DojoGenesis/gateway/server/agent"
@@ -43,10 +42,7 @@ func (a *OrchestratorAdapter) GeneratePlanForChat(ctx context.Context, userID, q
 
 	task := orchestrationpkg.NewTask(userID, query)
 
-	planCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	plan, err := a.Planner.GeneratePlan(planCtx, task)
+	plan, err := a.Planner.GeneratePlan(ctx, task)
 	if err != nil {
 		return "", fmt.Errorf("plan generation failed: %w", err)
 	}

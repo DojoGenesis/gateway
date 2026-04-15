@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -197,7 +198,8 @@ func (cs *CompressionService) CompressHistory(ctx context.Context, sessionID str
 	prov, err := cs.pluginManager.GetProvider("ollama")
 	if err != nil {
 		// Fallback: simple concatenation
-		return &CompressedHistory{
+		slog.Warn("ollama provider unavailable, falling back to simple concatenation", "error", err)
+		return &CompressedHistory{ //nolint:nilerr // error logged and swallowed intentionally
 			SessionID:         sessionID,
 			CompressedContent: content,
 			CompressionRatio:  1.0,
@@ -208,7 +210,8 @@ func (cs *CompressionService) CompressHistory(ctx context.Context, sessionID str
 	// Use the LLM provider via reflection-free interface assertion
 	compressed, err := callLLMCompletion(ctx, prov, prompt, 0.3, 500)
 	if err != nil {
-		return &CompressedHistory{
+		slog.Warn("LLM completion failed during history compression, falling back to simple concatenation", "error", err)
+		return &CompressedHistory{ //nolint:nilerr // error logged and swallowed intentionally
 			SessionID:         sessionID,
 			CompressedContent: content,
 			CompressionRatio:  1.0,
@@ -239,13 +242,15 @@ func (cs *CompressionService) CompressHistory(ctx context.Context, sessionID str
 func (cs *CompressionService) IdentifyKeyThemes(ctx context.Context, content string) ([]string, error) {
 	prov, err := cs.pluginManager.GetProvider("ollama")
 	if err != nil {
-		return []string{"general"}, nil
+		slog.Warn("ollama provider unavailable for theme identification, returning default themes", "error", err)
+		return []string{"general"}, nil //nolint:nilerr // error logged and swallowed intentionally
 	}
 
 	prompt := fmt.Sprintf("List 3-5 key themes from this text as a comma-separated list:\n\n%s", content)
 	resp, err := callLLMCompletion(ctx, prov, prompt, 0.3, 100)
 	if err != nil {
-		return []string{"general"}, nil
+		slog.Warn("LLM completion failed during theme identification, returning default themes", "error", err)
+		return []string{"general"}, nil //nolint:nilerr // error logged and swallowed intentionally
 	}
 
 	var themes []string
@@ -271,18 +276,6 @@ func (cs *CompressionService) ExtractSeeds(ctx context.Context, memories []Memor
 // The provider must implement a GenerateCompletion method. This function uses the
 // CompletionCaller interface for type-safe invocation.
 func callLLMCompletion(ctx context.Context, prov interface{}, prompt string, temperature float64, maxTokens int) (string, error) {
-	type completionRequest struct {
-		Model       string           `json:"model"`
-		Messages    []ContextMessage `json:"messages"`
-		Temperature float64          `json:"temperature"`
-		MaxTokens   int              `json:"max_tokens"`
-		Stream      bool             `json:"stream"`
-	}
-
-	type completionResponse struct {
-		Content string
-	}
-
 	// Try to use the provider via a simple interface
 	type simpleCompleter interface {
 		Complete(ctx context.Context, prompt string) (string, error)

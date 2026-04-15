@@ -124,6 +124,10 @@ func (sr *SemanticRouter) GetMode() RoutingMode {
 // SetMode hot-switches the routing mode. The change takes effect on the next
 // call to Route; in-flight calls continue with the mode they observed.
 func (sr *SemanticRouter) SetMode(mode RoutingMode) {
+	if mode < 0 || mode > RoutingModeEmbedding {
+		slog.Warn("semantic router: invalid mode, ignoring", "mode", int(mode))
+		return
+	}
 	sr.mode.Store(int32(mode))
 	slog.Info("semantic router: mode changed", "mode", mode.String())
 }
@@ -298,6 +302,8 @@ func (sr *SemanticRouter) tier1Deterministic(query string) (RoutingDecision, boo
 // exceeds its threshold; (zero, false, err) on embedding failure.
 func (sr *SemanticRouter) tier2Embedding(ctx context.Context, query string) (RoutingDecision, bool, error) {
 	sr.mu.RLock()
+	// Copy route slice under RLock so the mutex is not held during the
+	// I/O-bound embedding call. Centroids are read-only after Initialize.
 	routes := make([]RouteDefinition, len(sr.routes))
 	copy(routes, sr.routes)
 	sr.mu.RUnlock()

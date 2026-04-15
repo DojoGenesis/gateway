@@ -10,6 +10,8 @@ type QueryFeatures struct {
 	HasMultiPart    bool
 	HasConstraints  bool
 	HasComparison   bool
+	// IsFollowUp indicates whether this query references a prior exchange.
+	// Currently always false — multi-turn follow-up detection is deferred to v2.
 	IsFollowUp      bool
 	HasCodeBlock    bool
 	HasURL          bool

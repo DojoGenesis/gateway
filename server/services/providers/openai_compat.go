@@ -218,7 +218,40 @@ func (p *openaiCompatibleProvider) CallTool(ctx context.Context, req *provider.T
 }
 
 func (p *openaiCompatibleProvider) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	return nil, fmt.Errorf("%s: embedding not implemented via this provider", p.Name)
+	apiKey := p.ResolveAPIKey(ctx)
+	if apiKey == "" {
+		return nil, fmt.Errorf("%s API key is not set", p.Name)
+	}
+
+	reqBody := map[string]interface{}{
+		"input": text,
+		"model": "text-embedding-3-small",
+	}
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("%s: marshal embedding request: %w", p.Name, err)
+	}
+
+	resp, err := p.DoRequest(ctx, "POST", "/embeddings", bytes.NewReader(bodyBytes), map[string]string{
+		"Authorization": "Bearer " + apiKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%s: embedding request failed: %w", p.Name, err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Data []struct {
+			Embedding []float32 `json:"embedding"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("%s: decode embedding response: %w", p.Name, err)
+	}
+	if len(result.Data) == 0 {
+		return nil, fmt.Errorf("%s: empty embedding response", p.Name)
+	}
+	return result.Data[0].Embedding, nil
 }
 
 // --- Shared conversion helpers ---

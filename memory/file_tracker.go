@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -59,7 +60,7 @@ func (ft *FileTracker) TrackFile(ctx context.Context, path string, tier int, con
 	err := ft.db.QueryRowContext(ctx, "SELECT id FROM memory_files WHERE file_path = ?", path).Scan(&existingID)
 
 	now := time.Now()
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		id := uuid.New().String()
 		query := `
 			INSERT INTO memory_files (id, file_path, tier, content, embedding, themes, created_at, updated_at, archived_at)
@@ -115,7 +116,7 @@ func (ft *FileTracker) GetFile(ctx context.Context, path string) (*MemoryFile, e
 		&archivedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("file not found: %s", path)
 	}
 

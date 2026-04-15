@@ -72,7 +72,8 @@ type ServerConfig struct {
 	// Auth token TTLs (configurable, defaults: access=24h, refresh=7d)
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
-	// Admin API key for /admin/* endpoints (empty = unauthenticated)
+	// AdminAPIKey is reserved for a future simple bearer-token fallback on admin
+	// endpoints. Currently unused — AdminAuthMiddleware uses JWT validation only.
 	AdminAPIKey string
 	// RegistrationEnabled controls whether POST /auth/register is open.
 	// When false, the endpoint returns 403. Defaults to true.
@@ -145,6 +146,9 @@ type Server struct {
 	// routing. When non-nil, the chat handler delegates to it instead of the
 	// keyword-based classifier. Hot-switchable between cascade/llm/embedding modes.
 	semanticRouter *agent.SemanticRouter
+	// semanticRouterInitOnce ensures that lazy init is only kicked off once on
+	// rapid concurrent POST /v1/gateway/providers calls.
+	semanticRouterInitOnce sync.Once
 
 	// Specialist dispatch (Phase 2): routes requests to specialist agents
 	// based on intent classification. Nil means specialist dispatch is disabled.

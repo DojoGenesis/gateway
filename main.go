@@ -554,11 +554,12 @@ func main() {
 
 	server := srv.New(srv.ServerDeps{
 		Config: &srv.ServerConfig{
-			Port:            cfg.Port,
-			AllowedOrigins:  cfg.AllowedOrigins,
-			AuthMode:        "api_key",
-			Environment:     cfg.Environment,
-			ShutdownTimeout: 30 * time.Second,
+			Port:                cfg.Port,
+			AllowedOrigins:      cfg.AllowedOrigins,
+			AuthMode:            "api_key",
+			Environment:         cfg.Environment,
+			ShutdownTimeout:     30 * time.Second,
+			RegistrationEnabled: true,
 		},
 		PluginManager:       pluginManager,
 		OrchestrationEngine: orchestrationEngine,
@@ -572,7 +573,7 @@ func main() {
 		TraceLogger:         traceLogger,
 		CostTracker:         costTracker,
 		BudgetTracker:       budgetTracker,
-		MemoryMaintenance:   nil,
+		MemoryMaintenance:   nil, // deferred: memory maintenance service not yet configured
 		ToolRegistry:        toolRegistry,
 		AgentInitializer:    agentInitializer,
 		MCPHostManager:      mcpProvider,

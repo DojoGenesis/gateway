@@ -686,9 +686,22 @@ func (pa *PrimaryAgent) buildContextWithGarden(ctx context.Context, systemPrompt
 
 // generateID generates a random unique identifier.
 func generateID() string {
+	id, err := generateIDWithError()
+	if err != nil {
+		// crypto/rand failure is catastrophic; panic so it surfaces immediately.
+		panic(fmt.Sprintf("generateID: %v", err))
+	}
+	return id
+}
+
+// generateIDWithError generates a random unique identifier, returning any error
+// from the underlying crypto/rand source.
+func generateIDWithError() (string, error) {
 	bytes := make([]byte, 16)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("generate ID: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
 }
 
 // storeConversation stores a conversation turn in memory.
@@ -758,7 +771,9 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 		defer func() {
 			if rootSpan != nil {
 				if err := pa.traceLogger.EndTrace(ctx, traceID, "completed"); err == nil {
-					pa.traceLogger.EndSpan(ctx, rootSpan, nil)
+					if err := pa.traceLogger.EndSpan(ctx, rootSpan, nil); err != nil {
+						slog.Warn("trace: EndSpan failed", "error", err)
+					}
 				}
 			}
 		}()
@@ -775,11 +790,13 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 		if err == nil {
 			ctx = trace.WithSpan(ctx, classifySpan)
 			intent, confidence = pa.miniAgent.ClassifyIntent(ctx, req.Query)
-			pa.traceLogger.EndSpan(ctx, classifySpan, map[string]interface{}{
+			if err := pa.traceLogger.EndSpan(ctx, classifySpan, map[string]interface{}{
 				"intent":           string(intent),
 				"confidence":       confidence,
 				"confidence_level": getConfidenceLevel(confidence),
-			})
+			}); err != nil {
+				slog.Warn("trace: EndSpan failed", "error", err)
+			}
 			ctx = trace.WithSpan(ctx, rootSpan)
 		}
 	} else {
@@ -792,7 +809,9 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 		if pa.traceLogger != nil && rootSpan != nil {
 			rootSpan.AddMetadata("routing_decision", "orchestration")
 			rootSpan.AddMetadata("orchestration_reason", pa.getOrchestrationReason(intent, confidence, req.Query))
-			pa.traceLogger.EndSpan(ctx, rootSpan, nil)
+			if err := pa.traceLogger.EndSpan(ctx, rootSpan, nil); err != nil {
+				slog.Warn("trace: EndSpan failed", "error", err)
+			}
 		}
 		return pa.HandleQueryWithOrchestration(ctx, req)
 	}
@@ -830,7 +849,9 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 	provider, err := pa.pluginManager.GetProvider(providerName)
 	if err != nil {
 		if pa.traceLogger != nil && rootSpan != nil {
-			pa.traceLogger.FailSpan(ctx, rootSpan, fmt.Sprintf("failed to get provider: %v", err))
+			if err := pa.traceLogger.FailSpan(ctx, rootSpan, fmt.Sprintf("failed to get provider: %v", err)); err != nil {
+				slog.Warn("trace: FailSpan failed", "error", err)
+			}
 		}
 		return nil, fmt.Errorf("failed to get provider %s: %w", providerName, err)
 	}
@@ -884,7 +905,9 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 			var tiersUsed map[memory.ContextTier]int
 			messages, tiersUsed, err = pa.buildContextWithGarden(ctxWithTimeout, systemPrompt, req.Query, req.UserID, req.UseMemory)
 			if err != nil {
-				pa.traceLogger.FailSpan(ctx, contextSpan, fmt.Sprintf("failed to build context: %v", err))
+				if err := pa.traceLogger.FailSpan(ctx, contextSpan, fmt.Sprintf("failed to build context: %v", err)); err != nil {
+					slog.Warn("trace: FailSpan failed", "error", err)
+				}
 				ctx = trace.WithSpan(ctx, rootSpan)
 				return nil, err
 			}
@@ -972,7 +995,9 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 				ctx = trace.WithSpan(ctx, modelSpan)
 				response, err = provider.GenerateCompletion(ctxWithTimeout, completionReq)
 				if err != nil {
-					pa.traceLogger.FailSpan(ctx, modelSpan, fmt.Sprintf("completion failed: %v", err))
+					if err := pa.traceLogger.FailSpan(ctx, modelSpan, fmt.Sprintf("completion failed: %v", err)); err != nil {
+						slog.Warn("trace: FailSpan failed", "error", err)
+					}
 					ctx = trace.WithSpan(ctx, rootSpan)
 					slog.Error("completion failed",
 						"component", "agent_runner",
