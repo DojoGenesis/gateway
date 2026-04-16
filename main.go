@@ -269,7 +269,11 @@ func main() {
 		"initiative", defaultDisp.Initiative)
 
 	// ─── Initialize Memory ───────────────────────────────────────────
-	dbPath := getEnv("MEMORY_DB_PATH", "dojo_memory.db")
+	// Default to ~/.dojo/memory.db (absolute) to prevent data loss when the
+	// working directory changes between deploys. A relative default like
+	// "dojo_memory.db" resolves differently per CWD, silently creating new
+	// empty databases on VPS restarts.
+	dbPath := getEnv("MEMORY_DB_PATH", filepath.Join(userHomeDir(), ".dojo", "memory.db"))
 	memoryManager, err := memory.NewMemoryManager(dbPath)
 	if err != nil {
 		slog.Warn("memory manager initialization failed", "error", err)
@@ -520,7 +524,7 @@ func main() {
 	// matches the dojo CLI default (DOJO_CAS_PATH env var or dojo-skills.db).
 	var workflowCAS cas.Store
 	{
-		casPath := getEnv("DOJO_CAS_PATH", "dojo-skills.db")
+		casPath := getEnv("DOJO_CAS_PATH", filepath.Join(userHomeDir(), ".dojo", "skills.db"))
 		store, casErr := cas.NewSQLiteStore(casPath)
 		if casErr != nil {
 			slog.Warn("workflow CAS initialization failed — /api/skills and /api/workflows will be unavailable",
@@ -671,6 +675,14 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// userHomeDir returns the user's home directory, falling back to "." if unknown.
+func userHomeDir() string {
+	if h, err := os.UserHomeDir(); err == nil {
+		return h
+	}
+	return "."
 }
 
 // loadDotEnv reads key=value lines from path and calls os.Setenv for each.
