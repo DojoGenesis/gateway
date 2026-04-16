@@ -131,15 +131,19 @@ func main() {
 
 	// ─── Local Provider Retry Loop ────────────────────────────────────
 	// If Ollama wasn't reachable at startup (e.g. still loading, or Tauri app
-	// launched before Ollama was ready), poll every 30s and register it as
-	// soon as it becomes available.  This prevents the "0 providers" state
-	// that blocks all chat requests when the gateway starts before Ollama.
+	// launched before Ollama was ready), probe a few times with exponential
+	// backoff (5s → 15s → 45s) then give up quietly.  This prevents both the
+	// "0 providers" state that blocks chat requests AND the noisy log spam when
+	// Ollama is simply not installed on the host.
+	//
+	// If OLLAMA_HOST is not set, Ollama is being used at its default address
+	// (localhost:11434). We still probe — the user may have Ollama starting up.
 	if !ollamaLoadedAtStartup {
 		go func() {
-			ticker := time.NewTicker(30 * time.Second)
-			defer ticker.Stop()
-			for range ticker.C {
-				// Stop retrying once it's loaded (e.g. via plugin or prior tick).
+			backoffs := []time.Duration{5 * time.Second, 15 * time.Second, 45 * time.Second}
+			for attempt, wait := range backoffs {
+				time.Sleep(wait)
+				// Stop retrying once it's loaded (e.g. via plugin or API key push).
 				if pluginManager.IsPluginLoaded("ollama") {
 					slog.Info("ollama provider already registered — stopping retry loop")
 					return
@@ -153,7 +157,12 @@ func main() {
 					slog.Info("ollama provider registered (late — was not available at startup)")
 					return
 				}
-				slog.Debug("ollama still not available — will retry in 30s")
+				remaining := len(backoffs) - attempt - 1
+				if remaining > 0 {
+					slog.Debug("ollama not yet available — will retry", "attempt", attempt+1, "retries_remaining", remaining)
+				} else {
+					slog.Info("ollama not available — provider disabled (start ollama and restart gateway to enable)")
+				}
 			}
 		}()
 	}
