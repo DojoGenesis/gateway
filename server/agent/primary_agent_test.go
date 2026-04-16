@@ -194,7 +194,7 @@ func TestPrimaryAgent_HandleQuery_Success(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	resp, err := agent.HandleQuery(ctx, "Hello, world!", "mock", "", "user-123")
+	resp, err := agent.HandleQuery(ctx, "Hello, world!", "mock", "", "user-123", "")
 	if err != nil {
 		t.Fatalf("HandleQuery failed: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestPrimaryAgent_HandleQuery_WithModelSelection(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	resp, err := agent.HandleQuery(ctx, "Test", "mock", "model-2", "user-123")
+	resp, err := agent.HandleQuery(ctx, "Test", "mock", "model-2", "user-123", "")
 	if err != nil {
 		t.Fatalf("HandleQuery failed: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestPrimaryAgent_HandleQuery_InvalidModel(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err := agent.HandleQuery(ctx, "Test", "mock", "nonexistent-model", "user-123")
+	_, err := agent.HandleQuery(ctx, "Test", "mock", "nonexistent-model", "user-123", "")
 	if err == nil {
 		t.Fatal("Expected error for nonexistent model")
 	}
@@ -286,7 +286,7 @@ func TestPrimaryAgent_HandleQuery_UseDefaultProvider(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	resp, err := agent.HandleQuery(ctx, "Test query", "", "", "user-123")
+	resp, err := agent.HandleQuery(ctx, "Test query", "", "", "user-123", "")
 	if err != nil {
 		t.Fatalf("HandleQuery failed: %v", err)
 	}
@@ -306,7 +306,7 @@ func TestPrimaryAgent_HandleQuery_ProviderNotFound(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err := agent.HandleQuery(ctx, "Test query", "nonexistent", "", "user-123")
+	_, err := agent.HandleQuery(ctx, "Test query", "nonexistent", "", "user-123", "")
 	if err == nil {
 		t.Fatal("Expected error for nonexistent provider")
 	}
@@ -330,7 +330,7 @@ func TestPrimaryAgent_HandleQuery_NoModels(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err := agent.HandleQuery(ctx, "Test query", "mock", "", "user-123")
+	_, err := agent.HandleQuery(ctx, "Test query", "mock", "", "user-123", "")
 	if err == nil {
 		t.Fatal("Expected error for provider with no models")
 	}
@@ -354,7 +354,7 @@ func TestPrimaryAgent_HandleQuery_CompletionError(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err := agent.HandleQuery(ctx, "Test query", "mock", "", "user-123")
+	_, err := agent.HandleQuery(ctx, "Test query", "mock", "", "user-123", "")
 	if err == nil {
 		t.Fatal("Expected error from completion")
 	}
@@ -642,7 +642,7 @@ func TestPrimaryAgent_CostTracking(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	resp, err := agent.HandleQuery(ctx, "Test", "mock", "", "user-123")
+	resp, err := agent.HandleQuery(ctx, "Test", "mock", "", "user-123", "")
 	if err != nil {
 		t.Fatalf("HandleQuery failed: %v", err)
 	}
@@ -733,7 +733,7 @@ func TestPrimaryAgent_ContextTimeout(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err := agent.HandleQuery(ctx, "Test", "mock", "", "user-123")
+	_, err := agent.HandleQuery(ctx, "Test", "mock", "", "user-123", "")
 	if err == nil {
 		t.Log("Warning: Expected timeout error, but query may have completed too fast")
 	}

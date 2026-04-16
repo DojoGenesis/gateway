@@ -236,7 +236,7 @@ func TestEndToEndRouting(t *testing.T) {
 			if tt.expectedHandler == "llm-fast" || tt.expectedHandler == "llm-reasoning" {
 				ctx := context.Background()
 
-				response, err := agent.HandleQuery(ctx, tt.query, tt.expectedProvider, "", "test-user")
+				response, err := agent.HandleQuery(ctx, tt.query, tt.expectedProvider, "", "test-user", "")
 				if err != nil {
 					t.Fatalf("HandleQuery failed: %v", err)
 				}
@@ -333,7 +333,7 @@ func TestRoutingPropagation(t *testing.T) {
 
 				t.Logf("✓ Streaming response received %d chunks", len(chunks))
 			} else {
-				response, err := agent.HandleQuery(ctx, tt.query, "", "", "test-user")
+				response, err := agent.HandleQuery(ctx, tt.query, "", "", "test-user", "")
 				if err != nil {
 					if !tt.expectError {
 						t.Fatalf("HandleQuery failed: %v", err)

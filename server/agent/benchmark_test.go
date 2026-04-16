@@ -146,7 +146,7 @@ func BenchmarkPrimaryAgent(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err := agent.HandleQuery(ctx, query, providerName, modelID, userID)
+			_, err := agent.HandleQuery(ctx, query, providerName, modelID, userID, "")
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -176,7 +176,7 @@ func BenchmarkPrimaryAgent(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err := agent.HandleQuery(ctx, query, providerName, modelID, userID)
+			_, err := agent.HandleQuery(ctx, query, providerName, modelID, userID, "")
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -248,7 +248,7 @@ func BenchmarkConcurrentAgentRequests(b *testing.B) {
 						modelID := "mock-model"
 						userID := fmt.Sprintf("user-%d", idx)
 
-						agent.HandleQuery(ctx, query, providerName, modelID, userID)
+						agent.HandleQuery(ctx, query, providerName, modelID, userID, "")
 					}(j)
 				}
 
@@ -306,7 +306,7 @@ func BenchmarkAgentWithMemory(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := agent.HandleQuery(ctx, query, providerName, modelID, userID)
+				_, err := agent.HandleQuery(ctx, query, providerName, modelID, userID, "")
 				if err != nil {
 					b.Fatal(err)
 				}

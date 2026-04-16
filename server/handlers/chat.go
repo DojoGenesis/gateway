@@ -120,6 +120,7 @@ type ChatRequest struct {
 	UserID        string            `json:"user_id,omitempty"`
 	ProjectID     string            `json:"project_id,omitempty"`
 	WorkspaceRoot string            `json:"workspace_root,omitempty"` // User's CWD; file tools resolve relative paths against this
+	SystemPrompt  string            `json:"system_prompt,omitempty"`
 	Metadata      map[string]string `json:"metadata,omitempty"`
 }
 
@@ -369,7 +370,7 @@ func (h *ChatHandler) handleNonStreamingQuery(c *gin.Context, req *ChatRequest, 
 
 	slog.Info("selected provider", "provider", providerName, "model", resolvedModel, "handler", decision.Handler)
 
-	response, err := h.agent.HandleQuery(ctx, req.Message, providerName, resolvedModel, req.UserID)
+	response, err := h.agent.HandleQuery(ctx, req.Message, providerName, resolvedModel, req.UserID, req.SystemPrompt)
 	if err != nil {
 		slog.Error("failed to generate response", "error", err)
 		respondInternalError(c, "failed to generate response")
@@ -421,7 +422,12 @@ func (h *ChatHandler) handleStreamingQuery(c *gin.Context, req *ChatRequest, dec
 		MaxTokens:            agent.DefaultMaxTokens,
 		ProjectID:            req.ProjectID,
 		WorkspaceRoot:        req.WorkspaceRoot,
-		SystemPromptOverride: decision.SystemPromptOverride,
+		SystemPromptOverride: func() string {
+			if decision.SystemPromptOverride != "" {
+				return decision.SystemPromptOverride
+			}
+			return req.SystemPrompt
+		}(),
 	}
 
 	// Use StreamingAgent with detailed events
