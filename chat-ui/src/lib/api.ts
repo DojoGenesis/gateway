@@ -11,6 +11,7 @@ import type {
 	Model,
 	ModelsResponse
 } from './types';
+import { saveAuth, clearAuth } from './stores.svelte';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
 
@@ -25,8 +26,10 @@ function authHeaders(): Record<string, string> {
 	return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// Generic JSON fetch with auth
-async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+// Generic JSON fetch with auth.
+// On 401, attempts one token refresh before failing.
+// On repeated 401 after refresh (or no refresh token), clears auth state.
+async function apiFetch<T>(path: string, init: RequestInit = {}, _retried = false): Promise<T> {
 	const res = await fetch(`${API_BASE}${path}`, {
 		...init,
 		headers: {
@@ -35,6 +38,29 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 			...(init.headers as Record<string, string> | undefined)
 		}
 	});
+
+	if (res.status === 401 && !_retried) {
+		// Attempt silent token refresh before giving up.
+		const storedRefresh = typeof localStorage !== 'undefined'
+			? (localStorage.getItem('refresh_token') ?? '')
+			: '';
+		if (storedRefresh) {
+			try {
+				const renewed = await refreshToken(storedRefresh);
+				saveAuth(renewed.access_token, renewed.refresh_token, renewed.user_id, renewed.display_name);
+				// Retry original request with the new token.
+				return apiFetch<T>(path, init, true);
+			} catch {
+				// Refresh itself failed — clear auth so the UI redirects to login.
+				clearAuth();
+				throw new Error('Session expired — please sign in again');
+			}
+		}
+		// No refresh token stored — clear auth.
+		clearAuth();
+		throw new Error('Session expired — please sign in again');
+	}
+
 	if (!res.ok) {
 		let msg = `HTTP ${res.status}`;
 		try {
@@ -173,8 +199,15 @@ export async function listConversations(): Promise<Conversation[]> {
 	try {
 		const data = await apiFetch<{ conversations: Conversation[] }>('/v1/conversations');
 		return data.conversations ?? [];
-	} catch {
-		// Conversations endpoint may not exist yet — return empty list
+	} catch (err) {
+		// Re-throw 401 (apiFetch already cleared auth / tried refresh) so callers
+		// can redirect to login.  For all other errors (404, network, endpoint not
+		// yet implemented) return an empty list — conversations sidebar stays empty
+		// but the rest of the UI remains functional.
+		if (err instanceof Error && err.message.includes('Session expired')) {
+			throw err;
+		}
+		console.error('listConversations failed:', err);
 		return [];
 	}
 }

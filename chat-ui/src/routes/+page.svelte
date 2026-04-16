@@ -14,6 +14,7 @@
 		sidebarOpen,
 		error,
 		loadAuthFromStorage,
+		saveAuth,
 		clearAuth,
 		setError,
 		appendMessage,
@@ -144,8 +145,8 @@
 		// Persist user message (non-blocking — don't await before showing UI)
 		const convId = currentConversationId.value;
 		if (convId) {
-			createMessage(convId, 'user', text).catch(() => {
-				// Non-fatal — continue even if persistence fails
+			createMessage(convId, 'user', text).catch((err: unknown) => {
+				console.error('Failed to persist user message:', err);
 			});
 		}
 
@@ -172,13 +173,13 @@
 
 			// Persist assistant message after stream completes
 			if (convId && fullResponse) {
-				createMessage(convId, 'assistant', fullResponse, model).catch(() => {
-					// Non-fatal
+				createMessage(convId, 'assistant', fullResponse, model).catch((err: unknown) => {
+					console.error('Failed to persist assistant message:', err);
 				});
 			}
 
 			// Refresh sidebar conversation list
-			loadConversations().catch(() => {});
+			loadConversations().catch((err: unknown) => { console.error('Failed to refresh conversations:', err); });
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : 'Stream error';
 			setError(msg);

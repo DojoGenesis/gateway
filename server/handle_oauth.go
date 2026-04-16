@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -26,24 +27,36 @@ type OAuthConfig struct {
 	GitHubClientSecret string
 	GitHubRedirectURI  string
 	Enabled            bool
+	AllowedUsers       []string // if non-empty, only these GitHub logins are permitted
 }
 
 // loadOAuthConfig reads GitHub OAuth configuration from environment variables.
 //
-//	GITHUB_OAUTH_CLIENT_ID     — OAuth app client ID
-//	GITHUB_OAUTH_CLIENT_SECRET — OAuth app client secret
-//	GITHUB_OAUTH_REDIRECT_URI  — Callback URI (default: https://pdi.trespies.dev/auth/github/callback)
-//	GITHUB_OAUTH_ENABLED       — Set to "true" to enable the flow
+//	GITHUB_OAUTH_CLIENT_ID          — OAuth app client ID
+//	GITHUB_OAUTH_CLIENT_SECRET      — OAuth app client secret
+//	GITHUB_OAUTH_REDIRECT_URI       — Callback URI (default: https://pdi.trespies.dev/auth/github/callback)
+//	GITHUB_OAUTH_ENABLED            — Set to "true" to enable the flow
+//	GITHUB_OAUTH_ALLOWED_USERS      — Comma-separated list of GitHub logins permitted to log in (empty = all)
 func loadOAuthConfig() OAuthConfig {
 	redirectURI := os.Getenv("GITHUB_OAUTH_REDIRECT_URI")
 	if redirectURI == "" {
 		redirectURI = "https://pdi.trespies.dev/auth/github/callback"
 	}
+
+	allowedRaw := os.Getenv("GITHUB_OAUTH_ALLOWED_USERS") // comma-separated
+	var allowedUsers []string
+	for _, u := range strings.Split(allowedRaw, ",") {
+		if u = strings.TrimSpace(u); u != "" {
+			allowedUsers = append(allowedUsers, u)
+		}
+	}
+
 	return OAuthConfig{
 		GitHubClientID:     os.Getenv("GITHUB_OAUTH_CLIENT_ID"),
 		GitHubClientSecret: os.Getenv("GITHUB_OAUTH_CLIENT_SECRET"),
 		GitHubRedirectURI:  redirectURI,
 		Enabled:            os.Getenv("GITHUB_OAUTH_ENABLED") == "true",
+		AllowedUsers:       allowedUsers,
 	}
 }
 
@@ -168,6 +181,23 @@ func (s *Server) handleOAuthGitHubCallback(c *gin.Context) {
 	displayName := strings.TrimSpace(ghUser.Name)
 	if displayName == "" {
 		displayName = ghUser.Login
+	}
+
+	// Enforce allowlist: if AllowedUsers is non-empty, reject logins not in the list.
+	if len(cfg.AllowedUsers) > 0 {
+		allowed := false
+		for _, u := range cfg.AllowedUsers {
+			if strings.EqualFold(u, ghUser.Login) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			slog.Warn("OAuth login rejected: user not in allowlist",
+				"github_login", ghUser.Login)
+			c.Redirect(http.StatusFound, "/chat?error=access_denied")
+			return
+		}
 	}
 
 	providerID := fmt.Sprintf("%d", ghUser.ID)
