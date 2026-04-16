@@ -23,7 +23,7 @@ fi
 # Extract README LOC claim (looks for patterns like "83,000+ lines" or "83000 lines")
 readme_loc_claim=""
 if [ -f README.md ]; then
-  readme_loc_claim=$(grep -oE '[0-9,]+\+?\s*lines\s*(of\s*Go)?' README.md | head -1 | grep -oE '[0-9,]+' | tr -d ',')
+  readme_loc_claim=$(grep -oE '[0-9,]+\+?\s*lines\s*(of\s*Go)?' README.md | head -1 | grep -oE '[0-9,]+' | tr -d ',' || true)
 fi
 
 go_loc_fmt=$(printf "%'d" "$go_loc" 2>/dev/null || echo "$go_loc")
@@ -47,7 +47,7 @@ test_files=$(find . -name "*_test.go" -not -path "./.git/*" | wc -l | tr -d ' ')
 # Extract STATUS.md test file claim
 status_test_claim=""
 if [ -f STATUS.md ]; then
-  status_test_claim=$(grep -oE '[0-9]+ test files' STATUS.md | head -1 | grep -oE '[0-9]+')
+  status_test_claim=$(grep -oE '[0-9]+ test files' STATUS.md | head -1 | grep -oE '[0-9]+' || true)
 fi
 
 if [ -n "$status_test_claim" ]; then
@@ -74,7 +74,7 @@ mod_count=$(find . -name "go.mod" -not -path "./.git/*" | wc -l | tr -d ' ')
 # Extract README module claim
 readme_mod_claim=""
 if [ -f README.md ]; then
-  readme_mod_claim=$(grep -oiE '[0-9]+\s*independently.versioned\s*modules' README.md | head -1 | grep -oE '[0-9]+')
+  readme_mod_claim=$(grep -oiE '[0-9]+\s*independently.versioned\s*modules' README.md | head -1 | grep -oE '[0-9]+' || true)
 fi
 
 if [ -n "$readme_mod_claim" ]; then
@@ -93,8 +93,8 @@ skill_count=$(find plugins -name "SKILL.md" 2>/dev/null | wc -l | tr -d ' ')
 
 readme_skill_claim=""
 if [ -f README.md ]; then
-  readme_skill_claim=$(grep -oE '[0-9]+ built-in skills' README.md | head -1 | grep -oE '[0-9]+')
-  [ -z "$readme_skill_claim" ] && readme_skill_claim=$(grep -oE '[0-9]+ skills' README.md | head -1 | grep -oE '[0-9]+')
+  readme_skill_claim=$(grep -oE '[0-9]+ built-in skills' README.md | head -1 | grep -oE '[0-9]+' || true)
+  [ -z "$readme_skill_claim" ] && readme_skill_claim=$(grep -oE '[0-9]+ skills' README.md | head -1 | grep -oE '[0-9]+' || true)
 fi
 
 if [ -n "$readme_skill_claim" ]; then
