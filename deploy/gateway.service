@@ -15,6 +15,9 @@ LimitNOFILE=65535
 
 # Environment variables (override via /etc/dojo/env or systemd drop-in)
 EnvironmentFile=-/etc/dojo/env
+Environment="SYSTEM_PROMPT_FILE=/etc/dojo/system-prompt.md"
+Environment="MEMORY_DB_PATH=/var/lib/dojo/memory.db"
+Environment="DOJO_CAS_PATH=/var/lib/dojo/skills.db"
 
 # Security hardening
 NoNewPrivileges=true
