@@ -31,6 +31,18 @@ func loadSystemPrompt() string {
 	return ""
 }
 
+// hasCallerSystemMessage reports whether the request already contains a system
+// message from the caller. When true, the env-var system prompt should NOT be
+// injected — the caller's system prompt takes precedence.
+func hasCallerSystemMessage(msgs []OpenAIChatMessage) bool {
+	for _, m := range msgs {
+		if m.Role == "system" {
+			return true
+		}
+	}
+	return false
+}
+
 // ─── OpenAI-Compatible Request/Response Types ────────────────────────────────
 
 // OpenAIChatRequest matches the OpenAI chat completion request format.
@@ -45,6 +57,7 @@ type OpenAIChatRequest struct {
 	PresencePenalty  *float64            `json:"presence_penalty,omitempty"`
 	Stop             interface{}         `json:"stop,omitempty"`
 	User             string              `json:"user,omitempty"`
+	Metadata         map[string]string   `json:"metadata,omitempty"`
 }
 
 // OpenAIChatMessage represents a message in OpenAI format.
@@ -131,25 +144,33 @@ func (s *Server) nonStreamChatCompletions(c *gin.Context, ctx context.Context, r
 		return
 	}
 
+	// ─── Route bypass: X-Route: direct skips all injection ───────────
+	directRoute := c.GetHeader("X-Route") == "direct"
+
 	// ─── Base system prompt injection ──────────────────────────────────
 	// Prepends a system message from SYSTEM_PROMPT or SYSTEM_PROMPT_FILE env vars.
-	// Runs before RAG so RAG context is appended after the base prompt.
-	if sysPrompt := loadSystemPrompt(); sysPrompt != "" {
-		sysMsg := OpenAIChatMessage{Role: "system", Content: sysPrompt}
-		req.Messages = append([]OpenAIChatMessage{sysMsg}, req.Messages...)
-		slog.Debug("base system prompt injected", "chars", len(sysPrompt))
+	// Skipped when: (a) caller already sent a system message (Route E), or
+	// (b) X-Route: direct header is set (Route A).
+	if !directRoute && !hasCallerSystemMessage(req.Messages) {
+		if sysPrompt := loadSystemPrompt(); sysPrompt != "" {
+			sysMsg := OpenAIChatMessage{Role: "system", Content: sysPrompt}
+			req.Messages = append([]OpenAIChatMessage{sysMsg}, req.Messages...)
+			slog.Debug("base system prompt injected", "chars", len(sysPrompt))
+		}
 	}
 
 	// ─── RAG context injection ──────────────────────────────────
-	if userID, ok := getUserIDFromContext(c); ok && s.authDB != nil {
-		ragCtx, ragErr := s.BuildRAGContext(ctx, userID, lastUserMsg, 5)
-		if ragErr != nil {
-			slog.Warn("rag context retrieval failed", "error", ragErr)
-		} else if ragCtx != "" {
-			// Prepend RAG context as a system message
-			ragMsg := OpenAIChatMessage{Role: "system", Content: ragCtx}
-			req.Messages = append([]OpenAIChatMessage{ragMsg}, req.Messages...)
-			slog.Debug("rag context injected", "user_id", userID, "chars", len(ragCtx))
+	if !directRoute {
+		if userID, ok := getUserIDFromContext(c); ok && s.authDB != nil {
+			ragCtx, ragErr := s.BuildRAGContext(ctx, userID, lastUserMsg, 5)
+			if ragErr != nil {
+				slog.Warn("rag context retrieval failed", "error", ragErr)
+			} else if ragCtx != "" {
+				// Prepend RAG context as a system message
+				ragMsg := OpenAIChatMessage{Role: "system", Content: ragCtx}
+				req.Messages = append([]OpenAIChatMessage{ragMsg}, req.Messages...)
+				slog.Debug("rag context injected", "user_id", userID, "chars", len(ragCtx))
+			}
 		}
 	}
 
@@ -235,13 +256,18 @@ func (s *Server) streamChatCompletions(c *gin.Context, ctx context.Context, req 
 		return
 	}
 
+	// ─── Route bypass: X-Route: direct skips all injection ───────────
+	directRoute := c.GetHeader("X-Route") == "direct"
+
 	// ─── Base system prompt injection ──────────────────────────────────
-	// Prepends a system message from SYSTEM_PROMPT or SYSTEM_PROMPT_FILE env vars.
-	// Runs before RAG so RAG context is appended after the base prompt.
-	if sysPrompt := loadSystemPrompt(); sysPrompt != "" {
-		sysMsg := OpenAIChatMessage{Role: "system", Content: sysPrompt}
-		req.Messages = append([]OpenAIChatMessage{sysMsg}, req.Messages...)
-		slog.Debug("base system prompt injected", "chars", len(sysPrompt))
+	// Skipped when: (a) caller already sent a system message (Route E), or
+	// (b) X-Route: direct header is set (Route A).
+	if !directRoute && !hasCallerSystemMessage(req.Messages) {
+		if sysPrompt := loadSystemPrompt(); sysPrompt != "" {
+			sysMsg := OpenAIChatMessage{Role: "system", Content: sysPrompt}
+			req.Messages = append([]OpenAIChatMessage{sysMsg}, req.Messages...)
+			slog.Debug("base system prompt injected", "chars", len(sysPrompt))
+		}
 	}
 
 	// ─── RAG context injection ──────────────────────────────────
@@ -253,14 +279,16 @@ func (s *Server) streamChatCompletions(c *gin.Context, ctx context.Context, req 
 			break
 		}
 	}
-	if userID, ok := getUserIDFromContext(c); ok && s.authDB != nil && lastUserMsg != "" {
-		ragCtx, ragErr := s.BuildRAGContext(ctx, userID, lastUserMsg, 5)
-		if ragErr != nil {
-			slog.Warn("rag context retrieval failed", "error", ragErr)
-		} else if ragCtx != "" {
-			ragMsg := OpenAIChatMessage{Role: "system", Content: ragCtx}
-			req.Messages = append([]OpenAIChatMessage{ragMsg}, req.Messages...)
-			slog.Debug("rag context injected", "user_id", userID, "chars", len(ragCtx))
+	if !directRoute {
+		if userID, ok := getUserIDFromContext(c); ok && s.authDB != nil && lastUserMsg != "" {
+			ragCtx, ragErr := s.BuildRAGContext(ctx, userID, lastUserMsg, 5)
+			if ragErr != nil {
+				slog.Warn("rag context retrieval failed", "error", ragErr)
+			} else if ragCtx != "" {
+				ragMsg := OpenAIChatMessage{Role: "system", Content: ragCtx}
+				req.Messages = append([]OpenAIChatMessage{ragMsg}, req.Messages...)
+				slog.Debug("rag context injected", "user_id", userID, "chars", len(ragCtx))
+			}
 		}
 	}
 

@@ -112,14 +112,15 @@ func (h *ChatHandler) SetDB(db database.DatabaseAdapter) {
 }
 
 type ChatRequest struct {
-	Message       string `json:"message"`
-	Model         string `json:"model,omitempty"`
-	Provider      string `json:"provider,omitempty"`
-	Stream        bool   `json:"stream"`
-	SessionID     string `json:"session_id"`
-	UserID        string `json:"user_id,omitempty"`
-	ProjectID     string `json:"project_id,omitempty"`
-	WorkspaceRoot string `json:"workspace_root,omitempty"` // User's CWD; file tools resolve relative paths against this
+	Message       string            `json:"message"`
+	Model         string            `json:"model,omitempty"`
+	Provider      string            `json:"provider,omitempty"`
+	Stream        bool              `json:"stream"`
+	SessionID     string            `json:"session_id"`
+	UserID        string            `json:"user_id,omitempty"`
+	ProjectID     string            `json:"project_id,omitempty"`
+	WorkspaceRoot string            `json:"workspace_root,omitempty"` // User's CWD; file tools resolve relative paths against this
+	Metadata      map[string]string `json:"metadata,omitempty"`
 }
 
 type ChatResponse struct {
@@ -173,9 +174,11 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 
 	// Route using semantic router when available, falling back to legacy classifier.
 	var decision agent.RoutingDecision
-	if h.semanticRouter != nil {
+	if c.GetHeader("X-Route") == "direct" {
+		decision = agent.RoutingDecision{Handler: "llm-fast", Confidence: 1.0}
+	} else if h.semanticRouter != nil {
 		var err error
-		decision, err = h.semanticRouter.Route(c.Request.Context(), req.Message)
+		decision, err = h.semanticRouter.Route(c.Request.Context(), req.Message, req.Metadata)
 		if err != nil {
 			slog.Warn("semantic router error, falling back to legacy classifier", "error", err)
 			decision = h.classifier.Route(req.Message)
@@ -183,6 +186,7 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 	} else {
 		decision = h.classifier.Route(req.Message)
 	}
+	decision.Metadata = req.Metadata
 
 	// If the request explicitly specifies a provider, honour it — this overrides the
 	// intent classifier's provider selection while preserving its handler/category logic.

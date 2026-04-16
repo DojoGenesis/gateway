@@ -199,7 +199,7 @@ func TestSemanticRouter_Tier1_EmptyQuery(t *testing.T) {
 
 	for _, q := range []string{"", "   ", "\t", "\n"} {
 		t.Run(fmt.Sprintf("query=%q", q), func(t *testing.T) {
-			dec, err := sr.Route(context.Background(), q)
+			dec, err := sr.Route(context.Background(), q, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -249,7 +249,7 @@ func TestSemanticRouter_Tier1_Greetings(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.query, func(t *testing.T) {
-			dec, err := sr.Route(context.Background(), tc.query)
+			dec, err := sr.Route(context.Background(), tc.query, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -285,7 +285,7 @@ func TestSemanticRouter_Tier1_ProviderOverride(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.query, func(t *testing.T) {
-			dec, err := sr.Route(context.Background(), tc.query)
+			dec, err := sr.Route(context.Background(), tc.query, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -320,7 +320,7 @@ func TestSemanticRouter_Tier2_MatchesRoute(t *testing.T) {
 
 	// A query that the mock embedder will map to the same tech-family vector.
 	query := "write a Go HTTP handler and debug the function"
-	dec, err := sr.Route(context.Background(), query)
+	dec, err := sr.Route(context.Background(), query, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -352,7 +352,7 @@ func TestSemanticRouter_Tier2_BelowThreshold_FallsToTier3(t *testing.T) {
 	sr.AddRoute(lowSimilarityRoute()) // threshold=0.99, never matches
 
 	query := "a completely generic question about nothing specific"
-	dec, err := sr.Route(context.Background(), query)
+	dec, err := sr.Route(context.Background(), query, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -385,7 +385,7 @@ func TestSemanticRouter_ModeLLM(t *testing.T) {
 	queries := []string{"hello", "write some code", "what is 2+2"}
 	for _, q := range queries {
 		t.Run(q, func(t *testing.T) {
-			dec, err := sr.Route(context.Background(), q)
+			dec, err := sr.Route(context.Background(), q, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -409,7 +409,7 @@ func TestSemanticRouter_ModeEmbedding_NoFallback(t *testing.T) {
 	sr.AddRoute(lowSimilarityRoute()) // threshold=0.99, never matches
 
 	query := "a question that matches no route"
-	dec, err := sr.Route(context.Background(), query)
+	dec, err := sr.Route(context.Background(), query, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -433,7 +433,7 @@ func TestSemanticRouter_SetMode_HotSwitch(t *testing.T) {
 
 	sr := NewSemanticRouter(emb, llm)
 	// Start in cascade — "hello" should be caught by tier1.
-	dec, err := sr.Route(context.Background(), "hello")
+	dec, err := sr.Route(context.Background(), "hello", nil)
 	if err != nil {
 		t.Fatalf("cascade mode: unexpected error: %v", err)
 	}
@@ -446,7 +446,7 @@ func TestSemanticRouter_SetMode_HotSwitch(t *testing.T) {
 
 	// Hot-switch to LLM mode.
 	sr.SetMode(RoutingModeLLM)
-	dec, err = sr.Route(context.Background(), "hello")
+	dec, err = sr.Route(context.Background(), "hello", nil)
 	if err != nil {
 		t.Fatalf("llm mode: unexpected error: %v", err)
 	}
@@ -459,7 +459,7 @@ func TestSemanticRouter_SetMode_HotSwitch(t *testing.T) {
 
 	// Hot-switch back to cascade.
 	sr.SetMode(RoutingModeCascade)
-	dec, err = sr.Route(context.Background(), "hello")
+	dec, err = sr.Route(context.Background(), "hello", nil)
 	if err != nil {
 		t.Fatalf("cascade mode (restored): unexpected error: %v", err)
 	}

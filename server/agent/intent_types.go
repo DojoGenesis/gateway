@@ -74,4 +74,5 @@ type RoutingDecision struct {
 	// SystemPromptOverride replaces the default system prompt when set.
 	// Used by specialist dispatch to inject specialist-specific identity.
 	SystemPromptOverride string
+	Metadata             map[string]string `json:"metadata,omitempty"`
 }
