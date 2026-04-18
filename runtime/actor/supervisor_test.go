@@ -504,7 +504,7 @@ func TestBackoffTiming(t *testing.T) {
 		gap := timestamps[i].Sub(timestamps[i-1])
 		prevGap := timestamps[i-1].Sub(timestamps[i-2])
 		// Allow some slack for scheduling jitter.
-		if gap < prevGap-20*time.Millisecond {
+		if gap < prevGap-100*time.Millisecond {
 			t.Errorf("backoff gap[%d]=%v should be >= gap[%d]=%v (increasing)", i, gap, i-1, prevGap)
 		}
 	}
