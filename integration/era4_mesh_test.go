@@ -391,7 +391,7 @@ func TestEra4_PeerTTLExpiry(t *testing.T) {
 	t.Parallel()
 
 	// Use a very short TTL
-	node := newMeshTestNode(t, "gateway.example.com", 20*time.Millisecond)
+	node := newMeshTestNode(t, "gateway.example.com", 500*time.Millisecond)
 
 	identity, err := mesh.GenerateIdentity("ephemeral.example.com")
 	if err != nil {
@@ -424,7 +424,7 @@ func TestEra4_PeerTTLExpiry(t *testing.T) {
 	}
 
 	// Wait for TTL to expire
-	time.Sleep(40 * time.Millisecond)
+	time.Sleep(700 * time.Millisecond)
 
 	resp3, _ := http.Get(node.server.URL + "/mesh/peers")
 	var peersResp2 struct {
