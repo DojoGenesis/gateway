@@ -15,7 +15,8 @@ func TestWebNavigateIntegration(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	result, err := WebNavigate(ctx, map[string]interface{}{
 		"url": "https://example.com",
@@ -50,7 +51,8 @@ func TestWebScrapeStructuredIntegration(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	result, err := WebScrapeStructured(ctx, map[string]interface{}{
 		"url": "https://example.com",
@@ -83,7 +85,8 @@ func TestWebScreenshotIntegration(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	result, err := WebScreenshot(ctx, map[string]interface{}{
 		"url": "https://example.com",
@@ -119,7 +122,8 @@ func TestWebMonitorIntegration(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	result1, err := WebMonitor(ctx, map[string]interface{}{
 		"url": "https://example.com",
@@ -219,7 +223,8 @@ func TestWebAdvancedPerformance(t *testing.T) {
 		t.Skip("Skipping performance test in short mode")
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	start := time.Now()
 	result, err := WebNavigate(ctx, map[string]interface{}{
