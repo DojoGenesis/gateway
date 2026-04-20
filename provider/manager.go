@@ -171,6 +171,7 @@ func (pm *PluginManager) loadPluginWithConfig(name, pluginPath string, config ma
 		},
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+		StartTimeout:     10 * time.Second,
 		Logger: hclog.New(&hclog.LoggerOptions{
 			Name:   fmt.Sprintf("plugin-%s", name),
 			Output: os.Stdout,
