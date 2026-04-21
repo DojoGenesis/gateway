@@ -105,7 +105,7 @@ services:
   # ─── OTEL Collector ────────────────────────────────────────────────────────
   # Optional — set OTEL_ENABLED=true in .env to activate telemetry.
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.115.0
+    image: otel/opentelemetry-collector-contrib:latest
     restart: unless-stopped
     volumes:
       - ./otel-config.yaml:/etc/otel/config.yaml:ro

@@ -3,6 +3,7 @@ package orchestration
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -520,7 +521,7 @@ func TestEngine_Execute_FatalError_NoReplan(t *testing.T) {
 	assert.Equal(t, int32(0), planner.regenerateCount.Load())
 }
 
-func TestEngine_SetEventEmitter_WiresEvents(t *testing.T) {
+func TestEngine_PerExecuteEmitter_WiresEvents(t *testing.T) {
 	ctx := context.Background()
 
 	invoker := &mockToolInvoker{
@@ -572,7 +573,7 @@ func TestEngine_SetEventEmitter_WiresEvents(t *testing.T) {
 	assert.True(t, hasEnd, "should have received orchestration.node.end")
 }
 
-func TestEngine_SetEventEmitter_NilClearsEmitter(t *testing.T) {
+func TestEngine_PerExecuteEmitter_NilEmitsNothing(t *testing.T) {
 	ctx := context.Background()
 
 	invoker := &mockToolInvoker{}
@@ -598,4 +599,96 @@ func TestEngine_SetEventEmitter_NilClearsEmitter(t *testing.T) {
 
 	// Original emitter should have NO events since nil was passed to Execute
 	assert.Empty(t, emitter.events, "unconnected emitter should not receive events")
+}
+
+// lockedEventEmitter is a sync-safe event sink used by the concurrent-Execute
+// stress test. mockEventEmitter is not safe under parallel node emission.
+type lockedEventEmitter struct {
+	id     int
+	mu     sync.Mutex
+	events []StreamEvent
+}
+
+func (l *lockedEventEmitter) Emit(event StreamEvent) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.events = append(l.events, event)
+}
+
+// TestEngine_ConcurrentExecute_NoEmitterRace runs many Execute calls in parallel
+// on the same Engine, each with its own emitter, and verifies:
+//  1. No data race is reported by -race.
+//  2. Each emitter receives only its own orchestration's events — no cross-
+//     orchestration event leakage from a shared engine field.
+//
+// This is the regression test for ADR-022's P0 prerequisite: the old
+// SetEventEmitter → Execute → SetEventEmitter(nil) pattern let two concurrent
+// orchestrations clobber each other's emitter.
+func TestEngine_ConcurrentExecute_NoEmitterRace(t *testing.T) {
+	ctx := context.Background()
+
+	invoker := &mockToolInvoker{
+		invokeFunc: func(ctx context.Context, toolName string, params map[string]interface{}) (map[string]interface{}, error) {
+			// Small sleep so Executes actually overlap in time.
+			time.Sleep(2 * time.Millisecond)
+			return map[string]interface{}{"tool": toolName, "ok": true}, nil
+		},
+	}
+	planner := &mockPlanner{}
+	rapidDisp := &disposition.DispositionConfig{Pacing: "rapid"}
+	engine := NewEngine(DefaultEngineConfig(), planner, invoker, nil, nil, nil, WithDisposition(rapidDisp))
+
+	const parallelism = 16
+	emitters := make([]*lockedEventEmitter, parallelism)
+	for i := range emitters {
+		emitters[i] = &lockedEventEmitter{id: i}
+	}
+
+	var wg sync.WaitGroup
+	errs := make(chan error, parallelism)
+
+	for i := 0; i < parallelism; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			planID := fmt.Sprintf("plan-%d", idx)
+			// Two independent nodes so executeNodesInParallel spawns inner goroutines
+			// that concurrently hit this Execute's emitter.
+			plan := &Plan{
+				ID:     planID,
+				TaskID: fmt.Sprintf("task-%d", idx),
+				Nodes: []*PlanNode{
+					{ID: fmt.Sprintf("n-%d-a", idx), ToolName: "tool_a", Parameters: map[string]interface{}{"plan": planID}, Dependencies: []string{}, State: NodeStatePending},
+					{ID: fmt.Sprintf("n-%d-b", idx), ToolName: "tool_b", Parameters: map[string]interface{}{"plan": planID}, Dependencies: []string{}, State: NodeStatePending},
+				},
+			}
+			task := NewTask("user1", fmt.Sprintf("concurrent-%d", idx))
+			if err := engine.Execute(ctx, plan, task, "user1", emitters[idx]); err != nil {
+				errs <- fmt.Errorf("execute %d: %w", idx, err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Errorf("concurrent execute failed: %v", err)
+	}
+
+	// Invariant: each emitter only ever saw events for its own plan_id.
+	// If the old racy shared-field design were in effect, a late SetEventEmitter(nil)
+	// from one orchestration would cause another's events to be dropped or mis-routed.
+	for i, em := range emitters {
+		expectedPlanID := fmt.Sprintf("plan-%d", i)
+		em.mu.Lock()
+		require.NotEmpty(t, em.events, "emitter %d should have received events", i)
+		for _, evt := range em.events {
+			if gotPlanID, ok := evt.Data["plan_id"].(string); ok {
+				assert.Equal(t, expectedPlanID, gotPlanID,
+					"emitter %d received an event for %s (cross-orchestration leak)", i, gotPlanID)
+			}
+		}
+		em.mu.Unlock()
+	}
 }
