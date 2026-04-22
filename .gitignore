@@ -11,6 +11,15 @@ bin/
 *.out
 coverage.*
 dist/
+# Keep the embed-anchor .gitkeep visible so `//go:embed all:dist` compiles
+# on fresh checkouts before the SPA is built. The SPA build outputs
+# themselves stay ignored via the rule pairs below.
+!server/chatui/dist/
+server/chatui/dist/*
+!server/chatui/dist/.gitkeep
+!server/workflowui/dist/
+server/workflowui/dist/*
+!server/workflowui/dist/.gitkeep
 
 # Certificates and keys
 *.pem
@@ -63,7 +72,6 @@ claude-plugins-official/
 # Claude workspace state
 **/.claude/
 cmd/dojo/dojo
-server/workflowui/dist/
 
 # Chat UI SPA
 chat-ui/node_modules/
