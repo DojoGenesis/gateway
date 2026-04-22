@@ -85,8 +85,10 @@ func (a *EmailAdapter) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ParseMultipartForm reads the entire body into memory (32 MB limit).
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
+	// Limit the request body to 1 MiB before parsing to prevent memory exhaustion.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	// ParseMultipartForm reads the body up to the given limit.
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
 		http.Error(w, fmt.Sprintf("email: failed to parse multipart form: %v", err), http.StatusBadRequest)
 		return
 	}

@@ -128,7 +128,10 @@ jobs:
 
       - name: Verify admin endpoints
         run: |
-          curl -sf http://localhost:7340/admin/metrics/prometheus || exit 1
+          # Admin routes require Bearer auth. In dev mode (no ENVIRONMENT=production),
+          # any token with the "admin-" prefix is accepted by AdminAuthMiddleware.
+          curl -sf http://localhost:7340/admin/metrics/prometheus \
+            -H "Authorization: Bearer admin-ci-test" || exit 1
 
       - name: Stop gateway
         if: always()

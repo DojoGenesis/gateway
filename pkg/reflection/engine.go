@@ -149,9 +149,9 @@ func (e *Engine) generateStructured(sessionData SessionData) (*ReflectionOutput,
 
 	content.WriteString("# Reflection\n\n")
 	content.WriteString("## Session Summary\n")
-	content.WriteString(fmt.Sprintf("- Duration: %v\n", sessionData.Duration))
-	content.WriteString(fmt.Sprintf("- Tasks Completed: %d\n", sessionData.TasksCompleted))
-	content.WriteString(fmt.Sprintf("- Errors Encountered: %d\n", sessionData.ErrorsHit))
+	fmt.Fprintf(&content, "- Duration: %v\n", sessionData.Duration)
+	fmt.Fprintf(&content, "- Tasks Completed: %d\n", sessionData.TasksCompleted)
+	fmt.Fprintf(&content, "- Errors Encountered: %d\n", sessionData.ErrorsHit)
 	content.WriteString(fmt.Sprintf("- Tools Used: %d\n\n", len(sessionData.ToolsUsed)))
 
 	content.WriteString("## Key Events\n")

@@ -566,7 +566,7 @@ func main() {
 			slog.Warn("mesh identity generation failed — mesh disabled", "error", meshErr)
 		} else {
 			gatewayMesh = mesh.New(identity, 5*time.Minute)
-			slog.Info("mesh initialized", "did", identity.DID())
+			slog.Info("mesh initialized", "did", identity.DID()) //nolint:gosec // G706 -- DID derived from operator-set env var DOJO_MESH_HOSTNAME, not user-controlled
 		}
 	}
 

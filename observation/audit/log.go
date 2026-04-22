@@ -175,7 +175,7 @@ func (l *sqliteAuditLog) Query(ctx context.Context, filter AuditFilter) ([]Audit
 	}
 	// Support offset for pagination. (#26)
 	if filter.Offset > 0 {
-		query += fmt.Sprintf(" OFFSET %d", filter.Offset)
+		query += fmt.Sprintf(" OFFSET %d", filter.Offset) //nolint:gosec // G202: integer-only interpolation; filter.Offset is a typed int field, not user-supplied string — %d cannot inject SQL syntax
 	}
 
 	rows, err := l.db.QueryContext(ctx, query, args...)
