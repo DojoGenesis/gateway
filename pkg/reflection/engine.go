@@ -152,14 +152,14 @@ func (e *Engine) generateStructured(sessionData SessionData) (*ReflectionOutput,
 	fmt.Fprintf(&content, "- Duration: %v\n", sessionData.Duration)
 	fmt.Fprintf(&content, "- Tasks Completed: %d\n", sessionData.TasksCompleted)
 	fmt.Fprintf(&content, "- Errors Encountered: %d\n", sessionData.ErrorsHit)
-	content.WriteString(fmt.Sprintf("- Tools Used: %d\n\n", len(sessionData.ToolsUsed)))
+	fmt.Fprintf(&content, "- Tools Used: %d\n\n", len(sessionData.ToolsUsed))
 
 	content.WriteString("## Key Events\n")
 	if len(sessionData.Events) == 0 {
 		content.WriteString("- No significant events logged\n\n")
 	} else {
 		for _, event := range sessionData.Events {
-			content.WriteString(fmt.Sprintf("- **%s**: %s\n", event.Type, event.Context))
+			fmt.Fprintf(&content, "- **%s**: %s\n", event.Type, event.Context)
 		}
 		content.WriteString("\n")
 	}
@@ -181,11 +181,11 @@ func (e *Engine) generateNarrative(sessionData SessionData) (*ReflectionOutput, 
 	var content strings.Builder
 
 	content.WriteString("# Session Reflection\n\n")
-	content.WriteString(fmt.Sprintf("During this session, which lasted %v, I completed %d tasks and encountered %d errors. ",
-		sessionData.Duration, sessionData.TasksCompleted, sessionData.ErrorsHit))
+	fmt.Fprintf(&content, "During this session, which lasted %v, I completed %d tasks and encountered %d errors. ",
+		sessionData.Duration, sessionData.TasksCompleted, sessionData.ErrorsHit)
 
 	if len(sessionData.ToolsUsed) > 0 {
-		content.WriteString(fmt.Sprintf("I used %d different tools throughout the session. ", len(sessionData.ToolsUsed)))
+		fmt.Fprintf(&content, "I used %d different tools throughout the session. ", len(sessionData.ToolsUsed))
 	}
 
 	content.WriteString("\n\n")
@@ -193,8 +193,8 @@ func (e *Engine) generateNarrative(sessionData SessionData) (*ReflectionOutput, 
 	if len(sessionData.Events) > 0 {
 		content.WriteString("Notable events during this session:\n\n")
 		for _, event := range sessionData.Events {
-			content.WriteString(fmt.Sprintf("- At %s, %s: %s\n",
-				event.Timestamp.Format("15:04:05"), event.Type, event.Context))
+			fmt.Fprintf(&content, "- At %s, %s: %s\n",
+				event.Timestamp.Format("15:04:05"), event.Type, event.Context)
 		}
 		content.WriteString("\n")
 	}
@@ -213,15 +213,15 @@ func (e *Engine) generateBullets(sessionData SessionData) (*ReflectionOutput, er
 
 	content.WriteString("# Session Reflection\n\n")
 	content.WriteString("## Summary\n")
-	content.WriteString(fmt.Sprintf("- Duration: %v\n", sessionData.Duration))
-	content.WriteString(fmt.Sprintf("- %d tasks completed\n", sessionData.TasksCompleted))
-	content.WriteString(fmt.Sprintf("- %d errors encountered\n", sessionData.ErrorsHit))
-	content.WriteString(fmt.Sprintf("- %d tools used\n\n", len(sessionData.ToolsUsed)))
+	fmt.Fprintf(&content, "- Duration: %v\n", sessionData.Duration)
+	fmt.Fprintf(&content, "- %d tasks completed\n", sessionData.TasksCompleted)
+	fmt.Fprintf(&content, "- %d errors encountered\n", sessionData.ErrorsHit)
+	fmt.Fprintf(&content, "- %d tools used\n\n", len(sessionData.ToolsUsed))
 
 	if len(sessionData.Events) > 0 {
 		content.WriteString("## Key Events\n")
 		for _, event := range sessionData.Events {
-			content.WriteString(fmt.Sprintf("- %s: %s\n", event.Type, event.Context))
+			fmt.Fprintf(&content, "- %s: %s\n", event.Type, event.Context)
 		}
 		content.WriteString("\n")
 	}
