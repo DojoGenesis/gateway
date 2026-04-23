@@ -22,19 +22,27 @@ import (
 func (s *Server) handleGatewayListAgentChannels(c *gin.Context) {
 	agentID := c.Param("id")
 
+	// Copy the Channels slice while the read lock is held.  Releasing the lock
+	// before reading runtime.Channels creates a data race against concurrent
+	// writers in handleGatewayBindAgentChannels (write lock + slice append).
+	var channels []string
+	var exists bool
 	s.agentMu.RLock()
 	runtime, exists := s.agents[agentID]
+	if exists {
+		if len(runtime.Channels) > 0 {
+			channels = make([]string, len(runtime.Channels))
+			copy(channels, runtime.Channels)
+		} else {
+			channels = []string{}
+		}
+	}
 	s.agentMu.RUnlock()
 
 	if !exists {
 		s.errorResponse(c, http.StatusNotFound, "not_found",
 			fmt.Sprintf("Agent not found: %s", agentID))
 		return
-	}
-
-	channels := runtime.Channels
-	if channels == nil {
-		channels = []string{}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

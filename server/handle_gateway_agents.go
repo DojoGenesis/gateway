@@ -124,39 +124,77 @@ func (s *Server) handleGatewayListAgentsFiltered(c *gin.Context) {
 func (s *Server) handleGatewayGetAgentDetail(c *gin.Context) {
 	agentID := c.Param("id")
 
+	// Copy all fields we need while the read lock is held.  Releasing the lock
+	// before dereferencing runtime fields would create a data race against
+	// concurrent writes in handleGatewayBindAgentChannels (which holds the
+	// write lock while appending to runtime.Channels).
+	type snapshot struct {
+		exists      bool
+		hasConfig   bool
+		configPacing string
+		config      interface{}
+		hasDispo    bool
+		dispoPacing string
+		dispoDepth  string
+		dispoTone   string
+		dispoInit   string
+		channels    []string
+	}
+
+	var snap snapshot
 	s.agentMu.RLock()
 	runtime, exists := s.agents[agentID]
+	if exists {
+		snap.exists = true
+		if runtime.Config != nil {
+			snap.hasConfig = true
+			snap.configPacing = runtime.Config.Pacing
+			snap.config = runtime.Config
+		}
+		if runtime.Disposition != nil {
+			snap.hasDispo = true
+			snap.dispoPacing = runtime.Disposition.Pacing
+			snap.dispoDepth = runtime.Disposition.Depth
+			snap.dispoTone = runtime.Disposition.Tone
+			snap.dispoInit = runtime.Disposition.Initiative
+		}
+		if len(runtime.Channels) > 0 {
+			snap.channels = make([]string, len(runtime.Channels))
+			copy(snap.channels, runtime.Channels)
+		}
+	}
 	s.agentMu.RUnlock()
 
-	if !exists {
+	if !snap.exists {
 		s.errorResponse(c, http.StatusNotFound, "not_found",
 			fmt.Sprintf("Agent not found: %s", agentID))
 		return
 	}
 
+	// Build the response from the lock-free snapshot — no further runtime access.
 	response := gin.H{
 		"agent_id": agentID,
 		"status":   "active",
 	}
 
-	if runtime.Config != nil {
-		response["config"] = runtime.Config
-		response["model"] = runtime.Config.Pacing // disposition field; model routing handled by provider layer
+	if snap.hasConfig {
+		response["config"] = snap.config
+		response["model"] = snap.configPacing // disposition field; model routing handled by provider layer
 	} else {
 		response["status"] = "inactive"
 	}
 
-	if runtime.Disposition != nil {
+	if snap.hasDispo {
 		response["disposition"] = gin.H{
-			"pacing":     runtime.Disposition.Pacing,
-			"depth":      runtime.Disposition.Depth,
-			"tone":       runtime.Disposition.Tone,
-			"initiative": runtime.Disposition.Initiative,
+			"pacing":     snap.dispoPacing,
+			"depth":      snap.dispoDepth,
+			"tone":       snap.dispoTone,
+			"initiative": snap.dispoInit,
 		}
 	}
 
-	if len(runtime.Channels) > 0 {
-		response["channels"] = runtime.Channels
+	if len(snap.channels) > 0 {
+		response["channels"] = snap.channels
 	}
 
 	c.JSON(http.StatusOK, response)

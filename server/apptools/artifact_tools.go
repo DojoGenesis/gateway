@@ -16,6 +16,168 @@ func InitializeArtifactTools(am *artifacts.ArtifactManager) {
 	artifactManager = am
 }
 
+// RegisterArtifactTools registers all artifact tool definitions in the global
+// tool registry. It is safe to call multiple times: any previously registered
+// artifact tool is unregistered first so that it can be re-registered with the
+// current function pointers. This is required for tests that call
+// tools.ClearRegistry() between runs (e.g., -count>1).
+func RegisterArtifactTools(am *artifacts.ArtifactManager) {
+	artifactManager = am
+
+	defs := artifactToolDefs()
+	for _, def := range defs {
+		// Silently unregister in case a previous test iteration left a stale entry.
+		_ = tools.UnregisterTool(def.Name)
+		if err := tools.RegisterTool(def); err != nil {
+			// Only possible if def itself is malformed — log and continue.
+			slog.Error("RegisterArtifactTools: failed to register tool", "name", def.Name, "error", err)
+		}
+	}
+}
+
+// artifactToolDefs returns the tool definitions for all artifact tools.
+// Factored out so both init() and RegisterArtifactTools() share the same source.
+func artifactToolDefs() []*tools.ToolDefinition {
+	return []*tools.ToolDefinition{
+		{
+			Name:        "create_artifact",
+			Description: "Create a new artifact in a project. Artifacts are persistent, versionable outputs like documents, diagrams, code projects, data visualizations, or images.",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"project_id": map[string]interface{}{
+						"type":        "string",
+						"description": "ID of the project this artifact belongs to",
+					},
+					"type": map[string]interface{}{
+						"type":        "string",
+						"description": "Type of artifact",
+						"enum":        []string{"document", "diagram", "code_project", "data_viz", "image"},
+					},
+					"name": map[string]interface{}{
+						"type":        "string",
+						"description": "Name of the artifact",
+					},
+					"content": map[string]interface{}{
+						"type":        "string",
+						"description": "Content of the artifact (e.g., Markdown text, Mermaid diagram code, JSON data)",
+					},
+					"session_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional session ID that created this artifact",
+					},
+				},
+				"required": []string{"project_id", "type", "name", "content"},
+			},
+			Function: CreateArtifact,
+		},
+		{
+			Name:        "update_artifact",
+			Description: "Update an existing artifact with new content. This creates a new version and calculates a diff from the previous version.",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"artifact_id": map[string]interface{}{
+						"type":        "string",
+						"description": "ID of the artifact to update",
+					},
+					"content": map[string]interface{}{
+						"type":        "string",
+						"description": "New content for the artifact",
+					},
+					"commit_message": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional message describing the changes made",
+					},
+				},
+				"required": []string{"artifact_id", "content"},
+			},
+			Function: UpdateArtifact,
+		},
+		{
+			Name:        "get_artifact",
+			Description: "Get details and content of a specific artifact, optionally at a specific version",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"artifact_id": map[string]interface{}{
+						"type":        "string",
+						"description": "ID of the artifact to retrieve",
+					},
+					"version": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional specific version to retrieve (defaults to latest)",
+					},
+				},
+				"required": []string{"artifact_id"},
+			},
+			Function: GetArtifact,
+		},
+		{
+			Name:        "list_artifacts",
+			Description: "List artifacts, optionally filtered by project and/or type",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"project_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Filter by project ID",
+					},
+					"type": map[string]interface{}{
+						"type":        "string",
+						"description": "Filter by artifact type",
+						"enum":        []string{"document", "diagram", "code_project", "data_viz", "image"},
+					},
+					"limit": map[string]interface{}{
+						"type":        "integer",
+						"description": "Maximum number of artifacts to return (default: 50, max: 1000)",
+					},
+				},
+			},
+			Function: ListArtifacts,
+		},
+		{
+			Name:        "list_artifact_versions",
+			Description: "Get version history for a specific artifact",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"artifact_id": map[string]interface{}{
+						"type":        "string",
+						"description": "ID of the artifact to get version history for",
+					},
+				},
+				"required": []string{"artifact_id"},
+			},
+			Function: ListArtifactVersions,
+		},
+		{
+			Name:        "export_artifact",
+			Description: "Export an artifact to a specific format (raw, base64, json) for download or external use",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"artifact_id": map[string]interface{}{
+						"type":        "string",
+						"description": "ID of the artifact to export",
+					},
+					"format": map[string]interface{}{
+						"type":        "string",
+						"description": "Export format",
+						"enum":        []string{"raw", "base64", "json"},
+					},
+					"version": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional specific version to export (defaults to latest)",
+					},
+				},
+				"required": []string{"artifact_id"},
+			},
+			Function: ExportArtifact,
+		},
+	}
+}
+
 func CreateArtifact(ctx context.Context, params map[string]interface{}) (map[string]interface{}, error) {
 	if artifactManager == nil {
 		return map[string]interface{}{
@@ -374,145 +536,7 @@ func getMimeType(artifactType artifacts.ArtifactType) string {
 }
 
 func init() {
-	tools.RegisterTool(&tools.ToolDefinition{
-		Name:        "create_artifact",
-		Description: "Create a new artifact in a project. Artifacts are persistent, versionable outputs like documents, diagrams, code projects, data visualizations, or images.",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"project_id": map[string]interface{}{
-					"type":        "string",
-					"description": "ID of the project this artifact belongs to",
-				},
-				"type": map[string]interface{}{
-					"type":        "string",
-					"description": "Type of artifact",
-					"enum":        []string{"document", "diagram", "code_project", "data_viz", "image"},
-				},
-				"name": map[string]interface{}{
-					"type":        "string",
-					"description": "Name of the artifact",
-				},
-				"content": map[string]interface{}{
-					"type":        "string",
-					"description": "Content of the artifact (e.g., Markdown text, Mermaid diagram code, JSON data)",
-				},
-				"session_id": map[string]interface{}{
-					"type":        "string",
-					"description": "Optional session ID that created this artifact",
-				},
-			},
-			"required": []string{"project_id", "type", "name", "content"},
-		},
-		Function: CreateArtifact,
-	})
-
-	tools.RegisterTool(&tools.ToolDefinition{
-		Name:        "update_artifact",
-		Description: "Update an existing artifact with new content. This creates a new version and calculates a diff from the previous version.",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"artifact_id": map[string]interface{}{
-					"type":        "string",
-					"description": "ID of the artifact to update",
-				},
-				"content": map[string]interface{}{
-					"type":        "string",
-					"description": "New content for the artifact",
-				},
-				"commit_message": map[string]interface{}{
-					"type":        "string",
-					"description": "Optional message describing the changes made",
-				},
-			},
-			"required": []string{"artifact_id", "content"},
-		},
-		Function: UpdateArtifact,
-	})
-
-	tools.RegisterTool(&tools.ToolDefinition{
-		Name:        "get_artifact",
-		Description: "Get details and content of a specific artifact, optionally at a specific version",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"artifact_id": map[string]interface{}{
-					"type":        "string",
-					"description": "ID of the artifact to retrieve",
-				},
-				"version": map[string]interface{}{
-					"type":        "integer",
-					"description": "Optional specific version to retrieve (defaults to latest)",
-				},
-			},
-			"required": []string{"artifact_id"},
-		},
-		Function: GetArtifact,
-	})
-
-	tools.RegisterTool(&tools.ToolDefinition{
-		Name:        "list_artifacts",
-		Description: "List artifacts, optionally filtered by project and/or type",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"project_id": map[string]interface{}{
-					"type":        "string",
-					"description": "Filter by project ID",
-				},
-				"type": map[string]interface{}{
-					"type":        "string",
-					"description": "Filter by artifact type",
-					"enum":        []string{"document", "diagram", "code_project", "data_viz", "image"},
-				},
-				"limit": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum number of artifacts to return (default: 50, max: 1000)",
-				},
-			},
-		},
-		Function: ListArtifacts,
-	})
-
-	tools.RegisterTool(&tools.ToolDefinition{
-		Name:        "list_artifact_versions",
-		Description: "Get version history for a specific artifact",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"artifact_id": map[string]interface{}{
-					"type":        "string",
-					"description": "ID of the artifact to get version history for",
-				},
-			},
-			"required": []string{"artifact_id"},
-		},
-		Function: ListArtifactVersions,
-	})
-
-	tools.RegisterTool(&tools.ToolDefinition{
-		Name:        "export_artifact",
-		Description: "Export an artifact to a specific format (raw, base64, json) for download or external use",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"artifact_id": map[string]interface{}{
-					"type":        "string",
-					"description": "ID of the artifact to export",
-				},
-				"format": map[string]interface{}{
-					"type":        "string",
-					"description": "Export format",
-					"enum":        []string{"raw", "base64", "json"},
-				},
-				"version": map[string]interface{}{
-					"type":        "integer",
-					"description": "Optional specific version to export (defaults to latest)",
-				},
-			},
-			"required": []string{"artifact_id"},
-		},
-		Function: ExportArtifact,
-	})
+	for _, def := range artifactToolDefs() {
+		tools.RegisterTool(def)
+	}
 }
