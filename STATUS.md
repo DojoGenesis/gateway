@@ -33,7 +33,7 @@ A modular Go framework for building agentic AI systems with pluggable providers,
 | **Provider Layer** | ✅ Complete | 8 providers (7 cloud + Ollama), dynamic API key resolution, auto-discovery at startup |
 | **Events Module** | ✅ Complete | SSE event catalog with 254-line schema definitions |
 | **Shared Types** | ✅ Complete | Cross-cutting currency types, standard errors |
-| **Tests** | ✅ Passing | 563 Go files, 228 test files, ~141K LOC total |
+| **Tests** | ✅ Passing | 563 Go files, 229 test files, ~141K LOC total |
 | **Documentation** | ✅ Complete | README, ARCHITECTURE, CHANGELOG, API docs, ADRs |
 | **CI/CD** | ✅ Complete | GitHub Actions, multi-arch Docker (amd64 + arm64), Goreleaser, E2E smoke tests |
 
@@ -326,7 +326,7 @@ AgenticGatewayByDojoGenesis/
 | `CHANGELOG.md` | Version history |
 | `docs/v0.2.0/contract-gateway-ada.md` | ADA Contract specification |
 | `docs/v0.3.0/` | Skills and backend integration guides |
-| All test files (`*_test.go`) | Test suite (228 files) |
+| All test files (`*_test.go`) | Test suite (229 files) |
 | `CONTRIBUTING.md` | Contribution guidelines |
 | `DEPLOYMENT.md` | Deployment guide |
 
