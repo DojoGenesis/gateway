@@ -804,7 +804,12 @@ func (s *Server) handleGatewayOrchestrate(c *gin.Context) {
 		orchState.Status = "executing"
 		orchState.mu.Unlock()
 
-		execErr := s.orchestrationEngine.Execute(c.Request.Context(), orchPlan, task, userID, nil)
+		// Use context.Background() so the long-running orchestration is not
+		// cancelled when Gin flushes the HTTP 202 response and tears down the
+		// request context. Matches the pattern in handle_orchestrate.go:165.
+		bgCtx, bgCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer bgCancel()
+		execErr := s.orchestrationEngine.Execute(bgCtx, orchPlan, task, userID, nil)
 
 		orchState.mu.Lock()
 		if execErr != nil {
