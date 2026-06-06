@@ -87,6 +87,20 @@ func (s *Server) handleHealth(c *gin.Context) {
 	})
 }
 
+// handleRoot returns a minimal 200 banner at GET /.
+// Without this, Gin returns 404 for the root path — external probes that
+// check the base URL rather than /health hit a 404. Registered on s.router
+// (Gin radix tree), not http.ServeMux, because ServeMux "/" is a catch-all
+// that would intercept unmatched workflow routes.
+func (s *Server) handleRoot(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"name":    "DojoGenesis AgenticGateway",
+		"version": Version,
+		"status":  "running",
+		"health":  "/health",
+	})
+}
+
 // handleMetrics handles GET /metrics (Prometheus-style).
 func (s *Server) handleMetrics(c *gin.Context) {
 	incrementRequests()

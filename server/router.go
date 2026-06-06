@@ -46,6 +46,7 @@ func (s *Server) setupRoutes() {
 	// ─── Infrastructure ──────────────────────────────────────────────
 	s.router.GET("/health", s.handleHealth)
 	s.router.GET("/metrics", s.handleMetrics)
+	s.router.GET("/", s.handleRoot)
 
 	// ─── SSE (existing broadcaster) ──────────────────────────────────
 	s.router.GET("/events", handlers.HandleSSE)
