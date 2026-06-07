@@ -39,14 +39,25 @@ func (p *AnthropicProvider) GetInfo(ctx context.Context) (*provider.ProviderInfo
 
 func (p *AnthropicProvider) ListModels(ctx context.Context) ([]provider.ModelInfo, error) {
 	return []provider.ModelInfo{
-		// Canonical date-stamped IDs
+		// Canonical date-stamped IDs (stable, always-resolvable pins)
 		{ID: "claude-sonnet-4-20250514", Name: "Claude Sonnet 4", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
 		{ID: "claude-haiku-4-20250414", Name: "Claude Haiku 4", Provider: "anthropic", ContextSize: 200000, Cost: 0.25},
 		{ID: "claude-opus-4-20250514", Name: "Claude Opus 4", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
-		// Short-form aliases that users actually type (routed to Anthropic API which resolves them)
+		// Short-form aliases users actually type (routed to the Anthropic API, which resolves them).
+		// Newest-first. When Anthropic ships a new model, add its alias at the top of its family.
+		// This list is one of the surfaces the model-update runbook covers (ADR 028).
+		{ID: "claude-opus-4-8", Name: "Claude Opus 4.8", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
+		{ID: "claude-opus-4-7", Name: "Claude Opus 4.7", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
+		{ID: "claude-opus-4-6", Name: "Claude Opus 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
 		{ID: "claude-sonnet-4-6", Name: "Claude Sonnet 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
 		{ID: "claude-haiku-4-5", Name: "Claude Haiku 4.5", Provider: "anthropic", ContextSize: 200000, Cost: 0.25},
-		{ID: "claude-opus-4-6", Name: "Claude Opus 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
+		// ── Frontier / security tier (NOT YET GA) ──────────────────────────────────
+		// Claude Mythos Preview is gated to Project Glasswing (critical-infra cyber) and
+		// has NO public API model ID — it cannot be added here. Anthropic plans to fold
+		// Mythos-class capability into a future public Claude Opus behind safeguards.
+		// When that ships, uncomment + set the real alias below (newest-first above): that
+		// one line is the entire Gateway-side adopt step. See ADR 028 + the model-update runbook.
+		// {ID: "claude-opus-<NEXT>", Name: "Claude Opus <NEXT> (Mythos-class)", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
 	}, nil
 }
 
@@ -100,7 +111,7 @@ func (p *AnthropicProvider) GenerateCompletion(ctx context.Context, req *provide
 
 	model := req.Model
 	if model == "" {
-		model = "claude-sonnet-4-20250514"
+		model = "claude-sonnet-4-6"
 	}
 	maxTokens := req.MaxTokens
 	if maxTokens == 0 {
@@ -126,7 +137,7 @@ func (p *AnthropicProvider) GenerateCompletion(ctx context.Context, req *provide
 			aReq.ToolChoice = map[string]string{"type": "any"}
 		case "none":
 			aReq.ToolChoice = map[string]string{"type": "none"}
-		// "auto" or "" → omit (Anthropic defaults to auto when tools are present)
+			// "auto" or "" → omit (Anthropic defaults to auto when tools are present)
 		}
 	}
 
@@ -188,7 +199,7 @@ func (p *AnthropicProvider) GenerateCompletionStream(ctx context.Context, req *p
 
 	model := req.Model
 	if model == "" {
-		model = "claude-sonnet-4-20250514"
+		model = "claude-sonnet-4-6"
 	}
 	maxTokens := req.MaxTokens
 	if maxTokens == 0 {
