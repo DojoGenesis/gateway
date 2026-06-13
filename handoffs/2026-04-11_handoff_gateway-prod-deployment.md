@@ -1,6 +1,8 @@
 # Handoff: Gateway Production Deployment Orchestration
 **From:** Sonnet (build session) | **To:** Opus | **Date:** 2026-04-11
 
+**Status:** SETTLED 2026-06-13 — gateway is live in production (gateway.trespies.dev; root + /health verified 2026-06-06 via the gateway-404 handoff, COMPLETED). Deployment orchestration complete.
+
 ## Objective
 
 > Execute the five-phase production deployment of the Dojo Agentic Gateway stack to a Hetzner VPS with Named Cloudflare Tunnel, so that `bridge.trespiesdesign.com` is live, the Slack adapter is connected via Infisical, and every subsequent push to `main` auto-deploys via GitHub Actions.
