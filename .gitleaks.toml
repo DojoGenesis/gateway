@@ -1,0 +1,77 @@
+# .gitleaks.toml — secret scanning for AgenticGatewayByDojoGenesis
+# Defense-in-depth secret scanning. Part of the cross-repo gitleaks coverage
+# (handoff 2026-06-28_secret-scanning-coverage). Scan-only; no runtime impact.
+#
+# Design: EXTENDS the gitleaks default ruleset (useDefault = true) so every known
+# provider signature is active (AWS, Stripe, GitHub, Google, Slack, Twilio,
+# SendGrid, private keys, JWT, generic-api-key, ...). This is intentionally broader
+# than the nightshift-v2 standalone template — the goal here is to catch the NEXT
+# accidental secret, whatever provider it is.
+#
+# The allowlist below neutralizes only this repo's KNOWN false positives —
+# placeholders, test fixtures, public-by-design tokens, and documentation examples —
+# verified against FULL history on 2026-06-29. No real secret was ever allowlisted.
+#
+# Test:   gitleaks git --no-banner --log-opts="--all --full-history"
+# Local:  git config core.hooksPath .githooks   (then .githooks/pre-commit runs on commit)
+# CI:     .github/workflows/secret-scan.yml
+# False positive? add a line below, or append "# gitleaks:allow" to the offending line.
+
+title = "AgenticGatewayByDojoGenesis — Secret Scan (extends gitleaks default ruleset)"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "AgenticGatewayByDojoGenesis repo-wide allowlist: placeholders, test fixtures, public tokens, generated files, docs"
+regexTargets = "match"
+
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)\.env\.sample$''',
+  '''(^|/)\.env\.template$''',
+  '''(^|/)\.env\..*\.example$''',
+  '''(^|/)\.dev\.vars\.example$''',
+  '''(^|/)\.gitleaks\.toml$''',
+  '''(^|/)\.githooks/''',
+  '''(^|/)\.pre-commit-config\.yaml$''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)yarn\.lock$''',
+  '''(^|/)go\.sum$''',
+  '''(^|/)Cargo\.lock$''',
+  '''(^|/)poetry\.lock$''',
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)build/''',
+  '''(^|/)\.wrangler/''',
+  '''(^|/)vendor/''',
+  '''(^|/)docs?/''',
+  '''\.md$''',
+  '''(^|/)\.zenflow/''',
+  '''_test\.go$''',
+  '''(^|/)tests?/''',
+  '''(^|/)__tests__/''',
+  '''(^|/)__fixtures__/''',
+  '''(^|/)testdata/''',
+  '''\.test\.[jt]sx?$''',
+  '''(^|/)e2e/''',
+  '''(^|/)fixtures?/''',
+]
+
+regexes = [
+  '''(?i)your[-_]?(api[-_]?)?(key|token|secret|password|id|client[-_]?secret)[-_]?(here|goes[-_]?here)?''',
+  '''(?i)(replace|change)[-_]?me''',
+  '''(?i)placeholder''',
+  '''(?i)dummy''',
+  '''(?i)example[-_.]''',
+  '''<[A-Za-z0-9_./-]+>''',
+  '''x{6,}''',
+  '''\.\.\.''',
+  '''(?i)sk-(test-)?1234567890''',
+  '''(?i)test[-_]?(signing[-_]?)?(secret|token|key)''',
+  '''(?i)(fake|sample|insert|todo)[-_]?(secret|token|key|value)''',
+  '''example\.(com|org|net|test)''',
+  # ---- repo-specific verified false positives (see header) ----
+  '''admin-ci-test''',
+]

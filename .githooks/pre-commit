@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Pre-commit secret scan via gitleaks. Part of the cross-repo coverage:
+# handoff 2026-06-28_secret-scanning-coverage. Scan-only; no runtime impact.
+#
+# Activate once per clone:   git config core.hooksPath .githooks
+# Bypass (discouraged):      git commit --no-verify
+set -uo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "[pre-commit] gitleaks not installed - skipping secret scan."
+  echo "             install: brew install gitleaks  (https://github.com/gitleaks/gitleaks)"
+  exit 0
+fi
+
+# Scan ONLY what is staged for this commit.
+if gitleaks git --staged --no-banner --redact --config .gitleaks.toml; then
+  exit 0
+fi
+
+cat >&2 <<'MSG'
+
+[pre-commit] BLOCKED: gitleaks found a potential secret in staged changes.
+  - If REAL: remove it and rotate it now (see docs/SECRETS-RECOVERY.md). Do NOT commit.
+  - If a false positive: add an allowlist entry in .gitleaks.toml,
+    or append  # gitleaks:allow  to the offending line.
+  - To bypass intentionally (discouraged): git commit --no-verify
+MSG
+exit 1
