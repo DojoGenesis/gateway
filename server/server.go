@@ -41,10 +41,12 @@ import (
 //	-X github.com/DojoGenesis/gateway/server.Version={{.Version}}
 var Version = "1.1.0"
 
-// MCPStatusProvider is the interface used by the server to query MCP status.
+// MCPStatusProvider is the interface used by the server to query MCP status
+// and invoke MCP-bridged tools directly by server+tool name.
 // *mcp.MCPHostManager satisfies this interface.
 type MCPStatusProvider interface {
 	Status() map[string]mcp.ServerStatus
+	CallTool(ctx context.Context, serverName string, toolName string, args map[string]interface{}) (map[string]interface{}, error)
 }
 
 // AgentRuntime holds per-agent disposition config and instantiated consumer modules.
