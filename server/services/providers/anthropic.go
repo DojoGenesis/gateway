@@ -6,12 +6,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/DojoGenesis/gateway/provider"
 )
 
 type AnthropicProvider struct {
 	BaseProvider
+}
+
+// modelSupportsTemperature reports whether the given Anthropic model accepts the
+// `temperature` request parameter. Fable-class models deprecated it — Anthropic
+// returns 400 "temperature is deprecated for this model" — so it must be omitted
+// for them. Denylist by prefix; extend as new models drop the parameter.
+func modelSupportsTemperature(model string) bool {
+	return !strings.HasPrefix(model, "claude-fable")
 }
 
 func NewAnthropicProvider(apiKey string) *AnthropicProvider {
@@ -122,12 +131,14 @@ func (p *AnthropicProvider) GenerateCompletion(ctx context.Context, req *provide
 	system, messages := convertToAnthropicMessages(req.Messages)
 
 	aReq := anthropicRequest{
-		Model:       model,
-		Messages:    messages,
-		MaxTokens:   maxTokens,
-		Temperature: req.Temperature,
-		Stream:      false,
-		System:      system,
+		Model:     model,
+		Messages:  messages,
+		MaxTokens: maxTokens,
+		Stream:    false,
+		System:    system,
+	}
+	if modelSupportsTemperature(model) {
+		aReq.Temperature = req.Temperature
 	}
 	if len(req.Tools) > 0 {
 		aReq.Tools = convertToAnthropicTools(req.Tools)
@@ -211,7 +222,10 @@ func (p *AnthropicProvider) GenerateCompletionStream(ctx context.Context, req *p
 
 	aReq := anthropicRequest{
 		Model: model, Messages: messages, MaxTokens: maxTokens,
-		Temperature: req.Temperature, Stream: true, System: system,
+		Stream: true, System: system,
+	}
+	if modelSupportsTemperature(model) {
+		aReq.Temperature = req.Temperature
 	}
 	if len(req.Tools) > 0 {
 		aReq.Tools = convertToAnthropicTools(req.Tools)
