@@ -543,13 +543,20 @@ func (s *Server) handleGatewayListTools(c *gin.Context) {
 // POST /v1/gateway/agents
 func (s *Server) handleGatewayCreateAgent(c *gin.Context) {
 	var req struct {
-		WorkspaceRoot string `json:"workspace_root" binding:"required"`
+		WorkspaceRoot string `json:"workspace_root"`
 		ActiveMode    string `json:"active_mode"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.errorResponse(c, http.StatusBadRequest, "invalid_request", fmt.Sprintf("Invalid request: %v", err))
 		return
+	}
+
+	if req.WorkspaceRoot == "" {
+		req.WorkspaceRoot = os.Getenv("AGENT_WORKSPACE_ROOT")
+		if req.WorkspaceRoot == "" {
+			req.WorkspaceRoot = "."
+		}
 	}
 
 	if s.agentInitializer == nil {

@@ -46,6 +46,7 @@ func (p *AnthropicProvider) ListModels(ctx context.Context) ([]provider.ModelInf
 		// Short-form aliases users actually type (routed to the Anthropic API, which resolves them).
 		// Newest-first. When Anthropic ships a new model, add its alias at the top of its family.
 		// This list is one of the surfaces the model-update runbook covers (ADR 028).
+		{ID: "claude-fable-5", Name: "Claude Fable 5", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
 		{ID: "claude-opus-4-8", Name: "Claude Opus 4.8", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
 		{ID: "claude-opus-4-7", Name: "Claude Opus 4.7", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
 		{ID: "claude-opus-4-6", Name: "Claude Opus 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
