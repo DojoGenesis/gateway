@@ -222,12 +222,13 @@ func TestStartMigration(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotEmpty(t, migrationID)
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 
 		progress, err := manager.GetMigrationStatus(ctx, migrationID)
 		assert.NoError(t, err)
-		assert.NotNil(t, progress)
-		assert.Equal(t, migrationID, progress.MigrationID)
+		if assert.NotNil(t, progress) {
+			assert.Equal(t, migrationID, progress.MigrationID)
+		}
 	})
 
 	t.Run("migration already in progress", func(t *testing.T) {

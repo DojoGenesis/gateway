@@ -125,6 +125,8 @@ func (a *SMSAdapter) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit the request body to 1 MiB before parsing to prevent memory exhaustion.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	// Ensure form is parsed (VerifySignature may have already done this).
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "failed to parse form", http.StatusBadRequest)

@@ -1,0 +1,11 @@
+# Pre-commit framework config - secret scanning via gitleaks.
+# Part of the cross-repo coverage: handoff 2026-06-28_secret-scanning-coverage.
+#
+# If you use the pre-commit framework (https://pre-commit.com):  pre-commit install
+# If you do NOT, the native hook covers the same check:           git config core.hooksPath .githooks
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        name: Detect hardcoded secrets (AgenticGatewayByDojoGenesis)

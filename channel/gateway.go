@@ -62,6 +62,8 @@ func (gw *WebhookGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "channel: missing platform in path", http.StatusBadRequest)
 		return
 	}
+	// Sanitize platform for safe logging: strip CR/LF to prevent log injection.
+	safePlatform := strings.NewReplacer("\r", "", "\n", "").Replace(platform)
 
 	gw.mu.RLock()
 	adapter, ok := gw.adapters[platform]
@@ -90,8 +92,8 @@ func (gw *WebhookGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Verify signature before processing.
 	if err := adapter.VerifySignature(r); err != nil {
-		slog.Warn("channel: signature verification failed",
-			"platform", platform,
+		slog.Warn("channel: signature verification failed", //nolint:gosec // G706 -- platform sanitized (CR/LF stripped) and validated against registered adapter map
+			"platform", safePlatform,
 			"error", err,
 		)
 		http.Error(w, "channel: signature verification failed", http.StatusUnauthorized)
@@ -104,8 +106,8 @@ func (gw *WebhookGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Normalize to ChannelMessage.
 	msg, err := adapter.Normalize(body)
 	if err != nil {
-		slog.Error("channel: normalization failed",
-			"platform", platform,
+		slog.Error("channel: normalization failed", //nolint:gosec // G706 -- platform sanitized (CR/LF stripped) and validated against registered adapter map
+			"platform", safePlatform,
 			"error", err,
 		)
 		http.Error(w, "channel: normalization failed", http.StatusBadRequest)
@@ -121,16 +123,16 @@ func (gw *WebhookGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if gw.bus != nil {
 		evt, err := ToCloudEvent(msg)
 		if err != nil {
-			slog.Error("channel: failed to create CloudEvent",
-				"platform", platform,
+			slog.Error("channel: failed to create CloudEvent", //nolint:gosec // G706 -- platform sanitized (CR/LF stripped) and validated against registered adapter map
+				"platform", safePlatform,
 				"error", err,
 			)
 			// Still return 200 — the webhook was received.
 		} else {
-			subject := fmt.Sprintf("dojo.channel.message.%s", platform)
+			subject := fmt.Sprintf("dojo.channel.message.%s", safePlatform)
 			if pubErr := gw.bus.Publish(subject, evt); pubErr != nil {
-				slog.Error("channel: failed to publish event",
-					"platform", platform,
+				slog.Error("channel: failed to publish event", //nolint:gosec // G706 -- platform sanitized (CR/LF stripped) and validated against registered adapter map
+					"platform", safePlatform,
 					"subject", subject,
 					"error", pubErr,
 				)

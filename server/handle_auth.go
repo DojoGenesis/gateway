@@ -14,6 +14,10 @@ import (
 	"github.com/DojoGenesis/gateway/server/middleware"
 )
 
+// bcryptCost is the work factor for bcrypt password hashing.
+// Lowered to bcrypt.MinCost in test binaries via TestMain.
+var bcryptCost = 12
+
 // ─── Request / Response types ───────────────────────────────────────────────
 
 type authRegisterRequest struct {
@@ -68,8 +72,8 @@ func (s *Server) handleAuthRegister(c *gin.Context) {
 		return
 	}
 
-	// Hash password with bcrypt cost 12
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
+	// Hash password
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcryptCost)
 	if err != nil {
 		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to process password")
 		return

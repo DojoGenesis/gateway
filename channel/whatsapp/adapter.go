@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"strconv"
@@ -272,7 +273,7 @@ func (a *WhatsAppAdapter) handleVerification(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprint(w, challenge)
+	_, _ = fmt.Fprint(w, html.EscapeString(challenge))
 }
 
 // handleMessage processes a POST webhook payload.

@@ -213,8 +213,12 @@ func TestConcurrentRequestsWithDifferentProjects(t *testing.T) {
 		t.Fatalf("Failed to create ArtifactManager: %v", err)
 	}
 
-	// Initialize artifact tools with managers
-	apptools.InitializeArtifactTools(am)
+	// RegisterArtifactTools sets the artifact manager AND re-registers all
+	// artifact tool definitions in the global registry. This is safe to call on
+	// every test invocation (including -count>1 runs) because it unregisters any
+	// stale entries before re-registering, ensuring the registry is consistent
+	// regardless of what previous tests did with ClearRegistry().
+	apptools.RegisterArtifactTools(am)
 	defer tools.ClearRegistry()
 
 	ctx := context.Background()

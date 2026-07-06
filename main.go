@@ -379,8 +379,9 @@ func main() {
 	traceAdapter := orchestration.NewTraceLoggerAdapter(traceLogger)
 	budgetAdapter := orchestration.NewBudgetTrackerAdapter(budgetTracker)
 
-	// Event emitter starts nil — set per-execution in handle_orchestrate.go
-	// via engine.SetEventEmitter() with a per-request EventEmitterAdapter.
+	// Event emitter is supplied per-Execute invocation (see ADR-022 P0 resolution).
+	// Handlers construct a per-request EventEmitterAdapter and pass it directly
+	// to engine.Execute(); the NewEngine parameter is ignored.
 	var eventEmitter orchestrationpkg.EventEmitterInterface = nil
 
 	// Create the standalone orchestration engine with all adapters
@@ -565,7 +566,7 @@ func main() {
 			slog.Warn("mesh identity generation failed — mesh disabled", "error", meshErr)
 		} else {
 			gatewayMesh = mesh.New(identity, 5*time.Minute)
-			slog.Info("mesh initialized", "did", identity.DID())
+			slog.Info("mesh initialized", "did", identity.DID()) //nolint:gosec // G706 -- DID derived from operator-set env var DOJO_MESH_HOSTNAME, not user-controlled
 		}
 	}
 

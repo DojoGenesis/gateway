@@ -204,52 +204,77 @@ func (sr *SemanticRouter) TryInitialize(ctx context.Context) (bool, error) {
 //   - RoutingModeCascade: Tier1 → Tier2 → Tier3
 //   - RoutingModeLLM: Tier3 only
 //   - RoutingModeEmbedding: Tier2 only (no LLM fallback)
-func (sr *SemanticRouter) Route(ctx context.Context, query string) (RoutingDecision, error) {
+//
+// metadata is optional caller-supplied key/value pairs threaded into the
+// returned decision. When metadata["tool_origin"] is non-empty, a -0.15
+// confidence penalty is applied to any specialist_dispatch route selected by
+// Tier 2, making MCP tool-origin calls less likely to be dispatched to a
+// specialist.
+func (sr *SemanticRouter) Route(ctx context.Context, query string, metadata map[string]string) (RoutingDecision, error) {
 	mode := RoutingMode(sr.mode.Load())
+
+	var decision RoutingDecision
+	var err error
 
 	switch mode {
 	case RoutingModeLLM:
 		slog.Debug("semantic router: LLM-only mode", "query_len", len(query))
-		return sr.tier3LLM(ctx, query)
-
-	case RoutingModeEmbedding:
-		slog.Debug("semantic router: embedding-only mode", "query_len", len(query))
-		decision, matched, err := sr.tier2Embedding(ctx, query)
+		decision, err = sr.tier3LLM(ctx, query)
 		if err != nil {
 			return RoutingDecision{}, err
 		}
-		if matched {
-			return decision, nil
+
+	case RoutingModeEmbedding:
+		slog.Debug("semantic router: embedding-only mode", "query_len", len(query))
+		var matched bool
+		decision, matched, err = sr.tier2Embedding(ctx, query)
+		if err != nil {
+			return RoutingDecision{}, err
 		}
-		// No match and no LLM fallback in this mode — return low-confidence default.
-		return RoutingDecision{
-			Handler:    "llm-fast",
-			Provider:   "llm-fast",
-			Confidence: 0.0,
-			Category:   Factual,
-			Reasoning:  []string{"embedding-only mode: no route matched similarity threshold"},
-		}, nil
+		if !matched {
+			// No match and no LLM fallback in this mode — return low-confidence default.
+			decision = RoutingDecision{
+				Handler:    "llm-fast",
+				Provider:   "llm-fast",
+				Confidence: 0.0,
+				Category:   Factual,
+				Reasoning:  []string{"embedding-only mode: no route matched similarity threshold"},
+			}
+		}
 
 	default: // RoutingModeCascade
 		// Tier 1: deterministic fast-path.
-		if decision, matched := sr.tier1Deterministic(query); matched {
-			slog.Debug("semantic router: tier1 match", "handler", decision.Handler, "confidence", decision.Confidence)
-			return decision, nil
+		if d, matched := sr.tier1Deterministic(query); matched {
+			slog.Debug("semantic router: tier1 match", "handler", d.Handler, "confidence", d.Confidence)
+			d.Metadata = metadata
+			return d, nil
 		}
 
 		// Tier 2: embedding similarity.
-		decision, matched, err := sr.tier2Embedding(ctx, query)
+		var matched bool
+		decision, matched, err = sr.tier2Embedding(ctx, query)
 		if err != nil {
 			slog.Warn("semantic router: tier2 error, falling through to tier3", "error", err)
 		} else if matched {
+			if metadata["tool_origin"] != "" && decision.Handler == "specialist" {
+				decision.Confidence -= 0.15
+				decision.Reasoning = append(decision.Reasoning, "metadata: tool_origin penalty -0.15 applied to specialist_dispatch")
+			}
 			slog.Debug("semantic router: tier2 match", "handler", decision.Handler, "confidence", decision.Confidence)
+			decision.Metadata = metadata
 			return decision, nil
 		}
 
 		// Tier 3: LLM fallback.
 		slog.Debug("semantic router: falling through to tier3", "query_len", len(query))
-		return sr.tier3LLM(ctx, query)
+		decision, err = sr.tier3LLM(ctx, query)
+		if err != nil {
+			return RoutingDecision{}, err
+		}
 	}
+
+	decision.Metadata = metadata
+	return decision, nil
 }
 
 // tier1Deterministic handles trivially classifiable queries without any I/O.

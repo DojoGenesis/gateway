@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -71,7 +74,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: latest
+          version: v2.12.2
 
   docker:
     runs-on: ubuntu-latest
@@ -128,7 +131,10 @@ jobs:
 
       - name: Verify admin endpoints
         run: |
-          curl -sf http://localhost:7340/admin/metrics/prometheus || exit 1
+          # Admin routes require Bearer auth. In dev mode (no ENVIRONMENT=production),
+          # any token with the "admin-" prefix is accepted by AdminAuthMiddleware.
+          curl -sf http://localhost:7340/admin/metrics/prometheus \
+            -H "Authorization: Bearer admin-ci-test" || exit 1
 
       - name: Stop gateway
         if: always()

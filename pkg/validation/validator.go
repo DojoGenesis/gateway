@@ -236,13 +236,13 @@ func (v *Validator) buildSummary(passed bool, checkCount int, strategy string) s
 			"validation passed:",
 			strategy,
 			"strategy,",
-			strings.Join([]string{string(rune(checkCount + '0')), "checks"}, " "),
+			strings.Join([]string{string(rune(checkCount + '0')), "checks"}, " "), //nolint:gosec // G115: intentional ASCII digit conversion; checkCount is an internal counter bounded by the number of registered checks, not external input
 		}, " ")
 	}
 	return strings.Join([]string{
 		"validation failed:",
 		strategy,
 		"strategy,",
-		strings.Join([]string{string(rune(checkCount + '0')), "checks"}, " "),
+		strings.Join([]string{string(rune(checkCount + '0')), "checks"}, " "), //nolint:gosec // G115: intentional ASCII digit conversion; checkCount is an internal counter bounded by the number of registered checks, not external input
 	}, " ")
 }

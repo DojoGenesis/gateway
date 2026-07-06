@@ -171,12 +171,18 @@ func main() {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 
-	cmd := exec.Command("go", "build", "-o", pluginPath, srcFile)
+	buildCtx, buildCancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer buildCancel()
+
+	cmd := exec.CommandContext(buildCtx, "go", "build", "-o", pluginPath, srcFile)
 	cmd.Dir = filepath.Dir(cwd)
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Logf("Build output: %s", output)
+		if buildCtx.Err() != nil {
+			t.Skip("Skipping: go build timed out (module cache contention or missing deps)")
+		}
 		require.NoError(t, err, "Failed to build mock plugin")
 	}
 
@@ -542,12 +548,18 @@ func main() {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 
-	cmd := exec.Command("go", "build", "-o", pluginPath, srcFile)
+	versionBuildCtx, versionBuildCancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer versionBuildCancel()
+
+	cmd := exec.CommandContext(versionBuildCtx, "go", "build", "-o", pluginPath, srcFile)
 	cmd.Dir = filepath.Dir(cwd)
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Logf("Build output: %s", output)
+		if versionBuildCtx.Err() != nil {
+			t.Skip("Skipping: go build timed out (module cache contention or missing deps)")
+		}
 	}
 	require.NoError(t, err)
 

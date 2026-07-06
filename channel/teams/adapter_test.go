@@ -80,10 +80,10 @@ func jwksServerFor(t *testing.T, kid string, pub *rsa.PublicKey) *httptest.Serve
 
 	e := pub.E
 	eBytes := make([]byte, 4)
-	eBytes[0] = byte(e >> 24)
-	eBytes[1] = byte(e >> 16)
-	eBytes[2] = byte(e >> 8)
-	eBytes[3] = byte(e)
+	eBytes[0] = byte(e >> 24) //nolint:gosec // G115 -- bounded test input, RSA public exponent fits int
+	eBytes[1] = byte(e >> 16) //nolint:gosec // G115 -- bounded test input, RSA public exponent fits int
+	eBytes[2] = byte(e >> 8)  //nolint:gosec // G115 -- bounded test input, RSA public exponent fits int
+	eBytes[3] = byte(e) //nolint:gosec // G115 -- bounded test input, RSA public exponent fits int
 	// Trim leading zero bytes.
 	i := 0
 	for i < len(eBytes)-1 && eBytes[i] == 0 {

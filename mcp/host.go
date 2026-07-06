@@ -2,12 +2,24 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/DojoGenesis/gateway/pkg/gateway"
+)
+
+// Sentinel errors returned by MCPHostManager.CallTool. Callers should use
+// errors.Is to detect these, since CallTool wraps them with the server name.
+var (
+	// ErrServerNotFound is returned when the requested MCP server is not
+	// present in the host manager's connection set.
+	ErrServerNotFound = errors.New("mcp server not found")
+	// ErrServerUnhealthy is returned when the requested MCP server is known
+	// but its connection is not currently healthy.
+	ErrServerUnhealthy = errors.New("mcp server unhealthy")
 )
 
 // ServerStatus represents the health and status of an MCP server connection.
@@ -255,6 +267,32 @@ func (m *MCPHostManager) Status() map[string]ServerStatus {
 	}
 
 	return status
+}
+
+// CallTool invokes a tool on a specific MCP server connection directly,
+// bypassing the global tool registry's "prefix:toolname" key convention.
+// It looks up serverName in the connections map (using the same locking
+// pattern as Status()), verifies the connection is healthy, and delegates
+// to the connection's CallTool method.
+//
+// Returns a wrapped ErrServerNotFound if serverName has no connection, or a
+// wrapped ErrServerUnhealthy if the connection exists but is not currently
+// healthy. Callers should use errors.Is against ErrServerNotFound /
+// ErrServerUnhealthy to distinguish these cases from tool execution errors.
+func (m *MCPHostManager) CallTool(ctx context.Context, serverName string, toolName string, args map[string]interface{}) (map[string]interface{}, error) {
+	m.mu.RLock()
+	conn, exists := m.connections[serverName]
+	m.mu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("%w: %s", ErrServerNotFound, serverName)
+	}
+
+	if !conn.IsHealthy() {
+		return nil, fmt.Errorf("%w: %s", ErrServerUnhealthy, serverName)
+	}
+
+	return conn.CallTool(ctx, toolName, args)
 }
 
 // getNamespacePrefix returns the namespace prefix for a given server ID.

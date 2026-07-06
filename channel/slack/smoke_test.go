@@ -66,7 +66,7 @@ func TestSlackAdapter_Compliance(t *testing.T) {
 func TestSlack_EndToEnd_SmokeTest(t *testing.T) {
 	// Build the Slack adapter with a mock sender.
 	mock := &mockSlackSender{}
-	cfg := SlackConfig{
+	cfg := SlackConfig{ //nolint:gosec // G101 -- test fixture, not a real credential
 		BotToken:      "xoxb-smoke-test",
 		SigningSecret: testSigningSecret,
 		Mode:          "http",

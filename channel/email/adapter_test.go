@@ -21,7 +21,7 @@ import (
 
 // newAdapter returns a default EmailAdapter suitable for most tests.
 func newAdapter() *EmailAdapter {
-	return New(EmailConfig{
+	return New(EmailConfig{ //nolint:gosec // G101 -- test fixture, not a real credential
 		WebhookSecret:  "test-secret",
 		SendGridAPIKey: "SG.test-key",
 		FromAddress:    "bot@example.com",

@@ -244,6 +244,7 @@ func (s *Server) setupRoutes() {
 		// MCP server management
 		admin.GET("/mcp/servers", s.handleAdminMCPServers)
 		admin.GET("/mcp/status", s.handleAdminMCPStatus)
+		admin.POST("/mcp/tools/invoke", s.handleAdminInvokeMCPTool)
 
 		// Cost aggregation
 		admin.GET("/costs", s.handleAdminCosts)

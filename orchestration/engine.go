@@ -68,12 +68,15 @@ type ToolHealthMetrics struct {
 
 // Engine is the DAG-based orchestration engine that executes plans
 // with auto-replanning, circuit breakers, and cost estimation.
+//
+// Engine is safe for concurrent Execute calls. The event emitter is supplied
+// per-Execute invocation (see Execute) rather than stored on the struct, so
+// parallel orchestrations never clobber each other's event stream.
 type Engine struct {
 	config          *EngineConfig
 	planner         PlannerInterface
 	toolInvoker     ToolInvokerInterface
 	traceLogger     TraceLoggerInterface
-	eventEmitter    EventEmitterInterface
 	budgetTracker   BudgetTrackerInterface
 	disposition     *disposition.DispositionConfig
 	mu              sync.RWMutex
@@ -93,18 +96,13 @@ func WithDisposition(disp *disposition.DispositionConfig) EngineOption {
 	}
 }
 
-// SetEventEmitter replaces the engine's event emitter at runtime.
-// Deprecated: Pass the emitter directly to Execute() instead.
-// Kept for backward compatibility only. Not safe for concurrent Execute calls
-// on the same engine instance.
-func (e *Engine) SetEventEmitter(emitter EventEmitterInterface) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.eventEmitter = emitter
-}
-
 // NewEngine creates a new orchestration engine.
-// traceLogger, eventEmitter, and budgetTracker are optional (can be nil).
+// traceLogger and budgetTracker are optional (can be nil).
+//
+// The eventEmitter parameter is retained for call-site backward compatibility
+// but is intentionally ignored: emitters must be supplied per-Execute to avoid
+// the cross-orchestration race surfaced by the previous SetEventEmitter API
+// (see ADR-022 P0). Callers should pass nil for this parameter.
 func NewEngine(
 	config *EngineConfig,
 	planner PlannerInterface,
@@ -114,6 +112,8 @@ func NewEngine(
 	budgetTracker BudgetTrackerInterface,
 	opts ...EngineOption,
 ) *Engine {
+	_ = eventEmitter // intentionally unused — pass emitter per-Execute instead
+
 	if config == nil {
 		config = DefaultEngineConfig()
 	}
@@ -123,7 +123,6 @@ func NewEngine(
 		planner:         planner,
 		toolInvoker:     toolInvoker,
 		traceLogger:     traceLogger,
-		eventEmitter:    eventEmitter,
 		budgetTracker:   budgetTracker,
 		disposition:     disposition.DefaultDisposition(),
 		circuitBreakers: make(map[string]*circuitBreakerState),

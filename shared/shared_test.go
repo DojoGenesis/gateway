@@ -210,7 +210,7 @@ func TestProviderConfig_JSONRoundTrip(t *testing.T) {
 		Endpoint:    "https://api.anthropic.com",
 	}
 
-	data, err := json.Marshal(cfg)
+	data, err := json.Marshal(cfg) //nolint:gosec // G117: test fixture with no real API key — APIKey field is empty, cfg contains only public metadata for round-trip verification
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}

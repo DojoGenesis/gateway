@@ -188,7 +188,7 @@ func (pa *PrimaryAgent) EnableOrchestration(enabled bool) {
 // NOTE: userID parameter is reserved for post-v1 user-based routing implementation.
 // Currently unused, but will enable routing between guest (ollama) and
 // authenticated users (cloud providers) based on tier and budget.
-func (pa *PrimaryAgent) HandleQuery(ctx context.Context, query string, providerName string, modelID string, userID string) (*Response, error) {
+func (pa *PrimaryAgent) HandleQuery(ctx context.Context, query string, providerName string, modelID string, userID string, systemPromptOverride string) (*Response, error) {
 	if providerName == "" {
 		providerName = pa.defaultProvider
 	}
@@ -202,6 +202,9 @@ func (pa *PrimaryAgent) HandleQuery(ctx context.Context, query string, providerN
 	defer cancel()
 
 	systemPrompt := resolveBaseSystemPrompt()
+	if systemPromptOverride != "" {
+		systemPrompt = systemPromptOverride
+	}
 
 	messages := []providerpkg.Message{
 		{

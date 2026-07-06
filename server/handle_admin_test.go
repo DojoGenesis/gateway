@@ -31,6 +31,10 @@ func (m *mockMCPHostManager) Stop(ctx context.Context) error {
 	return nil
 }
 
+func (m *mockMCPHostManager) CallTool(ctx context.Context, serverName string, toolName string, args map[string]interface{}) (map[string]interface{}, error) {
+	return nil, nil
+}
+
 func TestHandleAdminMCPStatus_NoMCPHost(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

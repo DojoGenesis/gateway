@@ -1,6 +1,8 @@
 # Handoff: Gateway Production Deployment Orchestration
 **From:** Sonnet (build session) | **To:** Opus | **Date:** 2026-04-11
 
+**Status:** DEFERRED 2026-06-14 — NOT deployed (corrects a wrong 2026-06-13 SETTLED marker; conflated gateway.trespies.dev with this handoff's target). Adversarial verification 2026-06-14: `bridge.trespiesdesign.com/health` → 404; `deployments/prod/cloudflared/config.yaml` still has the `<TUNNEL-UUID>` placeholder (Phase 3 never completed); phases 1–8 (VPS provision/bootstrap/tunnel/file-deploy/secrets/first-deploy/Slack-reconnect/CI-verify) show no execution evidence in-repo. Confirmed DONE only: deploy CI workflow present + `go build ./...` clean. UNBLOCK (operator/secrets): provision the Hetzner VPS, `cloudflared tunnel create` (replace the UUID placeholder), set the GitHub deploy secrets — then run the first deploy + verify, OR confirm the stack already runs elsewhere and record where.
+
 ## Objective
 
 > Execute the five-phase production deployment of the Dojo Agentic Gateway stack to a Hetzner VPS with Named Cloudflare Tunnel, so that `bridge.trespiesdesign.com` is live, the Slack adapter is connected via Infisical, and every subsequent push to `main` auto-deploys via GitHub Actions.

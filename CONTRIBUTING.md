@@ -14,8 +14,8 @@ Thank you for your interest in contributing to the Agentic Gateway! This guide w
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/dojogenesis/agentic-gateway.git
-   cd agentic-gateway
+   git clone https://github.com/DojoGenesis/gateway.git
+   cd gateway
    ```
 
 2. **Download dependencies:**
@@ -33,11 +33,11 @@ Thank you for your interest in contributing to the Agentic Gateway! This guide w
    ```bash
    ./bin/agentic-gateway
    ```
-   The gateway will start on `http://localhost:8080` by default.
+   The gateway will start on `http://localhost:7340` by default.
 
 5. **Verify the health endpoint:**
    ```bash
-   curl http://localhost:8080/health
+   curl http://localhost:7340/health
    ```
 
 ## Testing
@@ -153,7 +153,7 @@ make docker-compose-up
 ```
 
 Access:
-- Gateway: `http://localhost:8080`
+- Gateway: `http://localhost:7340`
 - Langfuse: `http://localhost:3000`
 - OTEL Collector: `localhost:4317` (gRPC)
 
