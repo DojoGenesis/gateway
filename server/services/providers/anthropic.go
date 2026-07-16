@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/DojoGenesis/gateway/provider"
 )
@@ -16,11 +15,33 @@ type AnthropicProvider struct {
 }
 
 // modelSupportsTemperature reports whether the given Anthropic model accepts the
-// `temperature` request parameter. Fable-class models deprecated it — Anthropic
-// returns 400 "temperature is deprecated for this model" — so it must be omitted
-// for them. Denylist by prefix; extend as new models drop the parameter.
+// `temperature` request parameter. Anthropic deprecated `temperature` for its
+// newest models — the Claude 5 family (Fable 5, Sonnet 5) and Opus 4.7/4.8 —
+// returning 400 "temperature is deprecated for this model" when it is sent, and
+// each newer model has continued to drop it. Because "newer model → temperature
+// unsupported" is now the trend, this is an ALLOWLIST, not a denylist: only
+// models verified to still accept temperature return true; every other model
+// (newer or unknown) omits it and fails safe — using Anthropic's server-side
+// default — instead of returning a hard 400 that makes the model unusable.
+// Add a model here only once it is confirmed to accept temperature.
+// See ADR 028 model-update runbook.
+//
+// Verified 2026-07-16 against live api.anthropic.com via this gateway:
+//   accept temperature: opus-4-6, sonnet-4-6, haiku-4-5
+//   reject  temperature: fable-5, sonnet-5, opus-4-7, opus-4-8
 func modelSupportsTemperature(model string) bool {
-	return !strings.HasPrefix(model, "claude-fable")
+	switch model {
+	case "claude-opus-4-6",
+		"claude-sonnet-4-6",
+		"claude-haiku-4-5",
+		// Date-stamped legacy pins, kept for callers that request them by pin.
+		"claude-opus-4-20250514",
+		"claude-sonnet-4-20250514",
+		"claude-haiku-4-20250414":
+		return true
+	default:
+		return false
+	}
 }
 
 func NewAnthropicProvider(apiKey string) *AnthropicProvider {
@@ -59,6 +80,7 @@ func (p *AnthropicProvider) ListModels(ctx context.Context) ([]provider.ModelInf
 		{ID: "claude-opus-4-8", Name: "Claude Opus 4.8", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
 		{ID: "claude-opus-4-7", Name: "Claude Opus 4.7", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
 		{ID: "claude-opus-4-6", Name: "Claude Opus 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
+		{ID: "claude-sonnet-5", Name: "Claude Sonnet 5", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
 		{ID: "claude-sonnet-4-6", Name: "Claude Sonnet 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
 		{ID: "claude-haiku-4-5", Name: "Claude Haiku 4.5", Provider: "anthropic", ContextSize: 200000, Cost: 0.25},
 		// ── Frontier / security tier (NOT YET GA) ──────────────────────────────────
