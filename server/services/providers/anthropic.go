@@ -12,6 +12,7 @@ import (
 
 type AnthropicProvider struct {
 	BaseProvider
+	modelCache modelCache
 }
 
 // modelSupportsTemperature reports whether the given Anthropic model accepts the
@@ -27,8 +28,9 @@ type AnthropicProvider struct {
 // See ADR 028 model-update runbook.
 //
 // Verified 2026-07-16 against live api.anthropic.com via this gateway:
-//   accept temperature: opus-4-6, sonnet-4-6, haiku-4-5
-//   reject  temperature: fable-5, sonnet-5, opus-4-7, opus-4-8
+//
+//	accept temperature: opus-4-6, sonnet-4-6, haiku-4-5
+//	reject  temperature: fable-5, sonnet-5, opus-4-7, opus-4-8
 func modelSupportsTemperature(model string) bool {
 	switch model {
 	case "claude-opus-4-6",
@@ -67,30 +69,38 @@ func (p *AnthropicProvider) GetInfo(ctx context.Context) (*provider.ProviderInfo
 	}, nil
 }
 
+// ListModels returns Anthropic's live catalog (GET /v1/models, cached), falling
+// back to anthropicStaticModels when the endpoint is unreachable.
 func (p *AnthropicProvider) ListModels(ctx context.Context) ([]provider.ModelInfo, error) {
-	return []provider.ModelInfo{
-		// Canonical date-stamped IDs (stable, always-resolvable pins)
-		{ID: "claude-sonnet-4-20250514", Name: "Claude Sonnet 4", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
-		{ID: "claude-haiku-4-20250414", Name: "Claude Haiku 4", Provider: "anthropic", ContextSize: 200000, Cost: 0.25},
-		{ID: "claude-opus-4-20250514", Name: "Claude Opus 4", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
-		// Short-form aliases users actually type (routed to the Anthropic API, which resolves them).
-		// Newest-first. When Anthropic ships a new model, add its alias at the top of its family.
-		// This list is one of the surfaces the model-update runbook covers (ADR 028).
-		{ID: "claude-fable-5", Name: "Claude Fable 5", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
-		{ID: "claude-opus-4-8", Name: "Claude Opus 4.8", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
-		{ID: "claude-opus-4-7", Name: "Claude Opus 4.7", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
-		{ID: "claude-opus-4-6", Name: "Claude Opus 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
-		{ID: "claude-sonnet-5", Name: "Claude Sonnet 5", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
-		{ID: "claude-sonnet-4-6", Name: "Claude Sonnet 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
-		{ID: "claude-haiku-4-5", Name: "Claude Haiku 4.5", Provider: "anthropic", ContextSize: 200000, Cost: 0.25},
-		// ── Frontier / security tier (NOT YET GA) ──────────────────────────────────
-		// Claude Mythos Preview is gated to Project Glasswing (critical-infra cyber) and
-		// has NO public API model ID — it cannot be added here. Anthropic plans to fold
-		// Mythos-class capability into a future public Claude Opus behind safeguards.
-		// When that ships, uncomment + set the real alias below (newest-first above): that
-		// one line is the entire Gateway-side adopt step. See ADR 028 + the model-update runbook.
-		// {ID: "claude-opus-<NEXT>", Name: "Claude Opus <NEXT> (Mythos-class)", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
-	}, nil
+	return listModelsDynamic(ctx, &p.modelCache, anthropicStaticModels, func(ctx context.Context) ([]provider.ModelInfo, error) {
+		return fetchAnthropicModels(ctx, &p.BaseProvider)
+	}), nil
+}
+
+// anthropicStaticModels is the curated fallback catalog, used only when the live
+// /v1/models endpoint is unreachable. Newest-first within each family.
+var anthropicStaticModels = []provider.ModelInfo{
+	// Canonical date-stamped IDs (stable, always-resolvable pins)
+	{ID: "claude-sonnet-4-20250514", Name: "Claude Sonnet 4", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
+	{ID: "claude-haiku-4-20250414", Name: "Claude Haiku 4", Provider: "anthropic", ContextSize: 200000, Cost: 0.25},
+	{ID: "claude-opus-4-20250514", Name: "Claude Opus 4", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
+	// Short-form aliases users actually type (routed to the Anthropic API, which resolves them).
+	// Newest-first. When Anthropic ships a new model, add its alias at the top of its family.
+	// This list is one of the surfaces the model-update runbook covers (ADR 028).
+	{ID: "claude-fable-5", Name: "Claude Fable 5", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
+	{ID: "claude-opus-4-8", Name: "Claude Opus 4.8", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
+	{ID: "claude-opus-4-7", Name: "Claude Opus 4.7", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
+	{ID: "claude-opus-4-6", Name: "Claude Opus 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
+	{ID: "claude-sonnet-5", Name: "Claude Sonnet 5", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
+	{ID: "claude-sonnet-4-6", Name: "Claude Sonnet 4.6", Provider: "anthropic", ContextSize: 200000, Cost: 3.0},
+	{ID: "claude-haiku-4-5", Name: "Claude Haiku 4.5", Provider: "anthropic", ContextSize: 200000, Cost: 0.25},
+	// ── Frontier / security tier (NOT YET GA) ──────────────────────────────────
+	// Claude Mythos Preview is gated to Project Glasswing (critical-infra cyber) and
+	// has NO public API model ID — it cannot be added here. Anthropic plans to fold
+	// Mythos-class capability into a future public Claude Opus behind safeguards.
+	// When that ships, uncomment + set the real alias below (newest-first above): that
+	// one line is the entire Gateway-side adopt step. See ADR 028 + the model-update runbook.
+	// {ID: "claude-opus-<NEXT>", Name: "Claude Opus <NEXT> (Mythos-class)", Provider: "anthropic", ContextSize: 200000, Cost: 15.0},
 }
 
 // anthropicRequest is the Anthropic Messages API request format.

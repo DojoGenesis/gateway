@@ -1151,6 +1151,7 @@ func (s *Server) hotRegisterProvider(name, apiKey string) {
 		"mistral":      func(k string) provider.ModelProvider { return providers.NewMistralProvider(k) },
 		"deepseek-api": func(k string) provider.ModelProvider { return providers.NewDeepSeekProvider(k) },
 		"kimi":         func(k string) provider.ModelProvider { return providers.NewKimiProvider(k) },
+		"openrouter":   func(k string) provider.ModelProvider { return providers.NewOpenRouterProvider(k) },
 	}
 
 	// If already registered, update the key directly via BaseProvider.

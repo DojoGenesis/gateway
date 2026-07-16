@@ -15,7 +15,8 @@ import (
 type openaiCompatibleProvider struct {
 	BaseProvider
 	defaultModel string
-	models       []provider.ModelInfo
+	models       []provider.ModelInfo // static fallback; live /models is authoritative
+	modelCache   modelCache
 	info         *provider.ProviderInfo
 }
 
@@ -91,8 +92,13 @@ func (p *openaiCompatibleProvider) GetInfo(ctx context.Context) (*provider.Provi
 	return p.info, nil
 }
 
+// ListModels returns the provider's live model catalog (fetched from GET
+// /models, cached for modelCacheTTL), falling back to the curated static list
+// when the endpoint is unreachable. See listModelsDynamic.
 func (p *openaiCompatibleProvider) ListModels(ctx context.Context) ([]provider.ModelInfo, error) {
-	return p.models, nil
+	return listModelsDynamic(ctx, &p.modelCache, p.models, func(ctx context.Context) ([]provider.ModelInfo, error) {
+		return fetchOpenAIFormatModels(ctx, &p.BaseProvider)
+	}), nil
 }
 
 func (p *openaiCompatibleProvider) GenerateCompletion(ctx context.Context, req *provider.CompletionRequest) (*provider.CompletionResponse, error) {

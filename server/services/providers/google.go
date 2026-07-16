@@ -15,6 +15,7 @@ import (
 // Uses query parameter authentication and a custom message format (contents/parts).
 type GoogleProvider struct {
 	BaseProvider
+	modelCache modelCache
 }
 
 func NewGoogleProvider(apiKey string) *GoogleProvider {
@@ -38,21 +39,32 @@ func (p *GoogleProvider) GetInfo(ctx context.Context) (*provider.ProviderInfo, e
 	}, nil
 }
 
+// ListModels returns Gemini's live catalog (GET /models?key=, filtered to models
+// that support generateContent, cached), falling back to googleStaticModels when
+// the endpoint is unreachable.
 func (p *GoogleProvider) ListModels(ctx context.Context) ([]provider.ModelInfo, error) {
-	return []provider.ModelInfo{
-		{ID: "gemini-2.0-flash", Name: "Gemini 2.0 Flash", Provider: "google", ContextSize: 1048576, Cost: 0.10},
-		{ID: "gemini-2.0-pro", Name: "Gemini 2.0 Pro", Provider: "google", ContextSize: 2097152, Cost: 1.25},
-		{ID: "gemini-1.5-flash", Name: "Gemini 1.5 Flash", Provider: "google", ContextSize: 1048576, Cost: 0.075},
-	}, nil
+	return listModelsDynamic(ctx, &p.modelCache, googleStaticModels, func(ctx context.Context) ([]provider.ModelInfo, error) {
+		return fetchGoogleModels(ctx, &p.BaseProvider)
+	}), nil
+}
+
+// googleStaticModels is the curated fallback catalog, used only when the live
+// /models endpoint is unreachable.
+var googleStaticModels = []provider.ModelInfo{
+	// Durable rolling aliases (won't 404 as dated snapshots retire); used only
+	// when the live /models fetch is unreachable.
+	{ID: "gemini-flash-latest", Name: "Gemini Flash (latest)", Provider: "google", ContextSize: 1048576, Cost: 0.10},
+	{ID: "gemini-pro-latest", Name: "Gemini Pro (latest)", Provider: "google", ContextSize: 2097152, Cost: 1.25},
+	{ID: "gemini-flash-lite-latest", Name: "Gemini Flash Lite (latest)", Provider: "google", ContextSize: 1048576, Cost: 0.075},
 }
 
 // --- Gemini API types ---
 
 type geminiRequest struct {
-	Contents         []geminiContent        `json:"contents"`
-	GenerationConfig *geminiGenerationCfg   `json:"generationConfig,omitempty"`
-	Tools            []geminiToolDecl       `json:"tools,omitempty"`
-	SystemInstruction *geminiContent        `json:"systemInstruction,omitempty"`
+	Contents          []geminiContent      `json:"contents"`
+	GenerationConfig  *geminiGenerationCfg `json:"generationConfig,omitempty"`
+	Tools             []geminiToolDecl     `json:"tools,omitempty"`
+	SystemInstruction *geminiContent       `json:"systemInstruction,omitempty"`
 }
 
 type geminiContent struct {
@@ -95,7 +107,7 @@ type geminiResponse struct {
 	Candidates []struct {
 		Content struct {
 			Parts []geminiPart `json:"parts"`
-			Role  string      `json:"role"`
+			Role  string       `json:"role"`
 		} `json:"content"`
 		FinishReason string `json:"finishReason"`
 	} `json:"candidates"`
@@ -148,7 +160,7 @@ func (p *GoogleProvider) doGeminiRequest(ctx context.Context, method, url string
 func (p *GoogleProvider) GenerateCompletion(ctx context.Context, req *provider.CompletionRequest) (*provider.CompletionResponse, error) {
 	model := req.Model
 	if model == "" {
-		model = "gemini-2.0-flash"
+		model = "gemini-flash-latest"
 	}
 
 	gReq := p.buildGeminiRequest(req)
@@ -173,7 +185,7 @@ func (p *GoogleProvider) GenerateCompletion(ctx context.Context, req *provider.C
 func (p *GoogleProvider) GenerateCompletionStream(ctx context.Context, req *provider.CompletionRequest) (<-chan *provider.CompletionChunk, error) {
 	model := req.Model
 	if model == "" {
-		model = "gemini-2.0-flash"
+		model = "gemini-flash-latest"
 	}
 
 	gReq := p.buildGeminiRequest(req)
