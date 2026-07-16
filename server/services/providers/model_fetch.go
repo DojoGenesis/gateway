@@ -128,7 +128,7 @@ func fetchOpenAIFormatModels(ctx context.Context, b *BaseProvider) ([]provider.M
 	}
 	models := make([]provider.ModelInfo, 0, len(out.Data))
 	for _, m := range out.Data {
-		if m.ID == "" {
+		if m.ID == "" || isNonChatModel(m.ID) {
 			continue
 		}
 		name := m.Name
@@ -140,6 +140,24 @@ func fetchOpenAIFormatModels(ctx context.Context, b *BaseProvider) ([]provider.M
 		})
 	}
 	return models, nil
+}
+
+// isNonChatModel reports whether an OpenAI-format model ID names a non-chat
+// model — embeddings, audio (TTS/transcription), images, moderation, the legacy
+// base-completion models, or the realtime API — none of which serve
+// /chat/completions. A chat gateway's model list should not advertise them.
+// Applies across the OpenAI-compatible family (OpenAI, Groq's whisper, etc.).
+func isNonChatModel(id string) bool {
+	lid := strings.ToLower(id)
+	for _, marker := range []string{
+		"embedding", "tts", "whisper", "transcribe", "dall-e",
+		"moderation", "davinci", "babbage", "gpt-image", "-realtime",
+	} {
+		if strings.Contains(lid, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // --- Anthropic /v1/models fetcher ----------------------------------------------

@@ -8,6 +8,31 @@ import (
 	"github.com/DojoGenesis/gateway/provider"
 )
 
+func TestIsNonChatModel(t *testing.T) {
+	nonChat := []string{
+		"text-embedding-3-small", "text-embedding-ada-002", "whisper-1",
+		"tts-1", "gpt-4o-mini-tts", "gpt-4o-transcribe", "dall-e-3",
+		"omni-moderation-latest", "davinci-002", "babbage-002",
+		"gpt-image-1", "gpt-4o-realtime-preview",
+	}
+	chat := []string{
+		"gpt-4o", "gpt-4.1", "o3", "o4-mini", "o1-pro", "gpt-4o-mini",
+		"gpt-4o-mini-search-preview", // search IS chat-capable
+		"llama-3.3-70b-versatile", "deepseek-chat", "kimi-k2.5",
+		"openai/gpt-4o", "anthropic/claude-sonnet-4.5",
+	}
+	for _, id := range nonChat {
+		if !isNonChatModel(id) {
+			t.Errorf("isNonChatModel(%q) = false, want true (should be filtered out)", id)
+		}
+	}
+	for _, id := range chat {
+		if isNonChatModel(id) {
+			t.Errorf("isNonChatModel(%q) = true, want false (a chat model was filtered out)", id)
+		}
+	}
+}
+
 func TestListModelsDynamic_FallsBackToStaticOnError(t *testing.T) {
 	static := []provider.ModelInfo{{ID: "static-1", Provider: "x"}}
 	var cache modelCache
