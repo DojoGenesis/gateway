@@ -30,7 +30,7 @@ curl -X POST http://localhost:7340/v1/chat/completions \
 
 ## Architecture
 
-148K lines of Go across 19 independently-versioned modules in a Go workspace (`go.work`). Each module has its own `go.mod` and can be versioned, tested, and imported independently.
+152K lines of Go across 19 independently-versioned modules in a Go workspace (`go.work`). Each module has its own `go.mod` and can be versioned, tested, and imported independently.
 
 ```
                         ┌─────────────────────────────┐
