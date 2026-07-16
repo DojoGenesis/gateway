@@ -44,6 +44,7 @@ func RegisterProviders(
 		{"deepseek-api", func(k string) provider.ModelProvider { return providers.NewDeepSeekProvider(k) }, "DEEPSEEK_API_KEY"},
 		{"kimi", func(k string) provider.ModelProvider { return providers.NewKimiProvider(k) }, "KIMI_API_KEY"},
 		{"openrouter", func(k string) provider.ModelProvider { return providers.NewOpenRouterProvider(k) }, "OPENROUTER_API_KEY"},
+		{"ollama-cloud", func(k string) provider.ModelProvider { return providers.NewOllamaCloudProvider(k) }, "OLLAMA_CLOUD_API_KEY"},
 		{"voyage", func(k string) provider.ModelProvider { return providers.NewVoyageProvider(k) }, "VOYAGE_API_KEY"},
 	}
 
