@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -452,4 +453,239 @@ func TestMemoryManagerDB(t *testing.T) {
 	defer mm.Close()
 	db := mm.DB()
 	assert.NotNil(t, db)
+}
+
+// TestSearchMemories_TokenBased reproduces the live defect (a substring-only
+// `content LIKE '%query%'` search contracted as semantic) using the exact shape of
+// the real-world entry that surfaced it: an IP-strategy decision whose words are
+// all present but never contiguous the way a natural-language question phrases
+// them.
+func TestSearchMemories_TokenBased(t *testing.T) {
+	mm, _ := setupTestDB(t)
+	defer mm.Close()
+	ctx := context.Background()
+
+	tradeSecret := &Memory{
+		ID:   "trade-secret-decision",
+		Type: "general",
+		Content: "DECISION 2026-07-01 (IP strategy - LOCKED default): ALL TresPies software IP is kept " +
+			"as a TRADE SECRET by default, until it is either deliberately open-sourced or patented.",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	require.NoError(t, mm.StoreMemory(ctx, tradeSecret))
+
+	unrelated := &Memory{
+		ID:        "unrelated",
+		Type:      "general",
+		Content:   "Reminder: renew the domain registration before it expires next month.",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	require.NoError(t, mm.StoreMemory(ctx, unrelated))
+
+	t.Run("exact substring still matches (regression guard)", func(t *testing.T) {
+		results, err := mm.SearchMemories(ctx, "trade secret", 10)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, "trade-secret-decision", results[0].Memory.ID)
+	})
+
+	t.Run("exact substring match is case-insensitive", func(t *testing.T) {
+		results, err := mm.SearchMemories(ctx, "TRADE", 10)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, "trade-secret-decision", results[0].Memory.ID)
+
+		results, err = mm.SearchMemories(ctx, "trade secret", 10)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, "trade-secret-decision", results[0].Memory.ID)
+	})
+
+	t.Run("natural language query matches scattered tokens (the reported bug)", func(t *testing.T) {
+		// None of these words are contiguous in the stored content in this
+		// order -- the old `content LIKE '%query%'` implementation returned
+		// zero hits for exactly this query against exactly this content.
+		results, err := mm.SearchMemories(ctx, "IP strategy trade secret locked default", 10)
+		require.NoError(t, err)
+		require.NotEmpty(t, results, "natural-language query should match despite no contiguous phrase match")
+		assert.Equal(t, "trade-secret-decision", results[0].Memory.ID, "the fully-covered entry should rank first")
+		assert.Greater(t, results[0].Similarity, 0.0, "RelevanceScore/Similarity must no longer be hardcoded to zero")
+	})
+
+	t.Run("unrelated content is never returned for trade-secret queries", func(t *testing.T) {
+		results, err := mm.SearchMemories(ctx, "IP strategy trade secret locked default", 10)
+		require.NoError(t, err)
+		for _, r := range results {
+			assert.NotEqual(t, "unrelated", r.Memory.ID)
+		}
+	})
+
+	t.Run("query with zero lexical overlap still misses (semantic gap, by design)", func(t *testing.T) {
+		// "intellectual property" shares no substring with "IP" in the stored
+		// text. Token matching is still exact/lexical, not semantic --
+		// closing this specific gap needs embeddings, which this codebase
+		// does not have and which are explicitly out of scope for this fix.
+		results, err := mm.SearchMemories(ctx, "intellectual property", 10)
+		require.NoError(t, err)
+		assert.Empty(t, results)
+	})
+
+	t.Run("partial token overlap still matches, ranked below full coverage", func(t *testing.T) {
+		// A single shared token ("default") is present in the trade-secret
+		// entry; requiring the whole phrase (old behavior) or zero tokens
+		// (a no-op search) are the two failure modes this guards against.
+		results, err := mm.SearchMemories(ctx, "default", 10)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, "trade-secret-decision", results[0].Memory.ID)
+	})
+}
+
+func TestCountMemories(t *testing.T) {
+	mm, _ := setupTestDB(t)
+	defer mm.Close()
+	ctx := context.Background()
+
+	now := time.Now()
+	for i := 0; i < 5; i++ {
+		mem := &Memory{
+			ID:          fmt.Sprintf("count-%d", i),
+			Type:        "conversation",
+			Content:     fmt.Sprintf("entry %d", i),
+			ContextType: "session",
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		require.NoError(t, mm.StoreMemory(ctx, mem))
+	}
+
+	t.Run("true total ignores limit (the reported list-total bug)", func(t *testing.T) {
+		// GET /v1/memory's TotalCount used to equal len(page): a caller
+		// listing with limit=2 saw TotalCount=2 even though the store held
+		// 5, indistinguishable from "there are only 2 memories total".
+		page, err := mm.ListMemories(ctx, MemoryFilter{Limit: 2})
+		require.NoError(t, err)
+		require.Len(t, page, 2)
+
+		total, err := mm.CountMemories(ctx, MemoryFilter{})
+		require.NoError(t, err)
+		assert.Equal(t, 5, total)
+		assert.NotEqual(t, len(page), total, "total must not silently equal the page size")
+	})
+
+	t.Run("total respects filter predicates", func(t *testing.T) {
+		total, err := mm.CountMemories(ctx, MemoryFilter{ContextType: "session"})
+		require.NoError(t, err)
+		assert.Equal(t, 5, total)
+
+		total, err = mm.CountMemories(ctx, MemoryFilter{ContextType: "nonexistent"})
+		require.NoError(t, err)
+		assert.Equal(t, 0, total)
+	})
+}
+
+func TestListMemories_Offset(t *testing.T) {
+	mm, _ := setupTestDB(t)
+	defer mm.Close()
+	ctx := context.Background()
+
+	base := time.Now()
+	ids := []string{"o0", "o1", "o2", "o3", "o4"}
+	for i, id := range ids {
+		mem := &Memory{
+			ID:        id,
+			Type:      "conversation",
+			Content:   "offset test " + id,
+			CreatedAt: base.Add(time.Duration(i) * time.Second),
+			UpdatedAt: base.Add(time.Duration(i) * time.Second),
+		}
+		require.NoError(t, mm.StoreMemory(ctx, mem))
+	}
+
+	t.Run("offset actually skips rows instead of being echoed and ignored", func(t *testing.T) {
+		firstPage, err := mm.ListMemories(ctx, MemoryFilter{Limit: 2, Offset: 0})
+		require.NoError(t, err)
+		require.Len(t, firstPage, 2)
+
+		secondPage, err := mm.ListMemories(ctx, MemoryFilter{Limit: 2, Offset: 2})
+		require.NoError(t, err)
+		require.Len(t, secondPage, 2)
+
+		assert.NotEqual(t, firstPage[0].ID, secondPage[0].ID)
+		assert.NotEqual(t, firstPage[1].ID, secondPage[0].ID)
+		assert.NotEqual(t, firstPage[0].ID, secondPage[1].ID)
+	})
+
+	t.Run("offset past the end returns empty, not an error", func(t *testing.T) {
+		page, err := mm.ListMemories(ctx, MemoryFilter{Limit: 2, Offset: 100})
+		require.NoError(t, err)
+		assert.Empty(t, page)
+	})
+}
+
+func TestSearchMemoriesPage(t *testing.T) {
+	mm, _ := setupTestDB(t)
+	defer mm.Close()
+	ctx := context.Background()
+
+	for i := 0; i < 3; i++ {
+		mem := &Memory{
+			ID:        fmt.Sprintf("page-%d", i),
+			Type:      "conversation",
+			Content:   "golang tips and tricks",
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		require.NoError(t, mm.StoreMemory(ctx, mem))
+	}
+
+	t.Run("total reflects all matches, not just the page", func(t *testing.T) {
+		page, total, err := mm.SearchMemoriesPage(ctx, "golang", 1, 0)
+		require.NoError(t, err)
+		assert.Len(t, page, 1)
+		assert.Equal(t, 3, total)
+	})
+
+	t.Run("offset pages through matches without gaps or repeats", func(t *testing.T) {
+		seen := make(map[string]bool)
+		for offset := 0; offset < 3; offset++ {
+			page, total, err := mm.SearchMemoriesPage(ctx, "golang", 1, offset)
+			require.NoError(t, err)
+			require.Len(t, page, 1)
+			assert.Equal(t, 3, total)
+			seen[page[0].Memory.ID] = true
+		}
+		assert.Len(t, seen, 3, "each offset should surface a distinct entry")
+	})
+
+	t.Run("empty query behaves like plain listing", func(t *testing.T) {
+		page, total, err := mm.SearchMemoriesPage(ctx, "", 2, 0)
+		require.NoError(t, err)
+		assert.Len(t, page, 2)
+		assert.Equal(t, 3, total)
+	})
+}
+
+func TestTokenizeQuery(t *testing.T) {
+	t.Run("splits on punctuation and whitespace", func(t *testing.T) {
+		tokens := tokenizeQuery("IP strategy, trade-secret! locked_default")
+		assert.Equal(t, []string{"ip", "strategy", "trade", "secret", "locked", "default"}, tokens)
+	})
+
+	t.Run("lowercases", func(t *testing.T) {
+		tokens := tokenizeQuery("TRADE Secret")
+		assert.Equal(t, []string{"trade", "secret"}, tokens)
+	})
+
+	t.Run("de-duplicates repeated words", func(t *testing.T) {
+		tokens := tokenizeQuery("golang golang programming")
+		assert.Equal(t, []string{"golang", "programming"}, tokens)
+	})
+
+	t.Run("empty or punctuation-only query yields no tokens", func(t *testing.T) {
+		assert.Empty(t, tokenizeQuery("   "))
+		assert.Empty(t, tokenizeQuery("..."))
+	})
 }

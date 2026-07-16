@@ -80,6 +80,7 @@ type MemoryFilter struct {
 	ContextType  string
 	CreatedAfter *time.Time
 	Limit        int
+	Offset       int
 }
 
 // SeedFilter specifies criteria for listing seeds.

@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	_ "modernc.org/sqlite"
 )
@@ -260,46 +262,189 @@ func (m *MemoryManager) DeleteMemory(ctx context.Context, id string) error {
 	return nil
 }
 
-// SearchMemories searches memories by content (text-based).
+// SearchMemories performs a case-insensitive, token-based relevance search over
+// memory content and returns up to limit results, best match first.
+//
+// This intentionally does NOT require the query to appear as one contiguous
+// substring of the stored content -- it is instead a bag-of-tokens match (see
+// rankedSearch), which is what lets a natural-language query like "IP strategy
+// trade secret locked default" match content where those words appear scattered
+// rather than in that exact order. An exact substring match of the whole query is
+// still recognized and ranked first, so single-word/phrase lookups like "trade
+// secret" keep behaving exactly as before.
+//
+// It does not do semantic/embedding matching: a query like "intellectual property"
+// will not match content that only ever spells it "IP" -- there is no embedding
+// infrastructure in this codebase, and adding one is out of scope for this fix.
 func (m *MemoryManager) SearchMemories(ctx context.Context, query string, limit int) ([]SearchResult, error) {
+	results, _, err := m.SearchMemoriesPage(ctx, query, limit, 0)
+	return results, err
+}
+
+// SearchMemoriesPage is SearchMemories with limit/offset paging, additionally
+// returning the true number of matches *before* paging was applied. Exposing that
+// total is what lets an HTTP caller tell "you got everything" apart from "you got
+// a page of a larger result set" -- the same class of gap fixed for plain listing
+// by CountMemories.
+func (m *MemoryManager) SearchMemoriesPage(ctx context.Context, query string, limit, offset int) ([]SearchResult, int, error) {
 	if limit <= 0 {
 		limit = 10
 	}
-
-	if query == "" {
-		return m.listAllAsResults(ctx, limit)
+	if offset < 0 {
+		offset = 0
 	}
 
-	sqlQuery := `
+	trimmed := strings.TrimSpace(query)
+
+	var all []SearchResult
+	var err error
+	if trimmed == "" {
+		all, err = m.listAllAsResults(ctx, 0) // 0 => no limit; we page below.
+	} else {
+		all, err = m.rankedSearch(ctx, trimmed)
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+
+	total := len(all)
+	if offset >= total {
+		return []SearchResult{}, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return all[offset:end], total, nil
+}
+
+// tokenExactPhraseBonus is added to a memory's score when the whole (trimmed,
+// lowercased) query appears in its content as a contiguous substring. It is large
+// enough to outrank any achievable sum of per-token weights, so an exact phrase
+// match always sorts first -- preserving the historical contiguous-substring
+// behavior as the top hit rather than replacing it.
+const tokenExactPhraseBonus = 1000.0
+
+// rankedSearch is the core of the token-based search. It returns every memory
+// whose content contains at least one token of trimmedQuery (case-insensitive
+// substring match per token), ranked best-first, with no limit/offset applied --
+// callers do their own paging.
+//
+// Ranking:
+//  1. An exact case-insensitive substring match of the whole query gets
+//     tokenExactPhraseBonus added on top, so it always sorts first when present.
+//  2. Otherwise, memories are scored by summed token weight: a token that appears
+//     in few stored memories (rare/specific) is weighted higher than one that
+//     appears in nearly all of them (common), an IDF-like weighting, plus a small
+//     length bonus for longer tokens. A coverage term additionally rewards
+//     matching more of the distinct query tokens, so "matches all 6 tokens"
+//     outranks "matches 1 of 6" even when the matched token itself is common.
+//  3. Ties fall back to updated_at DESC, matching the original ORDER BY.
+func (m *MemoryManager) rankedSearch(ctx context.Context, trimmedQuery string) ([]SearchResult, error) {
+	tokens := tokenizeQuery(trimmedQuery)
+	if len(tokens) == 0 {
+		return []SearchResult{}, nil
+	}
+
+	rows, err := m.db.QueryContext(ctx, `
 		SELECT id, type, content, metadata, embedding, context_type, created_at, updated_at
 		FROM memories
-		WHERE content LIKE ?
-		ORDER BY updated_at DESC
-		LIMIT ?
-	`
-
-	rows, err := m.db.QueryContext(ctx, sqlQuery, "%"+query+"%", limit)
+	`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search memories: %w", err)
 	}
 	defer rows.Close()
 
-	var results []SearchResult
+	var all []*Memory
 	for rows.Next() {
-		memory, err := m.scanMemory(rows)
+		mem, err := m.scanMemory(rows)
 		if err != nil {
 			slog.Warn("failed to scan memory row", "error", err)
 			continue
 		}
+		all = append(all, mem)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to search memories: %w", err)
+	}
+	if len(all) == 0 {
+		return []SearchResult{}, nil
+	}
 
-		snippet := memory.Content
+	lowerQuery := strings.ToLower(trimmedQuery)
+	lowerContents := make([]string, len(all))
+	docFreq := make(map[string]int, len(tokens))
+	for i, mem := range all {
+		lc := strings.ToLower(mem.Content)
+		lowerContents[i] = lc
+		for _, tok := range tokens {
+			if strings.Contains(lc, tok) {
+				docFreq[tok]++
+			}
+		}
+	}
+
+	type scored struct {
+		mem   *Memory
+		score float64
+	}
+
+	matches := make([]scored, 0, len(all))
+	for i, mem := range all {
+		lc := lowerContents[i]
+
+		matchedTokens := 0
+		var weightSum float64
+		for _, tok := range tokens {
+			if !strings.Contains(lc, tok) {
+				continue
+			}
+			matchedTokens++
+			// IDF-like weight: rarer tokens across the store count for more. A
+			// small per-character bonus additionally favors longer, more
+			// specific tokens over short ones with equal document frequency.
+			idf := math.Log(float64(len(all))/float64(docFreq[tok]) + 1)
+			weightSum += idf + float64(len(tok))*0.01
+		}
+		if matchedTokens == 0 {
+			continue
+		}
+
+		score := weightSum + float64(matchedTokens)/float64(len(tokens))
+		if strings.Contains(lc, lowerQuery) {
+			score += tokenExactPhraseBonus
+		}
+
+		matches = append(matches, scored{mem: mem, score: score})
+	}
+
+	sort.SliceStable(matches, func(i, j int) bool {
+		if matches[i].score != matches[j].score {
+			return matches[i].score > matches[j].score
+		}
+		return matches[i].mem.UpdatedAt.After(matches[j].mem.UpdatedAt)
+	})
+
+	var maxScore float64
+	for _, sm := range matches {
+		if sm.score > maxScore {
+			maxScore = sm.score
+		}
+	}
+
+	results := make([]SearchResult, 0, len(matches))
+	for _, sm := range matches {
+		snippet := sm.mem.Content
 		if len(snippet) > 200 {
 			snippet = snippet[:200] + "..."
 		}
-
+		similarity := 0.0
+		if maxScore > 0 {
+			similarity = sm.score / maxScore
+		}
 		results = append(results, SearchResult{
-			Memory:     *memory,
-			Similarity: 0.0,
+			Memory:     *sm.mem,
+			Similarity: similarity,
 			Snippet:    snippet,
 			SearchMode: "text",
 		})
@@ -308,27 +453,69 @@ func (m *MemoryManager) SearchMemories(ctx context.Context, query string, limit 
 	return results, nil
 }
 
-// ListMemories lists memories matching the given filter.
-func (m *MemoryManager) ListMemories(ctx context.Context, filter MemoryFilter) ([]*Memory, error) {
-	query := `SELECT id, type, content, metadata, embedding, context_type, created_at, updated_at FROM memories WHERE 1=1`
+// tokenizeQuery splits a query into lowercase word tokens (maximal runs of Unicode
+// letters/digits), dropping punctuation and whitespace as delimiters and
+// de-duplicating repeats so a repeated word isn't double-counted when scoring
+// "how many distinct tokens matched".
+func tokenizeQuery(query string) []string {
+	var tokens []string
+	seen := make(map[string]bool)
+	var cur strings.Builder
+
+	flush := func() {
+		if cur.Len() == 0 {
+			return
+		}
+		tok := cur.String()
+		cur.Reset()
+		if !seen[tok] {
+			seen[tok] = true
+			tokens = append(tokens, tok)
+		}
+	}
+
+	for _, r := range query {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			cur.WriteRune(unicode.ToLower(r))
+		} else {
+			flush()
+		}
+	}
+	flush()
+
+	return tokens
+}
+
+// buildMemoryFilterWhere builds the WHERE clause (and its bound args) shared by
+// ListMemories and CountMemories. Sharing this builder means the two queries
+// cannot drift out of sync with each other -- a mismatch there is exactly how a
+// "total" field silently stops meaning "total" (see CountMemories).
+func buildMemoryFilterWhere(filter MemoryFilter) (string, []interface{}) {
+	clause := " WHERE 1=1"
 	var args []interface{}
 
 	if filter.Type != "" {
-		query += " AND type = ?"
+		clause += " AND type = ?"
 		args = append(args, filter.Type)
 	}
 
 	if filter.ContextType != "" {
-		query += " AND context_type = ?"
+		clause += " AND context_type = ?"
 		args = append(args, filter.ContextType)
 	}
 
 	if filter.CreatedAfter != nil {
-		query += " AND created_at > ?"
+		clause += " AND created_at > ?"
 		args = append(args, *filter.CreatedAfter)
 	}
 
-	query += " ORDER BY updated_at DESC"
+	return clause, args
+}
+
+// ListMemories lists memories matching the given filter.
+func (m *MemoryManager) ListMemories(ctx context.Context, filter MemoryFilter) ([]*Memory, error) {
+	where, args := buildMemoryFilterWhere(filter)
+	query := `SELECT id, type, content, metadata, embedding, context_type, created_at, updated_at FROM memories` + where + ` ORDER BY updated_at DESC`
 
 	limit := filter.Limit
 	if limit <= 0 {
@@ -336,6 +523,11 @@ func (m *MemoryManager) ListMemories(ctx context.Context, filter MemoryFilter) (
 	}
 	query += " LIMIT ?"
 	args = append(args, limit)
+
+	if filter.Offset > 0 {
+		query += " OFFSET ?"
+		args = append(args, filter.Offset)
+	}
 
 	rows, err := m.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -354,6 +546,22 @@ func (m *MemoryManager) ListMemories(ctx context.Context, filter MemoryFilter) (
 	}
 
 	return memories, nil
+}
+
+// CountMemories returns the total number of memories matching filter, ignoring
+// filter.Limit and filter.Offset. This is the "true total" that ListMemories's
+// LIMIT/OFFSET otherwise hides from callers -- GET /v1/memory reported
+// TotalCount as len(page) instead of this, so a caller reading the default
+// (limit=20) page had no way to tell 20-of-20 apart from 20-of-34.
+func (m *MemoryManager) CountMemories(ctx context.Context, filter MemoryFilter) (int, error) {
+	where, args := buildMemoryFilterWhere(filter)
+	query := `SELECT COUNT(*) FROM memories` + where
+
+	var count int
+	if err := m.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("failed to count memories: %w", err)
+	}
+	return count, nil
 }
 
 // SearchMemoriesSemantic searches memories using embedding cosine similarity.
@@ -412,15 +620,23 @@ func (m *MemoryManager) SearchMemoriesSemantic(ctx context.Context, queryEmbeddi
 	return results, nil
 }
 
+// listAllAsResults returns every memory as a SearchResult, ordered by
+// updated_at DESC. limit <= 0 means "no limit" (return everything) -- callers that
+// want a bounded page (e.g. SearchMemories's empty-query case) must pass a
+// positive limit explicitly.
 func (m *MemoryManager) listAllAsResults(ctx context.Context, limit int) ([]SearchResult, error) {
 	sqlQuery := `
 		SELECT id, type, content, metadata, embedding, context_type, created_at, updated_at
 		FROM memories
 		ORDER BY updated_at DESC
-		LIMIT ?
 	`
+	var args []interface{}
+	if limit > 0 {
+		sqlQuery += " LIMIT ?"
+		args = append(args, limit)
+	}
 
-	rows, err := m.db.QueryContext(ctx, sqlQuery, limit)
+	rows, err := m.db.QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list memories: %w", err)
 	}

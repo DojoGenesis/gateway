@@ -155,10 +155,10 @@ func (s *Server) handleListMemories(c *gin.Context) {
 	sessionID := c.Query("session_id")
 
 	var memories []memory.Memory
-	var err error
+	var total int
 
 	if query != "" {
-		results, searchErr := s.memoryManager.Search(c.Request.Context(), query, limit)
+		results, searchTotal, searchErr := s.memoryManager.SearchMemoriesPage(c.Request.Context(), query, limit, offset)
 		if searchErr != nil {
 			s.errorResponse(c, http.StatusInternalServerError, "server_error", "Search failed: "+searchErr.Error())
 			return
@@ -166,10 +166,27 @@ func (s *Server) handleListMemories(c *gin.Context) {
 		for _, r := range results {
 			memories = append(memories, r.Memory)
 		}
+		total = searchTotal
 	} else {
-		memories, err = s.memoryManager.List(c.Request.Context(), sessionID, limit)
+		filter := memory.MemoryFilter{ContextType: sessionID, Limit: limit, Offset: offset}
+
+		listed, err := s.memoryManager.ListMemories(c.Request.Context(), filter)
 		if err != nil {
 			s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to list memories: "+err.Error())
+			return
+		}
+		for _, m := range listed {
+			memories = append(memories, *m)
+		}
+
+		// True total ignoring limit/offset -- NOT len(memories), which is only
+		// ever the size of the page just fetched. Without this, a caller has no
+		// way to tell "the store has exactly 20 entries" apart from "the store
+		// has 34 entries and I silently got the first 20 of them".
+		countFilter := memory.MemoryFilter{ContextType: sessionID}
+		total, err = s.memoryManager.CountMemories(c.Request.Context(), countFilter)
+		if err != nil {
+			s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to count memories: "+err.Error())
 			return
 		}
 	}
@@ -181,7 +198,7 @@ func (s *Server) handleListMemories(c *gin.Context) {
 
 	c.JSON(http.StatusOK, MemoryListResponse{
 		Memories:   respMemories,
-		TotalCount: len(respMemories),
+		TotalCount: total,
 		Limit:      limit,
 		Offset:     offset,
 	})
@@ -283,8 +300,12 @@ func (s *Server) handleSearchMemory(c *gin.Context) {
 	if limit > 100 {
 		limit = 100
 	}
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0
+	}
 
-	results, err := s.memoryManager.Search(c.Request.Context(), req.Query, limit)
+	results, total, err := s.memoryManager.SearchMemoriesPage(c.Request.Context(), req.Query, limit, offset)
 	if err != nil {
 		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Search failed: "+err.Error())
 		return
@@ -303,6 +324,6 @@ func (s *Server) handleSearchMemory(c *gin.Context) {
 
 	c.JSON(http.StatusOK, MemorySearchResponse{
 		Results:    searchResults,
-		TotalCount: len(searchResults),
+		TotalCount: total,
 	})
 }
