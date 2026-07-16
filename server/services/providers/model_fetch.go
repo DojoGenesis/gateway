@@ -62,12 +62,31 @@ func listModelsDynamic(
 		return cached
 	}
 	fetched, err := fetch(ctx)
-	if err != nil || len(fetched) == 0 {
+	if err != nil {
+		return static
+	}
+	fetched = filterChatModels(fetched)
+	if len(fetched) == 0 {
 		return static
 	}
 	fetched = mergeStaticMetadata(fetched, static)
 	cache.set(fetched)
 	return fetched
+}
+
+// filterChatModels drops non-chat models (embeddings, TTS, transcription,
+// image, moderation, legacy base-completion, realtime) from a fetched list, so
+// a chat gateway never advertises a model that cannot serve /chat/completions.
+// Applied uniformly to every provider's live list. See isNonChatModel.
+func filterChatModels(models []provider.ModelInfo) []provider.ModelInfo {
+	out := models[:0]
+	for _, m := range models {
+		if isNonChatModel(m.ID) {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
 }
 
 // mergeStaticMetadata copies curated Name/ContextSize/Cost from the static list
@@ -128,7 +147,7 @@ func fetchOpenAIFormatModels(ctx context.Context, b *BaseProvider) ([]provider.M
 	}
 	models := make([]provider.ModelInfo, 0, len(out.Data))
 	for _, m := range out.Data {
-		if m.ID == "" || isNonChatModel(m.ID) {
+		if m.ID == "" {
 			continue
 		}
 		name := m.Name
