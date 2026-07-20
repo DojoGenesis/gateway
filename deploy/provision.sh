@@ -5,7 +5,7 @@ DRY_RUN=false
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true
 
 DOMAIN="gateway.trespies.dev"
-GATEWAY_VERSION="v3.2.2"
+GATEWAY_VERSION="v3.3.0"
 GATEWAY_PORT=7340
 GATEWAY_USER="dojo"
 GATEWAY_HOME="/opt/dojo"
