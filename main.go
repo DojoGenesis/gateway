@@ -60,6 +60,12 @@ func main() {
 		os.Exit(0)
 	}
 
+	// ─── Version Mode (print version and exit; used by deploy/provision.sh) ────
+	if len(os.Args) > 1 && os.Args[1] == "--version" {
+		fmt.Printf("agentic-gateway %s\n", srv.Version)
+		os.Exit(0)
+	}
+
 	// ─── Load .env (if present) ─────────────────────────────────────
 	// Loads key=value pairs from .env into the environment before any
 	// config reads. Existing env vars take precedence (no override).

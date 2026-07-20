@@ -78,7 +78,7 @@ log "=== Phase 4: Download gateway binary ==="
 NEEDS_DOWNLOAD=true
 if [[ -x "${BINARY_PATH}" ]]; then
     INSTALLED_VERSION=$("${BINARY_PATH}" --version 2>/dev/null | awk '{print $NF}' || true)
-    if [[ "${INSTALLED_VERSION}" == "${GATEWAY_VERSION}" ]]; then
+    if [[ "${INSTALLED_VERSION#v}" == "${GATEWAY_VERSION#v}" ]]; then
         log "Binary ${BINARY_PATH} is already at ${GATEWAY_VERSION} — skipping download"
         NEEDS_DOWNLOAD=false
     else
