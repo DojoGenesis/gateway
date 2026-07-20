@@ -1,7 +1,7 @@
 version: '3.8'
 
 # Production Docker Compose Configuration
-# Includes: Gateway, MCPByDojoGenesis, OTEL Collector, Langfuse observability stack
+# Includes: Gateway, OTEL Collector, Langfuse observability stack
 
 services:
   # ─── AgenticGateway (Main Service) ─────────────────────────────────────
@@ -18,7 +18,6 @@ services:
 
       # MCP configuration
       MCP_CONFIG_PATH: "/etc/gateway/gateway-config.yaml"
-      MCP_BY_DOJO_BINARY: "/opt/mcp-servers/mcp-by-dojo-genesis"
 
       # OTEL configuration
       OTEL_ENABLED: "true"
@@ -33,15 +32,10 @@ services:
       # Mount gateway MCP configuration
       - ./gateway-config.yaml:/etc/gateway/gateway-config.yaml:ro
 
-      # Shared volume for MCP server binaries
-      - mcp-bin:/opt/mcp-servers:ro
-
       # Persistent storage for memory
       - gateway-data:/app/data
 
     depends_on:
-      mcp-by-dojo:
-        condition: service_completed_successfully
       otel-collector:
         condition: service_started
       postgres:
@@ -56,18 +50,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  # ─── MCPByDojoGenesis (MCP Server Binary Provider) ────────────────────
-  # This service copies the MCP server binary to a shared volume and exits
-  # The gateway starts the binary as a subprocess via stdio transport
-  mcp-by-dojo:
-    image: ghcr.io/trespies-source/mcpbydojogenesis:latest
-    volumes:
-      - mcp-bin:/opt/mcp-servers
-    # Copy binary to shared volume and exit
-    entrypoint: ["sh", "-c", "cp /usr/local/bin/mcp-by-dojo-genesis /opt/mcp-servers/ && chmod +x /opt/mcp-servers/mcp-by-dojo-genesis && ls -la /opt/mcp-servers/"]
-    networks:
-      - agentic-stack
 
   # ─── OTEL Collector (Observability Pipeline) ──────────────────────────
   otel-collector:
@@ -150,10 +132,6 @@ networks:
 
 # ─── Volumes ─────────────────────────────────────────────────────────────
 volumes:
-  # Shared volume for MCP server binaries
-  mcp-bin:
-    driver: local
-
   # Gateway persistent data (memory database)
   gateway-data:
     driver: local
