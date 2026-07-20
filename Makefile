@@ -74,7 +74,7 @@ docker:
 docker-compose-up:
 	@echo "Starting docker-compose stack..."
 	@docker-compose -f docker-compose.yaml up -d
-	@echo "Stack started. Gateway at http://localhost:8080, Langfuse at http://localhost:3000"
+	@echo "Stack started. Gateway at http://localhost:7340, Langfuse at http://localhost:3000"
 
 # Stop docker-compose stack
 docker-compose-down:
