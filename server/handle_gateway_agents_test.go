@@ -1,16 +1,17 @@
 package server
 
-// Regression test for the structural data race in handleGatewayGetAgentDetail
-// and handleGatewayListAgentChannels.
+// Race-detector regression test for the agent handlers sharing agentMu:
+// concurrent channel binds (write lock + slice append) against the live read
+// paths handleGatewayGetAgent and handleGatewayListAgentChannels.
 //
-// Root cause: both handlers took agentMu.RLock(), fetched the *AgentRuntime
-// pointer, then immediately released the lock — dereferencing runtime.Channels
-// (and other fields) without protection.  Concurrent writers in
-// handleGatewayBindAgentChannels hold agentMu.Lock() and do
-// runtime.Channels = append(...), racing on the slice header.
-//
-// Fix: copy all needed fields into local variables while the read lock is held;
-// release the lock before any JSON serialisation work.
+// Original root cause: readers took agentMu.RLock(), fetched the *AgentRuntime
+// pointer, then released the lock before dereferencing runtime.Channels —
+// racing on the slice header against handleGatewayBindAgentChannels.  Fix:
+// copy needed fields while the read lock is held (see
+// handleGatewayListAgentChannels).  The other affected reader,
+// handleGatewayGetAgentDetail, was never routed and has been deleted; the
+// GET /agents/:id leg now exercises the live handleGatewayGetAgent, which
+// must never dereference runtime.Channels after releasing the lock.
 
 import (
 	"bytes"
@@ -58,10 +59,9 @@ func buildAgentRaceTestServer(t *testing.T, agentID string) *Server {
 	return s
 }
 
-// TestHandleGatewayAgents_ConcurrentBindAndGet is the race-detector regression
-// test for Bug 2.  It launches 50 goroutines: half POST to /bind (write lock +
-// slice append) and half GET /detail and /channels (read path that previously
-// released the lock before dereferencing fields).
+// TestHandleGatewayAgents_ConcurrentBindAndGet launches 50 goroutines: half
+// POST to /bind (write lock + slice append) and half GET /agents/:id and
+// /channels (read paths that must copy shared state under the read lock).
 //
 // Run with: go test -race ./server/... — any data race causes an instant FAIL.
 func TestHandleGatewayAgents_ConcurrentBindAndGet(t *testing.T) {
@@ -74,7 +74,7 @@ func TestHandleGatewayAgents_ConcurrentBindAndGet(t *testing.T) {
 
 	router := gin.New()
 	router.POST("/agents/:id/channels", s.handleGatewayBindAgentChannels)
-	router.GET("/agents/:id", s.handleGatewayGetAgentDetail)
+	router.GET("/agents/:id", s.handleGatewayGetAgent)
 	router.GET("/agents/:id/channels", s.handleGatewayListAgentChannels)
 
 	var wg sync.WaitGroup
@@ -112,7 +112,7 @@ func TestHandleGatewayAgents_ConcurrentBindAndGet(t *testing.T) {
 						i, w.Code, w.Body.String())
 				}
 			} else if i%4 == 1 {
-				// ── Reader half A: GET agent detail ─────────────────────────
+				// ── Reader half A: GET agent ────────────────────────────────
 				req, err := http.NewRequest(
 					http.MethodGet,
 					"/agents/"+agentID,
@@ -127,7 +127,7 @@ func TestHandleGatewayAgents_ConcurrentBindAndGet(t *testing.T) {
 				router.ServeHTTP(w, req)
 
 				if w.Code != http.StatusOK {
-					errCh <- fmt.Errorf("goroutine %d (get-detail): unexpected status %d — body: %s",
+					errCh <- fmt.Errorf("goroutine %d (get-agent): unexpected status %d — body: %s",
 						i, w.Code, w.Body.String())
 				}
 			} else {
