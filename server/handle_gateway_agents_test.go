@@ -10,8 +10,10 @@ package server
 // copy needed fields while the read lock is held (see
 // handleGatewayListAgentChannels).  The other affected reader,
 // handleGatewayGetAgentDetail, was never routed and has been deleted; the
-// GET /agents/:id leg now exercises the live handleGatewayGetAgent, which
-// must never dereference runtime.Channels after releasing the lock.
+// GET /agents/:id leg now exercises the live handleGatewayGetAgent, and the
+// POST /chat leg exercises handleGatewayAgentChat — both copy Config (and
+// disposition fields) into locals under the read lock and must never
+// dereference the runtime after releasing it.
 
 import (
 	"bytes"
@@ -60,15 +62,16 @@ func buildAgentRaceTestServer(t *testing.T, agentID string) *Server {
 }
 
 // TestHandleGatewayAgents_ConcurrentBindAndGet launches 50 goroutines: half
-// POST to /bind (write lock + slice append) and half GET /agents/:id and
-// /channels (read paths that must copy shared state under the read lock).
+// POST to /bind (write lock + slice append), the other half spread across the
+// three reader legs — GET /agents/:id, GET /channels, and POST /chat — all
+// paths that must copy shared state under the read lock.
 //
 // Run with: go test -race ./server/... — any data race causes an instant FAIL.
 func TestHandleGatewayAgents_ConcurrentBindAndGet(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	const agentID = "agent-race-test"
-	const goroutines = 50 // 25 binders + 25 getters
+	const goroutines = 50 // 25 binders + 25 readers
 
 	s := buildAgentRaceTestServer(t, agentID)
 
@@ -76,6 +79,7 @@ func TestHandleGatewayAgents_ConcurrentBindAndGet(t *testing.T) {
 	router.POST("/agents/:id/channels", s.handleGatewayBindAgentChannels)
 	router.GET("/agents/:id", s.handleGatewayGetAgent)
 	router.GET("/agents/:id/channels", s.handleGatewayListAgentChannels)
+	router.POST("/agents/:id/chat", s.handleGatewayAgentChat)
 
 	var wg sync.WaitGroup
 	// Collect the first error from any goroutine to surface it.
@@ -112,7 +116,7 @@ func TestHandleGatewayAgents_ConcurrentBindAndGet(t *testing.T) {
 						i, w.Code, w.Body.String())
 				}
 			} else if i%4 == 1 {
-				// ── Reader half A: GET agent ────────────────────────────────
+				// ── Reader A: GET agent ─────────────────────────────────────
 				req, err := http.NewRequest(
 					http.MethodGet,
 					"/agents/"+agentID,
@@ -130,8 +134,34 @@ func TestHandleGatewayAgents_ConcurrentBindAndGet(t *testing.T) {
 					errCh <- fmt.Errorf("goroutine %d (get-agent): unexpected status %d — body: %s",
 						i, w.Code, w.Body.String())
 				}
+			} else if i%8 == 3 {
+				// ── Reader C: POST chat ─────────────────────────────────────
+				// Exercises the Config copy-under-lock in
+				// handleGatewayAgentChat.  The copy happens before the plugin
+				// manager check, so the expected 503 (no plugin manager on the
+				// test server) still covers the locked read path.
+				body := map[string]interface{}{"message": "race probe"}
+				b, _ := json.Marshal(body)
+				req, err := http.NewRequest(
+					http.MethodPost,
+					"/agents/"+agentID+"/chat",
+					bytes.NewReader(b),
+				)
+				if err != nil {
+					errCh <- fmt.Errorf("goroutine %d: request creation failed: %w", i, err)
+					return
+				}
+				req.Header.Set("Content-Type", "application/json")
+
+				w := httptest.NewRecorder()
+				router.ServeHTTP(w, req)
+
+				if w.Code != http.StatusServiceUnavailable {
+					errCh <- fmt.Errorf("goroutine %d (chat): unexpected status %d — body: %s",
+						i, w.Code, w.Body.String())
+				}
 			} else {
-				// ── Reader half B: GET agent channels ───────────────────────
+				// ── Reader B: GET agent channels ────────────────────────────
 				req, err := http.NewRequest(
 					http.MethodGet,
 					"/agents/"+agentID+"/channels",

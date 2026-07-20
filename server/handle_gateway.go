@@ -614,8 +614,28 @@ func (s *Server) handleGatewayCreateAgent(c *gin.Context) {
 func (s *Server) handleGatewayGetAgent(c *gin.Context) {
 	agentID := c.Param("id")
 
+	// Copy all response fields while the read lock is held.  Dereferencing
+	// the *AgentRuntime after RUnlock races with any writer that updates the
+	// runtime in place under agentMu (same idiom as
+	// handleGatewayListAgentChannels).
+	var (
+		agentConfig *gateway.AgentConfig
+		disp        gin.H
+		exists      bool
+	)
 	s.agentMu.RLock()
 	runtime, exists := s.agents[agentID]
+	if exists {
+		agentConfig = runtime.Config
+		if runtime.Disposition != nil {
+			disp = gin.H{
+				"pacing":     runtime.Disposition.Pacing,
+				"depth":      runtime.Disposition.Depth,
+				"tone":       runtime.Disposition.Tone,
+				"initiative": runtime.Disposition.Initiative,
+			}
+		}
+	}
 	s.agentMu.RUnlock()
 
 	if !exists {
@@ -625,16 +645,11 @@ func (s *Server) handleGatewayGetAgent(c *gin.Context) {
 
 	resp := gin.H{
 		"agent_id": agentID,
-		"config":   runtime.Config,
+		"config":   agentConfig,
 		"status":   "active",
 	}
-	if runtime.Disposition != nil {
-		resp["disposition"] = gin.H{
-			"pacing":     runtime.Disposition.Pacing,
-			"depth":      runtime.Disposition.Depth,
-			"tone":       runtime.Disposition.Tone,
-			"initiative": runtime.Disposition.Initiative,
-		}
+	if disp != nil {
+		resp["disposition"] = disp
 	}
 	c.JSON(http.StatusOK, resp)
 }
@@ -657,16 +672,24 @@ func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 		return
 	}
 
+	// Copy Config while the read lock is held — dereferencing the runtime
+	// after RUnlock races with in-place writers under agentMu (same idiom as
+	// handleGatewayListAgentChannels).  Passing runtime itself to
+	// runAgentLoopWithDisposition below is safe only because its module
+	// fields (ErrorHandler, CollabManager, …) are set once at registration
+	// and never reassigned.
+	var agentConfig *gateway.AgentConfig
 	s.agentMu.RLock()
 	runtime, exists := s.agents[agentID]
+	if exists {
+		agentConfig = runtime.Config
+	}
 	s.agentMu.RUnlock()
 
 	if !exists {
 		s.errorResponse(c, http.StatusNotFound, "not_found", fmt.Sprintf("Agent not found: %s", agentID))
 		return
 	}
-
-	agentConfig := runtime.Config
 
 	if s.pluginManager == nil {
 		s.errorResponse(c, http.StatusServiceUnavailable, "service_unavailable", "Plugin manager not available")
