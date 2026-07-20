@@ -1,254 +1,201 @@
 # Deployment Guide
 
-**Version:** v0.2.0 (Phase 3: MCP Server Wiring)
+**Release line:** `v3.x` — latest tag `v3.2.2`. Production (`gateway.trespies.dev`, Hetzner) runs `v3.2.2+dynmodels`.
+**Runtime:** a single Go binary (`agentic-gateway`) listening on **port 7340** by default.
+
+See [`README.md`](./README.md) for the architecture overview and [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system design.
 
 ---
 
 ## Quick Start
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: Build from source (local development)
 
 ```bash
-# 1. Clone the repository
+# 1. Clone and enter the repo
 git clone https://github.com/DojoGenesis/gateway.git
-cd AgenticGatewayByDojoGenesis
+cd gateway
 
-# 2. Set environment variables (optional)
-export LANGFUSE_NEXTAUTH_SECRET="your-random-secret-min-32-chars"
-export LANGFUSE_SALT="your-random-salt-min-32-chars"
+# 2. Configure — copy the example env and add provider API keys
+cp .env.example .env
 
-# 3. Start the stack
-docker-compose up -d
+# 3. Build the binary (outputs to bin/agentic-gateway)
+make build
 
-# 4. Verify all services are running
-docker-compose ps
-
-# 5. Check MCP server status
-curl http://localhost:8080/admin/mcp/status
-
-# 6. View observability in Langfuse
-open http://localhost:3000
+# 4. Run it
+./bin/agentic-gateway            # listening on :7340
 ```
 
-### Option 2: Local Development
+Or run without building: `go run main.go`.
+
+Verify it is live:
 
 ```bash
-# 1. Install MCPByDojoGenesis binary (if not already installed)
-go install github.com/TresPies-source/MCPByDojoGenesis@latest
-
-# 2. Create config directory and copy config
-mkdir -p config
-cp gateway-config.yaml config/mcp_servers.yaml
-
-# 3. Set environment variables
-export MCP_CONFIG_PATH=config/mcp_servers.yaml
-export MCP_BY_DOJO_BINARY=$(which mcp-by-dojo-genesis)
-export OTEL_ENABLED=false  # or configure OTEL endpoint
-
-# 4. Run the gateway
-go run main.go
-
-# 5. Verify MCP status
-curl http://localhost:8080/admin/mcp/status
+curl http://localhost:7340/health
 ```
+
+### Option 2: Docker
+
+```bash
+# Build the image (multi-stage: Go 1.25 Alpine builder → distroless runtime, non-root UID 65534)
+docker build -t agentic-gateway .
+
+# Run it
+docker run -p 7340:7340 --env-file .env agentic-gateway
+```
+
+The image `EXPOSE`s 7340 and ships a self-contained health probe (`agentic-gateway --health-check`) so no `curl`/`wget` is needed inside the distroless container.
+
+### Option 3: Production VPS
+
+For a TLS-terminated production deployment on Hetzner (Caddy + systemd), see
+[**VPS Production Deployment**](#vps-production-deployment) below and the dedicated guide at
+[`deploy/README.md`](./deploy/README.md).
 
 ---
 
 ## Configuration
 
-### MCP Server Configuration
+Configuration is layered, lowest precedence first:
 
-The gateway reads MCP server configuration from:
-- **Docker:** `/etc/gateway/gateway-config.yaml` (mounted via volume)
-- **Local:** `config/mcp_servers.yaml` (default) or path specified in `MCP_CONFIG_PATH`
+1. `.env` — loaded on startup if present (existing environment variables are **not** overridden)
+2. `gateway-config.yaml` (or the path passed via `-config` / `MCP_CONFIG_PATH`)
+3. Process environment variables — highest precedence
 
-See [docs/mcp-configuration.md](./docs/mcp-configuration.md) for detailed configuration options.
+### Provider API keys
 
-### Environment Variables
+Set the corresponding key in `.env` to enable a provider. Providers without a key are **silently skipped at startup** — no error, they just do not register.
 
-**Required for Docker Compose:**
-- `MCP_BY_DOJO_BINARY` — Path to MCPByDojoGenesis binary (set automatically in docker-compose)
-- `OTEL_EXPORTER_OTLP_ENDPOINT` — OTEL collector endpoint (default: `http://otel-collector:4318`)
+| Provider | Env var |
+|----------|---------|
+| Anthropic (Claude) | `ANTHROPIC_API_KEY` |
+| OpenAI | `OPENAI_API_KEY` (+ optional `OPENAI_BASE_URL`) |
+| Google (Gemini) | `GOOGLE_API_KEY` |
+| Groq | `GROQ_API_KEY` |
+| Mistral | `MISTRAL_API_KEY` |
+| DeepSeek | `DEEPSEEK_API_KEY` (+ optional `DEEPSEEK_BASE_URL`) |
+| Kimi (Moonshot) | `KIMI_API_KEY` (+ optional `KIMI_BASE_URL`) |
+| Ollama | `OLLAMA_HOST` (auto-detected on `localhost:11434`) |
 
-**Optional:**
-- `MCP_CONFIG_PATH` — Path to MCP configuration file (default: `config/mcp_servers.yaml`)
-- `MCP_LOG_LEVEL` — Log level for MCP servers (default: `info`)
-- `LANGFUSE_NEXTAUTH_SECRET` — Langfuse authentication secret (required for production)
-- `LANGFUSE_SALT` — Langfuse encryption salt (required for production)
-- `COMPOSIO_API_KEY` — Composio API key (if enabling Composio integration)
+The full set of variables is documented in [`.env.example`](./.env.example).
 
----
+### Common environment variables
 
-## Services
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `7340` | HTTP listen port |
+| `ENVIRONMENT` | `development` | `production` enables structured/JSON logging |
+| `ALLOWED_ORIGINS` | (none) | Comma-separated CORS origins (each must include scheme) |
+| `MEMORY_DB_PATH` | `~/.dojo/memory.db` | Conversation-memory SQLite path — **use an absolute path** |
+| `DOJO_CAS_PATH` | `~/.dojo/skills.db` | Content-addressable skill/workflow store |
+| `AUTH_DB_DIR` | `.dojo/` (CWD-relative) | Auth DB directory — set absolute for deploys |
+| `MCP_CONFIG_PATH` | `gateway-config.yaml` | MCP host configuration file |
+| `MCP_APPS_ENABLED` | `false` | Enable the MCP Apps bridge |
 
-The docker-compose stack includes:
+> **Relative DB paths bite.** A relative `MEMORY_DB_PATH` or `DOJO_CAS_PATH` silently creates a new empty database whenever the working directory changes (e.g. across restarts). Always use absolute paths in any non-local deployment.
 
-| Service | Port | Description |
-|---------|------|-------------|
-| **gateway** | 8080 | Main AgenticGateway API |
-| **mcp-by-dojo** | N/A | Binary provider (exits after copying binary) |
-| **otel-collector** | 4318 | OTLP HTTP receiver for traces |
-| **langfuse** | 3000 | Observability UI and trace storage |
-| **postgres** | 5432 | Langfuse database |
+### YAML config
 
----
+`gateway-config.yaml` controls runtime behaviour (feature flags, MCP servers, routing). Example feature block:
 
-## Health Checks
-
-### Gateway Health
-
-```bash
-curl http://localhost:8080/health
+```yaml
+features:
+  tool_calling: true            # agentic tool-calling loop
+  get_document_tool: true       # document fetch endpoint
+  patch_intent: true            # extract patch intents from responses
+  provider_key_management: true # accept API keys via settings endpoint
+  ollama_tool_fallback: true    # text-mode fallback for Ollama
 ```
 
-Expected response:
+### Observability (optional)
+
+The gateway supports OpenTelemetry trace export and Langfuse:
+
+```
+OTEL_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+OTEL_SERVICE_NAME=agentic-gateway
+```
+
+Use [`docker-compose.example.yml`](./docker-compose.example.yml) for a full local observability stack (gateway + OTEL Collector + Langfuse + PostgreSQL).
+
+---
+
+## Health & Metrics
+
+### Health check
+
+```bash
+curl http://localhost:7340/health
+```
+
+Example response:
+
 ```json
 {
   "status": "healthy",
-  "version": "v0.2.0"
-}
-```
-
-### MCP Server Status
-
-```bash
-curl http://localhost:8080/admin/mcp/status
-```
-
-Expected response:
-```json
-{
-  "servers": {
-    "mcp_by_dojo": {
-      "server_id": "mcp_by_dojo",
-      "display_name": "MCP By Dojo Genesis",
-      "state": "connected",
-      "tool_count": 14,
-      "last_health_check": "2026-02-13T12:00:00Z"
-    }
+  "version": "1.1.0",
+  "timestamp": "2026-07-19T12:00:00Z",
+  "providers": { "anthropic": "healthy" },
+  "dependencies": {
+    "memory_store": "healthy",
+    "tool_registry": "healthy",
+    "orchestration_engine": "healthy"
   },
-  "total_servers": 1,
-  "total_tools": 14,
-  "healthy": true
+  "uptime_seconds": 0,
+  "requests_processed": 0
 }
 ```
 
-### OTEL Collector Health
+`status` is `degraded` if any registered provider fails its info probe. The `version` field is the `server` module version injected at build time via
+`-ldflags "-X github.com/DojoGenesis/gateway/server.Version=<version>"`; an un-injected build reports the source default (`1.1.0`).
+
+### Metrics
 
 ```bash
-curl http://localhost:13133/
+curl http://localhost:7340/metrics                 # Prometheus-style, unauthenticated
+curl http://localhost:7340/admin/metrics/prometheus # admin surface (requires admin auth)
 ```
 
-### Langfuse Health
+### Version scheme
 
-```bash
-curl http://localhost:3000/api/health
-```
+Releases are cut as git tags `vMAJOR.MINOR.PATCH` (latest: `v3.2.2`). A running build may carry semver build metadata after a `+` — e.g. production runs `v3.2.2+dynmodels`.
 
 ---
 
-## Troubleshooting
+## VPS Production Deployment
 
-### MCP Server Not Connecting
-
-**Symptom:** `"state": "disconnected"` in `/admin/mcp/status`
-
-**Solutions:**
-
-1. **Check binary exists:**
-   ```bash
-   docker-compose exec gateway ls -la /opt/mcp-servers/
-   ```
-
-2. **Check logs:**
-   ```bash
-   docker-compose logs gateway | grep MCP
-   ```
-
-3. **Verify environment variables:**
-   ```bash
-   docker-compose exec gateway env | grep MCP
-   ```
-
-4. **Restart gateway:**
-   ```bash
-   docker-compose restart gateway
-   ```
-
-### No Tools Registered
-
-**Symptom:** `"tool_count": 0`
-
-**Solutions:**
-
-1. **Check allowlist/blocklist** in `gateway-config.yaml`
-2. **Verify MCP server implements `list_tools`** correctly
-3. **Check gateway logs** for registration errors
-4. **Increase startup timeout** in config
-
-### OTEL Traces Not Appearing
-
-**Symptom:** No traces in Langfuse UI
-
-**Solutions:**
-
-1. **Check OTEL collector is running:**
-   ```bash
-   docker-compose logs otel-collector
-   ```
-
-2. **Verify OTEL endpoint:**
-   ```bash
-   docker-compose exec gateway env | grep OTEL
-   ```
-
-3. **Check sampling rate** in `gateway-config.yaml`:
-   ```yaml
-   observability:
-     tool_span_sample_rate: 1.0  # 1.0 = trace all
-   ```
-
-4. **Test OTEL endpoint:**
-   ```bash
-   curl http://localhost:4318/v1/traces -X POST \
-     -H "Content-Type: application/json" \
-     -d '{"resourceSpans": []}'
-   ```
-
-### Langfuse Not Starting
-
-**Symptom:** Langfuse container exits or fails to start
-
-**Solutions:**
-
-1. **Set required environment variables:**
-   ```bash
-   export LANGFUSE_NEXTAUTH_SECRET="random-32-char-minimum-secret"
-   export LANGFUSE_SALT="random-32-char-minimum-salt"
-   docker-compose up -d
-   ```
-
-2. **Check PostgreSQL is healthy:**
-   ```bash
-   docker-compose logs postgres
-   ```
-
-3. **Verify database connection:**
-   ```bash
-   docker-compose exec langfuse env | grep DATABASE_URL
-   ```
-
----
-
-## Stopping the Stack
+Production runs on Hetzner behind Caddy (automatic Let's Encrypt TLS) with the Gateway managed by systemd. The full step-by-step guide, including the GitHub OAuth app setup and secret placement, is in [`deploy/README.md`](./deploy/README.md). Summary:
 
 ```bash
-# Stop all services
-docker-compose down
-
-# Stop and remove volumes (⚠️ deletes all data)
-docker-compose down -v
+# On the server (Ubuntu 24.04), from the repo's deploy/ directory:
+sudo bash deploy/provision.sh --dry-run   # preview every step
+sudo bash deploy/provision.sh             # idempotent — safe to re-run
 ```
+
+`provision.sh` installs Caddy, creates the unprivileged `dojo` system user, downloads the release binary to `/usr/local/bin/dojo-gateway`, installs the config + systemd unit, and starts the services.
+
+**Layout on the server:**
+
+| Path | Purpose |
+|------|---------|
+| `/usr/local/bin/dojo-gateway` | The Gateway binary (release tarball `agentic-gateway_<version>_linux_amd64.tar.gz`) |
+| `/etc/dojo/config.yaml` | Gateway config ([`deploy/gateway-config.yaml`](./deploy/gateway-config.yaml) template) |
+| `/etc/dojo/env` | Secrets — `DOJO_JWT_SECRET`, provider keys, GitHub OAuth creds (`chmod 640`, `root:dojo`) |
+| `/var/lib/dojo` | Data dir (memory + CAS SQLite) |
+| `/etc/caddy/Caddyfile` | TLS reverse proxy → `localhost:7340` ([`deploy/Caddyfile`](./deploy/Caddyfile)) |
+| `dojo-gateway.service` | systemd unit ([`deploy/gateway.service`](./deploy/gateway.service)) |
+
+**Service management:**
+
+```bash
+systemctl status dojo-gateway
+journalctl -u dojo-gateway -f       # Gateway logs
+journalctl -u caddy -f              # TLS / proxy logs
+curl https://gateway.trespies.dev/health
+```
+
+> **Version pin:** `deploy/provision.sh` sets `GATEWAY_VERSION` and only re-downloads when the installed binary's version differs. Bump that variable and re-run to upgrade.
 
 ---
 
@@ -256,61 +203,45 @@ docker-compose down -v
 
 ### Security
 
-1. **Set strong secrets:**
-   ```bash
-   export LANGFUSE_NEXTAUTH_SECRET=$(openssl rand -base64 32)
-   export LANGFUSE_SALT=$(openssl rand -base64 32)
-   ```
+- Generate a strong JWT secret: `openssl rand -hex 32` → `DOJO_JWT_SECRET` in `/etc/dojo/env`.
+- Keep `registration_enabled: false` in production config; create the first admin out-of-band.
+- The Docker image already runs as non-root (UID 65534) on a distroless base; the systemd unit adds `NoNewPrivileges`, `ProtectSystem=strict`, and `ProtectHome`.
+- Caddy sets HSTS, `X-Content-Type-Options`, `X-Frame-Options`, and `Referrer-Policy`; keep only ports 80/443 open in the firewall.
 
-2. **Use environment-specific configs:**
-   - Development: `gateway-config.dev.yaml`
-   - Staging: `gateway-config.staging.yaml`
-   - Production: `gateway-config.prod.yaml`
+### Secrets management
 
-3. **Enable authentication** on admin endpoints (future enhancement)
-
-4. **Use secrets management:**
-   - Kubernetes: Use `kubectl create secret`
-   - AWS: Use AWS Secrets Manager
-   - Docker Swarm: Use `docker secret create`
-
-### Scaling
-
-1. **Gateway horizontal scaling:**
-   ```yaml
-   gateway:
-     deploy:
-       replicas: 3
-   ```
-
-2. **PostgreSQL replication** for Langfuse
-
-3. **OTEL collector clustering** for high throughput
-
-### Monitoring
-
-1. **Prometheus metrics:**
-   ```bash
-   curl http://localhost:8080/admin/metrics/prometheus
-   ```
-
-2. **Langfuse analytics:**
-   - Go to http://localhost:3000
-   - Filter by `mcp.server_id`
-   - Analyze tool latency, error rates
-
-3. **Log aggregation:**
-   - Ship logs to ELK, Loki, or CloudWatch
-   - Configure structured logging
+Store provider keys and the JWT secret in `/etc/dojo/env` (systemd `EnvironmentFile`), not in the tracked YAML. For orchestrated deployments use the platform's secret store (Kubernetes secrets, cloud secret managers) rather than baking keys into images.
 
 ---
 
-## Next Steps
+## Troubleshooting
 
-- [MCP Configuration Guide](./docs/mcp-configuration.md) — Add custom MCP servers
-- [Composio Setup](./docs/composio-setup.md) — Enable Composio integration
-- [Architecture Overview](./ARCHITECTURE.md) — Understand system design
+### A provider is missing from `/health`
+
+Providers without an API key are skipped silently at startup. Confirm the key is present in the process environment (`.env` is only read if it exists in the working directory) and re-check `/health` → `providers`.
+
+### Port already in use
+
+The default port is `7340`. Override with `PORT=<port>` (the `--health-check` probe reads the same variable, so it follows the override).
+
+### TLS / 502 from Caddy
+
+Caddy reverse-proxies to `localhost:7340`. If Caddy returns 502, the Gateway process is down or bound to a different port — check `journalctl -u dojo-gateway` and confirm the `PORT`/config match the Caddyfile upstream.
+
+### Memory or skills "reset" after a restart
+
+Almost always a relative DB path. Set `MEMORY_DB_PATH` and `DOJO_CAS_PATH` to absolute paths (the systemd unit already points them at `/var/lib/dojo`).
 
 ---
 
-**Questions?** Open an issue on GitHub or consult the documentation.
+## References
+
+- [`README.md`](./README.md) — architecture, providers, API routes, key commands
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — system design deep-dive
+- [`deploy/README.md`](./deploy/README.md) — full VPS provisioning walkthrough
+- [`.env.example`](./.env.example) — every environment variable, documented
+- [`CHANGELOG.md`](./CHANGELOG.md) — release history
+
+---
+
+**Questions?** Open an issue on GitHub or consult the documentation above.

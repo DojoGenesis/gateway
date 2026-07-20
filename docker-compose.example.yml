@@ -4,9 +4,9 @@ services:
   gateway:
     build: .
     ports:
-      - "8080:8080"
+      - "7340:7340"
     environment:
-      PORT: "8080"
+      PORT: "7340"
       ENVIRONMENT: "production"
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
