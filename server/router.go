@@ -52,6 +52,24 @@ func (s *Server) setupRoutes() {
 
 	// ─── OpenAI-Compatible API (/v1) ─────────────────────────────────
 	v1 := s.router.Group("/v1")
+	// DGS-88: every route under /v1 either spends money (LLM completions,
+	// agent chat, orchestration), mutates durable state (memory, seeds,
+	// snapshots, CAS-backed settings), or reads private data. None of it is
+	// public. Before this line the only middleware reaching /v1 was the global
+	// OptionalAuthMiddleware, which never rejects — it assigns a random guest
+	// UUID and calls c.Next() — so an anonymous caller from the public internet
+	// could POST /v1/gateway/agents and /v1/gateway/agents/:id/chat and bill
+	// real provider spend.
+	//
+	// gin snapshots the handler chain at route/subgroup creation time
+	// (RouterGroup.combineHandlers), so this Use() MUST stay above every route
+	// and every v1.Group(...) below — including the /gateway and /settings
+	// subgroups. Moving it down silently un-protects everything above it.
+	//
+	// /health, /metrics, /auth/* and /.well-known/did.json are registered on
+	// s.router outside this group and stay public — the deploy liveness probe
+	// (deploy/provision.sh) hits /health unauthenticated by design.
+	v1.Use(middleware.AuthMiddleware())
 	{
 		// Chat completions (OpenAI-compatible)
 		v1.POST("/chat/completions", s.handleChatCompletions)
