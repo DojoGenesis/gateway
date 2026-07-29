@@ -84,7 +84,8 @@ The full set of variables is documented in [`.env.example`](./.env.example).
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PORT` | `7340` | HTTP listen port |
-| `ENVIRONMENT` | `development` | `production` enables structured/JSON logging |
+| `ENVIRONMENT` | `development` | `production` enables structured/JSON logging **and arms the JWT secret startup gate** |
+| `JWT_SECRET` | *(dev fallback)* | **Signing secret for every bearer token.** Required in production — see below |
 | `ALLOWED_ORIGINS` | (none) | Comma-separated CORS origins (each must include scheme) |
 | `MEMORY_DB_PATH` | `~/.dojo/memory.db` | Conversation-memory SQLite path — **use an absolute path** |
 | `DOJO_CAS_PATH` | `~/.dojo/skills.db` | Content-addressable skill/workflow store |
@@ -93,6 +94,28 @@ The full set of variables is documented in [`.env.example`](./.env.example).
 | `MCP_APPS_ENABLED` | `false` | Enable the MCP Apps bridge |
 
 > **Relative DB paths bite.** A relative `MEMORY_DB_PATH` or `DOJO_CAS_PATH` silently creates a new empty database whenever the working directory changes (e.g. across restarts). Always use absolute paths in any non-local deployment.
+
+### JWT signing secret
+
+The gateway signs and verifies **every** bearer token — human sessions and machine service tokens alike — with one HMAC secret.
+
+**`JWT_SECRET` is the only name that configures it.**
+
+```bash
+JWT_SECRET=$(openssl rand -hex 32)
+```
+
+| Source | Read by the gateway? |
+|---|---|
+| `JWT_SECRET` env var | **Yes — this is the one.** |
+| `DOJO_JWT_SECRET` env var | Deprecated alias. Honoured as a fallback so older hosts are not left unconfigured; `JWT_SECRET` wins when both are set. Rename it. |
+| `jwt_secret:` in a config YAML | **No.** Not wired to anything. Removed from `deploy/gateway-config.yaml`. |
+
+If neither variable is set, the gateway falls back to a built-in development secret that is committed to this repository — anyone who has read the source could forge a token, including one carrying `role: admin`.
+
+**With `ENVIRONMENT=production`, that is now a hard startup failure:** the gateway refuses to start and names the variable to set. Development is unaffected — local runs and tests keep working with no configuration.
+
+Startup logs the *name* of the variable the secret came from and whether it is the built-in default. The secret value is never logged.
 
 ### YAML config
 
@@ -181,7 +204,7 @@ sudo bash deploy/provision.sh             # idempotent — safe to re-run
 |------|---------|
 | `/usr/local/bin/dojo-gateway` | The Gateway binary (release tarball `agentic-gateway_<version>_linux_amd64.tar.gz`) |
 | `/etc/dojo/config.yaml` | Gateway config ([`deploy/gateway-config.yaml`](./deploy/gateway-config.yaml) template) |
-| `/etc/dojo/env` | Secrets — `DOJO_JWT_SECRET`, provider keys, GitHub OAuth creds (`chmod 640`, `root:dojo`) |
+| `/etc/dojo/env` | Secrets — `JWT_SECRET`, provider keys, GitHub OAuth creds (`chmod 640`, `root:dojo`) |
 | `/var/lib/dojo` | Data dir (memory + CAS SQLite) |
 | `/etc/caddy/Caddyfile` | TLS reverse proxy → `localhost:7340` ([`deploy/Caddyfile`](./deploy/Caddyfile)) |
 | `dojo-gateway.service` | systemd unit ([`deploy/gateway.service`](./deploy/gateway.service)) |
@@ -203,14 +226,14 @@ curl https://gateway.trespies.dev/health
 
 ### Security
 
-- Generate a strong JWT secret: `openssl rand -hex 32` → `DOJO_JWT_SECRET` in `/etc/dojo/env`.
+- Generate a strong JWT secret: `openssl rand -hex 32` → **`JWT_SECRET`** in `/etc/dojo/env`. With `ENVIRONMENT=production` the gateway refuses to start without it (see [JWT signing secret](#jwt-signing-secret)). `DOJO_JWT_SECRET` is a deprecated alias — rename any host still using it.
 - Keep `registration_enabled: false` in production config; create the first admin out-of-band.
 - The Docker image already runs as non-root (UID 65534) on a distroless base; the systemd unit adds `NoNewPrivileges`, `ProtectSystem=strict`, and `ProtectHome`.
 - Caddy sets HSTS, `X-Content-Type-Options`, `X-Frame-Options`, and `Referrer-Policy`; keep only ports 80/443 open in the firewall.
 
 ### Secrets management
 
-Store provider keys and the JWT secret in `/etc/dojo/env` (systemd `EnvironmentFile`), not in the tracked YAML. For orchestrated deployments use the platform's secret store (Kubernetes secrets, cloud secret managers) rather than baking keys into images.
+Store provider keys and `JWT_SECRET` in `/etc/dojo/env` (systemd `EnvironmentFile`), not in the tracked YAML — the YAML is not read for secrets at all. For orchestrated deployments use the platform's secret store (Kubernetes secrets, cloud secret managers) rather than baking keys into images.
 
 ---
 
@@ -219,6 +242,19 @@ Store provider keys and the JWT secret in `/etc/dojo/env` (systemd `EnvironmentF
 ### A provider is missing from `/health`
 
 Providers without an API key are skipped silently at startup. Confirm the key is present in the process environment (`.env` is only read if it exists in the working directory) and re-check `/health` → `providers`.
+
+### Gateway exits immediately with "refusing to start"
+
+`ENVIRONMENT=production` and no signing secret was found. Set `JWT_SECRET` in `/etc/dojo/env` and restart:
+
+```bash
+echo "JWT_SECRET=$(openssl rand -hex 32)" >> /etc/dojo/env
+systemctl restart dojo-gateway
+```
+
+This is deliberate. Before the gate existed, the gateway started anyway and signed every session with a secret published in this repository. If the host previously used `DOJO_JWT_SECRET`, it still works, but rename it to `JWT_SECRET`.
+
+> Changing the secret invalidates every existing session and service token. Rotate it during a maintenance window, and re-mint service tokens (`make service-token SERVICE=<name>`) afterwards.
 
 ### Port already in use
 

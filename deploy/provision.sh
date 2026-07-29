@@ -117,12 +117,35 @@ run "chown root:'${GATEWAY_USER}' '${CONFIG_DIR}/config.yaml'"
 run "chmod 640 '${CONFIG_DIR}/config.yaml'"
 
 # Ensure /etc/dojo/env exists (EnvironmentFile is non-fatal if absent, but create
-# it empty so operators know where to place secrets)
+# it empty so operators know where to place secrets).
+#
+# JWT_SECRET is the name the gateway actually reads. Do not write
+# DOJO_JWT_SECRET here: it is only a deprecated fallback, and for several
+# releases it was the ONLY name the docs gave — a host configured with it alone
+# signed every session with the built-in development secret. The unit sets
+# ENVIRONMENT=production, so a gateway with no secret now refuses to start
+# (Phase 8 below will surface that as a failed health check).
 if [[ ! -f "${CONFIG_DIR}/env" ]]; then
     run "touch '${CONFIG_DIR}/env'"
     run "chown root:'${GATEWAY_USER}' '${CONFIG_DIR}/env'"
     run "chmod 640 '${CONFIG_DIR}/env'"
     log "Created empty ${CONFIG_DIR}/env — populate with secrets before starting the service"
+fi
+
+# Warn loudly when no signing secret is configured. The gateway refuses to start
+# without one in production; catching it here gives a better message than a
+# failed health check. Only presence is tested — the value is never read, echoed
+# or logged.
+if ! $DRY_RUN; then
+    if grep -qE '^[[:space:]]*(JWT_SECRET|DOJO_JWT_SECRET)=.+' "${CONFIG_DIR}/env" 2>/dev/null; then
+        log "JWT signing secret found in ${CONFIG_DIR}/env"
+    else
+        log "ERROR: no JWT_SECRET in ${CONFIG_DIR}/env. The gateway signs every session"
+        log "       and service token with it, and refuses to start in production without"
+        log "       one. Add it, then re-run this script:"
+        log "           echo \"JWT_SECRET=\$(openssl rand -hex 32)\" >> ${CONFIG_DIR}/env"
+        exit 1
+    fi
 fi
 
 # ---------------------------------------------------------------------------

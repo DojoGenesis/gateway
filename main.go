@@ -29,6 +29,7 @@ import (
 	"github.com/DojoGenesis/gateway/server/config"
 	"github.com/DojoGenesis/gateway/server/database"
 	"github.com/DojoGenesis/gateway/server/logging"
+	"github.com/DojoGenesis/gateway/server/middleware"
 	"github.com/DojoGenesis/gateway/server/orchestration"
 	"github.com/DojoGenesis/gateway/server/services"
 	svcproviders "github.com/DojoGenesis/gateway/server/services/providers"
@@ -83,6 +84,32 @@ func main() {
 		slog.Warn("config validation issue", "error", err)
 	}
 	slog.Info("configuration loaded", "port", cfg.Port, "environment", cfg.Environment)
+
+	// ─── JWT Signing Secret (fail fast in production) ────────────────
+	// Re-read the secret now that .env has been loaded above: the middleware
+	// package resolves it in a package-level variable initialiser that runs at
+	// import time, before main() gets to loadDotEnv, so a secret living only in
+	// .env would otherwise never take effect.
+	//
+	// This whole block runs long before server.Start(), so the gateway never
+	// serves a single request on an unconfigured secret. Only presence and
+	// default-ness are logged — never the secret, not even truncated.
+	jwtSecretStatus := middleware.LoadJWTSecretFromEnv()
+	if jwtSecretStatus.BothNamesSet {
+		slog.Warn("both JWT secret variables are set — the deprecated alias is ignored",
+			"in_effect", middleware.EnvJWTSecret, "ignored", middleware.EnvJWTSecretLegacy)
+	}
+	if jwtSecretStatus.UsingLegacyName {
+		slog.Warn("JWT secret came from a deprecated variable — rename it",
+			"deprecated", middleware.EnvJWTSecretLegacy, "use", middleware.EnvJWTSecret)
+	}
+	slog.Info("JWT signing secret resolved",
+		"source", jwtSecretStatus.SourceLabel(),
+		"using_built_in_default", jwtSecretStatus.UsingDefault)
+	if err := middleware.EnsureJWTSecretConfigured(cfg.Environment); err != nil {
+		slog.Error("refusing to start", "error", err)
+		os.Exit(1)
+	}
 
 	// ─── Initialize OTEL (if enabled) ────────────────────────────────
 	var tracerProvider *sdktrace.TracerProvider

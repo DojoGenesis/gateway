@@ -39,10 +39,11 @@ func main() {
 	// A token signed with the publicly known development fallback is forgeable
 	// by anyone who has read this repository. Refuse by default.
 	if middleware.UsingDefaultJWTSecret() && !*allowDevSecret {
-		fatal("refusing to mint: this process is signing with the built-in development secret.\n" +
-			"       JWT_SECRET is unset or empty in this shell.\n" +
-			"       Load the SAME JWT_SECRET the running gateway uses, then retry.\n" +
-			"       (Pass -allow-dev-secret only for local testing.)")
+		fatal("refusing to mint: this process is signing with the built-in development secret.\n"+
+			"       %s is unset or empty in this shell (the deprecated %s is also honoured).\n"+
+			"       Load the SAME secret the running gateway uses, then retry.\n"+
+			"       (Pass -allow-dev-secret only for local testing.)",
+			middleware.EnvJWTSecret, middleware.EnvJWTSecretLegacy)
 	}
 
 	token, jti, err := middleware.IssueServiceToken(*service, *ttl)

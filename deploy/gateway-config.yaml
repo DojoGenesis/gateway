@@ -1,8 +1,14 @@
+# NOTE: secrets do NOT belong in this file and are not read from it.
+# The JWT signing secret is read from the JWT_SECRET environment variable only
+# (see deploy/README.md). A `jwt_secret:` key used to sit here expanding
+# ${DOJO_JWT_SECRET}; nothing in the Go code ever loaded either one, so a host
+# configured through them signed every session with the built-in development
+# secret. Put JWT_SECRET in /etc/dojo/env instead — do not re-add it here.
+
 port: 7340
 environment: production
 data_dir: /var/lib/dojo
 registration_enabled: false
-jwt_secret: "${DOJO_JWT_SECRET}"
 
 providers:
   anthropic:

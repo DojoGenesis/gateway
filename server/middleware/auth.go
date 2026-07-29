@@ -11,14 +11,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// defaultJWTSecret is the development fallback used when JWT_SECRET is unset.
-// It is publicly known, so anything signed with it is forgeable by anyone —
-// see UsingDefaultJWTSecret, which the service-token minting CLI checks.
-const defaultJWTSecret = "dev-secret-change-in-production"
-
-// jwtSecret is loaded once from the environment.
-// In production, JWT_SECRET must be set to a strong random value.
-var jwtSecret = []byte(getEnvDefault("JWT_SECRET", defaultJWTSecret))
+// The signing secret, where it is read from, and the production startup gate
+// all live in jwt_secret.go. Every sign and verify path below reads it through
+// currentJWTSecret() — do not reintroduce a package-level copy here.
 
 // isDevelopment returns true when ENVIRONMENT != "production".
 func isDevelopment() bool {
@@ -253,7 +248,7 @@ func validateTokenWithClaims(tokenString string) (string, *GatewayClaims, error)
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
 		}
-		return jwtSecret, nil
+		return currentJWTSecret(), nil
 	})
 	if err != nil {
 		return "", nil, err
@@ -300,7 +295,7 @@ func validateAdminRole(tokenString string, userID string) (bool, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
 		}
-		return jwtSecret, nil
+		return currentJWTSecret(), nil
 	})
 	if err != nil {
 		return false, err
@@ -323,7 +318,7 @@ func validateAdminRole(tokenString string, userID string) (bool, error) {
 // GetJWTSecret returns the configured JWT secret for use by token-issuing handlers.
 // This is the only function in this file that should be exported for issuance.
 func GetJWTSecret() []byte {
-	return jwtSecret
+	return currentJWTSecret()
 }
 
 // ValidateRefreshToken validates a refresh token and returns the user ID.
@@ -334,7 +329,7 @@ func ValidateRefreshToken(tokenString string) (string, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
 		}
-		return jwtSecret, nil
+		return currentJWTSecret(), nil
 	})
 	if err != nil || !token.Valid {
 		return "", jwt.ErrSignatureInvalid
@@ -347,11 +342,4 @@ func ValidateRefreshToken(tokenString string) (string, error) {
 		return "", jwt.ErrTokenInvalidSubject
 	}
 	return subject, nil
-}
-
-func getEnvDefault(key, defaultValue string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return defaultValue
 }

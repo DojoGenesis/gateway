@@ -157,7 +157,7 @@ The conversation handlers already extract `user_id` from gin context (set by Aut
    - `GITHUB_OAUTH_REDIRECT_URI=https://gateway.trespies.dev/auth/github/callback`
    - `GITHUB_OAUTH_ENABLED=true`
    - `REGISTRATION_ENABLED=false` (closed — admin creates users manually)
-   - `DOJO_JWT_SECRET=<random 64-char hex>`
+   - `DOJO_JWT_SECRET=<random 64-char hex>` — **CORRECTION (2026-07-28): this variable name was wrong.** No Go code read it; a host configured this way signed every session with the built-in development secret. Use `JWT_SECRET`. Preserved here as the historical record of what this handoff said; see `DEPLOYMENT.md` § JWT signing secret.
    - Provider API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY)
 5. Create first admin user via CLI or direct DB insert
 

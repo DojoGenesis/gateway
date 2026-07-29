@@ -20,7 +20,7 @@ Target: Hetzner CPX21, Ubuntu 24.04 LTS, `gateway.trespies.dev`
 After the first run of `provision.sh`, create `/etc/dojo/env` (the file is created empty by the script):
 
 ```
-DOJO_JWT_SECRET=<random 64-char hex string>
+JWT_SECRET=<random 64-char hex string>
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 GITHUB_OAUTH_CLIENT_ID=<from step 2>
@@ -31,6 +31,12 @@ Generate a strong JWT secret:
 ```bash
 openssl rand -hex 32
 ```
+
+> **`JWT_SECRET` is the variable that works.** It signs and verifies every bearer token — human sessions and machine service tokens alike.
+>
+> Earlier revisions of this guide said `DOJO_JWT_SECRET`, which no Go code read: a host provisioned from those instructions came up signing every session with a development secret committed to this repository, with no error. `DOJO_JWT_SECRET` is now honoured as a deprecated fallback so such hosts are not left unconfigured, and `JWT_SECRET` wins when both are set — but rename it.
+>
+> The unit sets `ENVIRONMENT=production`, so **the gateway now refuses to start if neither is set** rather than coming up forgeable. There is no `jwt_secret:` key in `gateway-config.yaml`; the YAML is not read for secrets.
 
 Protect the file (the script sets this, but verify):
 ```bash

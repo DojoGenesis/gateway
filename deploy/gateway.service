@@ -13,8 +13,18 @@ Restart=on-failure
 RestartSec=5
 LimitNOFILE=65535
 
-# Environment variables (override via /etc/dojo/env or systemd drop-in)
+# Secrets and provider keys (JWT_SECRET, ANTHROPIC_API_KEY, GitHub OAuth creds).
+# Assignments below this line win over the file, which is why the fixed paths and
+# ENVIRONMENT are set here rather than left to the operator.
 EnvironmentFile=-/etc/dojo/env
+
+# This unit IS the production deployment, so declare it. Two things depend on it:
+# the JWT-secret startup gate (the gateway refuses to run on the built-in
+# development secret in production) and the development-only legacy token shim in
+# validateToken, which is inert unless ENVIRONMENT is production. Leaving this
+# unset makes both silently permissive.
+Environment="ENVIRONMENT=production"
+
 Environment="SYSTEM_PROMPT_FILE=/etc/dojo/system-prompt.md"
 Environment="MEMORY_DB_PATH=/var/lib/dojo/memory.db"
 Environment="DOJO_CAS_PATH=/var/lib/dojo/skills.db"
