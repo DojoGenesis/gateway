@@ -78,7 +78,13 @@ type ServerConfig struct {
 	// endpoints. Currently unused — AdminAuthMiddleware uses JWT validation only.
 	AdminAPIKey string
 	// RegistrationEnabled controls whether POST /auth/register is open.
-	// When false, the endpoint returns 403. Defaults to true.
+	// When false, the endpoint returns 403. Defaults to true — this gateway
+	// deliberately lets anyone sign up and use the chat.
+	//
+	// main.go sets this from config.Config.RegistrationEnabled, which reads
+	// `registration_enabled` in the config file and REGISTRATION_ENABLED in
+	// the environment. It was hardcoded true here and in main.go until the
+	// config key was made real; a deployment that wrote the key got nothing.
 	RegistrationEnabled bool
 }
 

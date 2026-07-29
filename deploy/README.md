@@ -32,6 +32,20 @@ Generate a strong JWT secret:
 openssl rand -hex 32
 ```
 
+Optionally, to close public sign-up (it is **open** by default — anyone may
+register and use the chat):
+
+```
+REGISTRATION_ENABLED=false
+```
+
+> This variable is the only thing that closes registration. `registration_enabled:`
+> in `/etc/dojo/config.yaml` can only *open* it. Hosts provisioned before v3.3.2
+> have `registration_enabled: false` sitting in that file from when no Go code
+> parsed the key — the gateway ran open regardless — so honouring it on the next
+> restart would close a service that was deliberately left open. The gateway
+> reports the discrepancy at startup instead of acting on it.
+
 > **`JWT_SECRET` is the variable that works.** It signs and verifies every bearer token — human sessions and machine service tokens alike.
 >
 > Earlier revisions of this guide said `DOJO_JWT_SECRET`, which no Go code read: a host provisioned from those instructions came up signing every session with a development secret committed to this repository, with no error. `DOJO_JWT_SECRET` is now honoured as a deprecated fallback so such hosts are not left unconfigured, and `JWT_SECRET` wins when both are set — but rename it.

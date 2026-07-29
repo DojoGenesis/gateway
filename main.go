@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -46,19 +47,69 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
+// runHealthCheck probes the local /health endpoint and exits. Used by the
+// Docker HEALTHCHECK, which has no curl/wget on the distroless base image.
+func runHealthCheck() {
+	port := getEnv("PORT", "7340")
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%s/health", port))
+	if err != nil {
+		os.Exit(1)
+	}
+	_ = resp.Body.Close() // Explicitly ignore error in health check
+	if resp.StatusCode != http.StatusOK {
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
+// commandLine is the parsed process arguments.
+type commandLine struct {
+	// ConfigPath is the file named by -config. Empty when the flag was absent.
+	ConfigPath string
+	// CheckConfig makes the process load configuration, report on it, and exit
+	// without starting anything.
+	CheckConfig bool
+}
+
+// parseCommandLine reads the process arguments.
+//
+// The binary used to inspect os.Args[1] for two hardcoded strings and parse
+// nothing else. The shipped systemd unit runs
+// `dojo-gateway -config /etc/dojo/config.yaml`; that argument was discarded
+// without a word, which is why /etc/dojo/config.yaml has never been read.
+//
+// An unrecognised flag is fatal: a typo like -conifg must not degrade into
+// "started fine, ignored your configuration".
+func parseCommandLine(args []string) commandLine {
+	fs := flag.NewFlagSet("agentic-gateway", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+
+	path := fs.String("config", "", "path to the gateway YAML config file (overrides CONFIG_PATH)")
+	checkConfig := fs.Bool("check-config", false, "load the configuration, report what it does, and exit without starting the server")
+	showVersion := fs.Bool("version", false, "print the version and exit")
+	healthCheck := fs.Bool("health-check", false, "probe the local /health endpoint and exit")
+
+	if err := fs.Parse(args); err != nil {
+		// flag has already printed the error and usage.
+		os.Exit(2)
+	}
+	if *showVersion {
+		fmt.Printf("agentic-gateway %s\n", srv.Version)
+		os.Exit(0)
+	}
+	if *healthCheck {
+		runHealthCheck()
+	}
+	return commandLine{ConfigPath: *path, CheckConfig: *checkConfig}
+}
+
 func main() {
 	// ─── Health Check Mode (for Docker HEALTHCHECK in distroless) ────
+	// Kept as a leading-argument fast path so the container probe and
+	// deploy/provision.sh keep working byte-for-byte; parseCommandLine below
+	// accepts the same flags in any position.
 	if len(os.Args) > 1 && os.Args[1] == "--health-check" {
-		port := getEnv("PORT", "7340")
-		resp, err := http.Get(fmt.Sprintf("http://localhost:%s/health", port))
-		if err != nil {
-			os.Exit(1)
-		}
-		_ = resp.Body.Close() // Explicitly ignore error in health check
-		if resp.StatusCode != http.StatusOK {
-			os.Exit(1)
-		}
-		os.Exit(0)
+		runHealthCheck()
 	}
 
 	// ─── Version Mode (print version and exit; used by deploy/provision.sh) ────
@@ -67,23 +118,64 @@ func main() {
 		os.Exit(0)
 	}
 
+	cmdline := parseCommandLine(os.Args[1:])
+
 	// ─── Load .env (if present) ─────────────────────────────────────
 	// Loads key=value pairs from .env into the environment before any
 	// config reads. Existing env vars take precedence (no override).
 	loadDotEnv(".env")
 
 	// ─── Load Configuration ──────────────────────────────────────────
-	cfg := config.Load()
+	cfgResult := config.LoadWithOptions(config.LoadOptions{Path: cmdline.ConfigPath})
+	cfg := cfgResult.Config
 
 	// Initialize structured logging based on environment
 	logging.Init(cfg.Environment)
 
 	slog.Info("Agentic Gateway starting", "version", srv.Version)
 
+	// Say where configuration came from, every start. A config file that is
+	// never found — or is found and half-ignored — must not be a silent state.
+	switch {
+	case cfgResult.Loaded:
+		slog.Info("configuration file loaded", "path", cfgResult.Path, "source", string(cfgResult.PathSource))
+	case cfgResult.Err == nil:
+		slog.Info("no configuration file found — running on defaults and environment variables",
+			"looked_for", cfgResult.Path, "source", string(cfgResult.PathSource))
+	}
+	for _, w := range cfgResult.Warnings {
+		slog.Warn("configuration", "detail", w)
+	}
+	if cfgResult.Err != nil {
+		slog.Error("refusing to start: configuration could not be loaded", "error", cfgResult.Err)
+		os.Exit(1)
+	}
+
 	if err := cfg.Validate(); err != nil {
 		slog.Warn("config validation issue", "error", err)
 	}
-	slog.Info("configuration loaded", "port", cfg.Port, "environment", cfg.Environment)
+	slog.Info("configuration loaded",
+		"port", cfg.Port,
+		"environment", cfg.Environment,
+		"registration_enabled", cfg.RegistrationEnabled)
+
+	// Public sign-up is a deliberate posture on this deployment, not an
+	// accident — but it mints role=user tokens that can spend provider credit,
+	// so its state is stated on every boot rather than inferred from a default.
+	if cfg.RegistrationEnabled {
+		slog.Info("user registration is OPEN — POST /auth/register accepts anonymous sign-ups " +
+			"(set REGISTRATION_ENABLED=false to close it)")
+	} else {
+		slog.Info("user registration is CLOSED — POST /auth/register returns 403")
+	}
+
+	// --check-config: everything above is the configuration report. Stop here
+	// without touching a port, a database or a provider, so an operator can
+	// verify a host's real config file before restarting the service on it.
+	if cmdline.CheckConfig {
+		slog.Info("configuration check passed — exiting without starting the server")
+		os.Exit(0)
+	}
 
 	// ─── JWT Signing Secret (fail fast in production) ────────────────
 	// Re-read the secret now that .env has been loaded above: the middleware
@@ -619,7 +711,7 @@ func main() {
 			AuthMode:            "api_key",
 			Environment:         cfg.Environment,
 			ShutdownTimeout:     30 * time.Second,
-			RegistrationEnabled: true,
+			RegistrationEnabled: cfg.RegistrationEnabled,
 		},
 		PluginManager:       pluginManager,
 		OrchestrationEngine: orchestrationEngine,

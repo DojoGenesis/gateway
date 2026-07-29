@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -20,6 +22,22 @@ type Config struct {
 	Budget         BudgetConfig     `yaml:"budget"`
 	OTEL           OTELConfig       `yaml:"otel"`
 	MCPApps        MCPAppsConfig    `yaml:"mcp_apps"`
+
+	// RegistrationEnabled opens POST /auth/register to anonymous callers.
+	//
+	// The default is TRUE — open. Open registration is deliberate on this
+	// deployment: anyone may sign up and use the chat. The default matches
+	// the behaviour the gateway has always had in practice (the server used
+	// to hardcode it), so upgrading a host cannot close a door the operator
+	// wants open.
+	//
+	// Until this release the key did not exist on the struct at all, so a
+	// config file setting it — either way — was silently discarded. It is now
+	// parsed. See applyRegistrationFileValue for the one asymmetry: a config
+	// *file* is not allowed to close registration on an upgrade, because
+	// deployed files predate this key being read. REGISTRATION_ENABLED=false
+	// in the environment closes it and always wins.
+	RegistrationEnabled bool `yaml:"registration_enabled"`
 }
 
 // MCPAppsConfig configures MCP Apps host infrastructure (v1.1.0).
@@ -68,22 +86,109 @@ type OTELConfig struct {
 	ServiceName  string  `json:"service_name" yaml:"service_name"`
 }
 
-func Load() *Config {
-	cfg := loadDefaults()
+// DefaultConfigPath is consulted when neither -config nor CONFIG_PATH names a
+// file. It is relative to the process working directory, which is why a
+// deployment that does not name a path explicitly usually finds nothing.
+const DefaultConfigPath = "config/config.yaml"
 
-	// Try to load from YAML file if it exists
-	configPath := getEnv("CONFIG_PATH", "config/config.yaml")
-	if _, err := os.Stat(configPath); err == nil {
-		if err := cfg.loadFromYAML(configPath); err != nil {
-			// Log error but continue with defaults
-			fmt.Fprintf(os.Stderr, "Warning: failed to load config from %s: %v\n", configPath, err)
-		}
+// PathSource records how the config file path was chosen. A path the operator
+// named (flag or environment) is "explicit": failing to read it is an error,
+// because silently running on defaults is what let a whole config file sit
+// inert in production.
+type PathSource string
+
+const (
+	PathSourceFlag    PathSource = "-config flag"
+	PathSourceEnv     PathSource = "CONFIG_PATH environment variable"
+	PathSourceDefault PathSource = "built-in default path"
+)
+
+// Explicit reports whether an operator named this path.
+func (s PathSource) Explicit() bool { return s != PathSourceDefault }
+
+// LoadOptions carries command-line input into configuration loading.
+type LoadOptions struct {
+	// Path is the file named by -config. Empty when the flag was not given.
+	Path string
+}
+
+// LoadResult is the outcome of a load: always a usable Config, plus enough
+// diagnostics for the caller to say out loud where configuration came from.
+type LoadResult struct {
+	// Config is never nil — on any failure it holds defaults plus environment
+	// overrides, so a caller that chooses to continue still has a valid config.
+	Config *Config
+
+	// Path is the file that was consulted, and PathSource how it was chosen.
+	Path       string
+	PathSource PathSource
+
+	// Loaded is true when the file was found and decoded.
+	Loaded bool
+
+	// Warnings names every key the file contained that the gateway could not
+	// apply. Each one is a setting the operator wrote that does nothing.
+	Warnings []string
+
+	// Err is a hard failure: an explicitly-named file that could not be read,
+	// or a file that is not parseable YAML. Callers should refuse to start.
+	Err error
+}
+
+// LoadWithOptions resolves the config file, loads it, and applies environment
+// overrides on top.
+//
+// Precedence, lowest first: built-in defaults → config file → environment.
+func LoadWithOptions(opts LoadOptions) *LoadResult {
+	res := &LoadResult{Config: loadDefaults()}
+
+	switch {
+	case opts.Path != "":
+		res.Path, res.PathSource = opts.Path, PathSourceFlag
+	case os.Getenv("CONFIG_PATH") != "":
+		res.Path, res.PathSource = os.Getenv("CONFIG_PATH"), PathSourceEnv
+	default:
+		res.Path, res.PathSource = DefaultConfigPath, PathSourceDefault
 	}
 
-	// Override with environment variables
-	cfg.applyEnvironmentOverrides()
+	//nolint:gosec // G703 -- the path is operator input by design (-config / CONFIG_PATH);
+	// pointing the gateway at its own config file is the whole purpose of the flag.
+	if _, err := os.Stat(res.Path); err != nil {
+		if res.PathSource.Explicit() {
+			// An operator who names a config file expects it to be read. The
+			// systemd unit has passed -config /etc/dojo/config.yaml since the
+			// first deploy while the binary parsed no flags at all, so the file
+			// was never opened and nothing said so.
+			res.Err = fmt.Errorf("config file %q named by the %s could not be opened: %w",
+				res.Path, res.PathSource, err)
+		}
+		res.Config.applyEnvironmentOverrides()
+		return res
+	}
 
-	return cfg
+	warnings, err := res.Config.loadFromYAML(res.Path)
+	res.Warnings = warnings
+	if err != nil {
+		res.Err = fmt.Errorf("config file %q (from %s): %w", res.Path, res.PathSource, err)
+	} else {
+		res.Loaded = true
+	}
+
+	res.Config.applyEnvironmentOverrides()
+	return res
+}
+
+// Load is the historical entry point: it never reports failure to its caller,
+// so it writes diagnostics to stderr. Prefer LoadWithOptions.
+func Load() *Config {
+	res := LoadWithOptions(LoadOptions{})
+	for _, w := range res.Warnings {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", w)
+	}
+	if res.Err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", res.Err)
+	}
+	return res.Config
 }
 
 func loadDefaults() *Config {
@@ -109,23 +214,203 @@ func loadDefaults() *Config {
 			SamplingRate: 1.0,
 			ServiceName:  "agentic-gateway",
 		},
+		// Open by design: anyone may register and use the chat. See the field
+		// comment on Config.RegistrationEnabled.
+		RegistrationEnabled: true,
 	}
 }
 
-func (c *Config) loadFromYAML(path string) error {
+// loadFromYAML applies path to c and returns one warning per key it could not
+// use. It returns an error only when the file is unreadable or is not valid
+// YAML — cases where nothing at all could be applied.
+//
+// Unknown and unparseable keys are warnings rather than errors on purpose.
+// Strict decoding (KnownFields) is used to *find* them, but promoting them to
+// a startup failure would refuse to boot the current production host, whose
+// config file carries several keys this struct has never had fields for.
+func (c *Config) loadFromYAML(path string) ([]string, error) {
+	//nolint:gosec // G304 -- path is the operator-named config file (see LoadWithOptions).
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	// Expand environment variables in YAML content
 	expandedData := expandEnvVars(string(data))
 
-	if err := yaml.Unmarshal([]byte(expandedData), c); err != nil {
-		return fmt.Errorf("failed to parse YAML config: %w", err)
+	// Decode into a copy: a file that fails to parse outright must not leave
+	// the caller with a half-applied configuration.
+	scratch := *c
+
+	dec := yaml.NewDecoder(strings.NewReader(expandedData))
+	dec.KnownFields(true)
+	err = dec.Decode(&scratch)
+
+	var typeErr *yaml.TypeError
+	var warnings []string
+
+	switch {
+	case errors.Is(err, io.EOF):
+		// Empty or comment-only file. Nothing to apply, nothing wrong — but
+		// say so, because "my settings do nothing" is the bug being fixed.
+		return []string{fmt.Sprintf(
+			"config file %s contains no settings — every value is coming from defaults and environment variables", path,
+		)}, nil
+
+	case err == nil:
+		// Whole document understood.
+
+	case errors.As(err, &typeErr):
+		// yaml decoded everything it understood and is reporting the rest:
+		// unknown keys, and values whose shape does not fit the struct. Keep
+		// what decoded, name what did not.
+		warnings = describeTypeErrors(path, expandedData, typeErr)
+
+	default:
+		// A syntax error: the document could not be parsed, so none of it was
+		// applied. Do not pretend the file was honoured.
+		return nil, fmt.Errorf("failed to parse YAML config: %w", errors.New(redactYAMLScalars(err.Error())))
 	}
 
-	return nil
+	prior := c.RegistrationEnabled
+	*c = scratch
+	return append(warnings, c.applyRegistrationFileValue(path, expandedData, prior)...), nil
+}
+
+// applyRegistrationFileValue enforces the one asymmetry in config loading: a
+// config *file* may open registration but may not close it.
+//
+// The reason is a live upgrade hazard, not a policy preference. Deployed config
+// files were written when this key was silently discarded — the production host
+// carries `registration_enabled: false` in a file that has never once been read
+// — so the moment the file starts being honoured, a restart would close a
+// service the operator deliberately runs open. Nobody wrote that `false` with
+// the knowledge that it would take effect.
+//
+// REGISTRATION_ENABLED in the environment is applied later, unconditionally, in
+// both directions: it is the supported way to close registration, and it cannot
+// have been set by an older deploy that did not know about it.
+//
+// Remove this guard once no deployed config file still carries a stale
+// `registration_enabled: false` (see deploy/gateway-config.yaml).
+func (c *Config) applyRegistrationFileValue(path, expandedData string, prior bool) []string {
+	var probe struct {
+		RegistrationEnabled *bool `yaml:"registration_enabled"`
+	}
+	// Non-strict on purpose: this decode only inspects one key.
+	if err := yaml.Unmarshal([]byte(expandedData), &probe); err != nil {
+		return nil
+	}
+	if probe.RegistrationEnabled == nil || *probe.RegistrationEnabled {
+		return nil // absent, or opening registration — nothing to guard.
+	}
+
+	c.RegistrationEnabled = prior
+	if !prior {
+		return nil // already closed by a lower layer; nothing changed, nothing to say.
+	}
+	if v := os.Getenv("REGISTRATION_ENABLED"); v != "" && v != "true" && v != "1" {
+		// The environment override is applied after this and will close
+		// registration anyway. Announcing that the file is being overruled
+		// would contradict the state the gateway actually ends up in.
+		return nil
+	}
+	return []string{fmt.Sprintf(
+		"%s sets registration_enabled: false, but user registration is staying OPEN. "+
+			"That key was never read until this release, so a config file cannot be "+
+			"trusted to mean it — a restart would have silently closed public sign-up. "+
+			"To actually close registration set REGISTRATION_ENABLED=false in the "+
+			"environment; to keep it open, change this file to registration_enabled: true", path,
+	)}
+}
+
+// describeTypeErrors turns yaml's strict-decoding complaints into operator-
+// facing warnings. Every line here is a setting somebody wrote that does not
+// do what they think it does.
+func describeTypeErrors(path, doc string, typeErr *yaml.TypeError) []string {
+	keys := yamlKeyPaths(doc)
+	warnings := make([]string, 0, len(typeErr.Errors))
+	for _, msg := range typeErr.Errors {
+		clean := redactYAMLScalars(msg)
+		if strings.Contains(msg, "not found in type") {
+			// These already name the offending key.
+			warnings = append(warnings, fmt.Sprintf(
+				"%s: %s — this key is not a gateway setting and has NO effect", path, clean))
+			continue
+		}
+		// These identify the problem by line only ("line 14: cannot unmarshal
+		// !!map into []config.ProviderConfig"), which is useless in a journal
+		// without the file open. Name the key.
+		if key, ok := keys[yamlErrorLine(msg)]; ok {
+			clean += fmt.Sprintf(" (key %q)", key)
+		}
+		warnings = append(warnings, fmt.Sprintf(
+			"%s: %s — this value could not be parsed and was IGNORED; the previous value is still in effect", path, clean))
+	}
+	return warnings
+}
+
+// yamlErrorLineRE matches the "line N:" prefix yaml puts on each type error.
+var yamlErrorLineRE = regexp.MustCompile(`^line (\d+):`)
+
+func yamlErrorLine(msg string) int {
+	m := yamlErrorLineRE.FindStringSubmatch(msg)
+	if m == nil {
+		return 0
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// yamlKeyPaths maps each line that declares a mapping key to that key's dotted
+// path, so a line number from a decode error can be reported as a key name.
+func yamlKeyPaths(doc string) map[int]string {
+	var root yaml.Node
+	if err := yaml.Unmarshal([]byte(doc), &root); err != nil {
+		return nil
+	}
+
+	paths := make(map[int]string)
+	var walk func(n *yaml.Node, prefix string)
+	walk = func(n *yaml.Node, prefix string) {
+		switch n.Kind {
+		case yaml.DocumentNode:
+			for _, child := range n.Content {
+				walk(child, prefix)
+			}
+		case yaml.MappingNode:
+			for i := 0; i+1 < len(n.Content); i += 2 {
+				key, value := n.Content[i], n.Content[i+1]
+				path := key.Value
+				if prefix != "" {
+					path = prefix + "." + key.Value
+				}
+				paths[key.Line] = path
+				walk(value, path)
+			}
+		case yaml.SequenceNode:
+			for i, child := range n.Content {
+				walk(child, fmt.Sprintf("%s[%d]", prefix, i))
+			}
+		}
+	}
+	walk(&root, "")
+	return paths
+}
+
+// yamlQuotedScalar matches the offending value yaml embeds in type errors, e.g.
+// "cannot unmarshal !!str `sk-ant-...` into int".
+var yamlQuotedScalar = regexp.MustCompile("`[^`]*`")
+
+// redactYAMLScalars strips values out of yaml error text before it is logged.
+// Config files hold provider API keys — and ${VAR} placeholders are expanded
+// before parsing, so the real secret is what would be quoted. Key names and
+// line numbers survive; values do not.
+func redactYAMLScalars(msg string) string {
+	return yamlQuotedScalar.ReplaceAllString(msg, "`<redacted>`")
 }
 
 func (c *Config) applyEnvironmentOverrides() {
@@ -172,6 +457,13 @@ func (c *Config) applyEnvironmentOverrides() {
 	// Handle MCP Apps configuration
 	if mcpAppsEnabled := os.Getenv("MCP_APPS_ENABLED"); mcpAppsEnabled != "" {
 		c.MCPApps.Enabled = mcpAppsEnabled == "true" || mcpAppsEnabled == "1"
+	}
+
+	// Registration. Unlike the config file this is honoured in both
+	// directions — it is the supported way to close public sign-up, and no
+	// older deployment can have set it by accident.
+	if registration := os.Getenv("REGISTRATION_ENABLED"); registration != "" {
+		c.RegistrationEnabled = registration == "true" || registration == "1"
 	}
 }
 

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,8 +60,9 @@ budget:
 	require.NoError(t, err)
 
 	cfg := loadDefaults()
-	err = cfg.loadFromYAML(configPath)
+	warnings, err := cfg.loadFromYAML(configPath)
 	require.NoError(t, err)
+	require.Empty(t, warnings)
 
 	assert.Equal(t, "9000", cfg.Port)
 	assert.Equal(t, "test", cfg.Environment)
@@ -182,8 +184,9 @@ providers:
 	require.NoError(t, err)
 
 	cfg := loadDefaults()
-	err = cfg.loadFromYAML(configPath)
+	warnings, err := cfg.loadFromYAML(configPath)
 	require.NoError(t, err)
+	require.Empty(t, warnings)
 
 	assert.Len(t, cfg.Providers, 1)
 	assert.Equal(t, "my-secret-key", cfg.Providers[0].Config["api_key"])
@@ -482,8 +485,9 @@ routing:
 	require.NoError(t, err)
 
 	cfg := loadDefaults()
-	err = cfg.loadFromYAML(configPath)
+	warnings, err := cfg.loadFromYAML(configPath)
 	require.NoError(t, err)
+	require.Empty(t, warnings)
 
 	assert.Len(t, cfg.Providers, 2)
 
@@ -546,11 +550,16 @@ func TestValidationWithMixedEnabledProviders(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestLoadFromYAMLMalformed pins the split between the two failure modes:
+// a document that cannot be parsed at all is an error (nothing was applied),
+// while a value that does not fit the struct is a named warning (everything
+// else was applied). Type errors used to discard the whole file silently.
 func TestLoadFromYAMLMalformed(t *testing.T) {
 	tests := []struct {
 		name        string
 		yamlContent string
 		expectErr   bool
+		wantWarning string
 	}{
 		{
 			name: "invalid YAML syntax",
@@ -571,7 +580,7 @@ providers:
     priority: 1
     plugin_path: plugins/test
 `,
-			expectErr: true,
+			wantWarning: "was IGNORED",
 		},
 		{
 			name: "invalid type for priority",
@@ -582,7 +591,7 @@ providers:
     priority: "not a number"
     plugin_path: plugins/test
 `,
-			expectErr: true,
+			wantWarning: "was IGNORED",
 		},
 	}
 
@@ -595,13 +604,15 @@ providers:
 			require.NoError(t, err)
 
 			cfg := loadDefaults()
-			err = cfg.loadFromYAML(configPath)
+			warnings, err := cfg.loadFromYAML(configPath)
 
 			if tt.expectErr {
 				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+				return
 			}
+			assert.NoError(t, err)
+			require.NotEmpty(t, warnings, "an unusable value must be reported, not swallowed")
+			assert.Contains(t, strings.Join(warnings, "\n"), tt.wantWarning)
 		})
 	}
 }

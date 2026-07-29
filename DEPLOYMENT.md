@@ -59,8 +59,51 @@ For a TLS-terminated production deployment on Hetzner (Caddy + systemd), see
 Configuration is layered, lowest precedence first:
 
 1. `.env` — loaded on startup if present (existing environment variables are **not** overridden)
-2. `gateway-config.yaml` (or the path passed via `-config` / `MCP_CONFIG_PATH`)
+2. The YAML config file — see below
 3. Process environment variables — highest precedence
+
+### Which config file is read
+
+The gateway picks exactly one, in this order:
+
+| Source | Missing file behaviour |
+|---|---|
+| `-config /path/to/config.yaml` | **Startup fails** (exit 1) |
+| `CONFIG_PATH` environment variable | **Startup fails** (exit 1) |
+| `config/config.yaml`, relative to the working directory | Ignored — normal for a deployment that names no file |
+
+> **`-config` was ignored until v3.3.2.** The binary parsed no flags: it checked
+> `os.Args[1]` for `--health-check` and `--version` and discarded everything
+> else. The systemd unit has always run `dojo-gateway -config /etc/dojo/config.yaml`,
+> so that file was never opened and every setting in it was a no-op. Naming a
+> path that cannot be read is now a startup failure rather than a silent
+> fallback to defaults.
+
+`MCP_CONFIG_PATH` is unrelated — it points at `gateway-config.yaml` for the MCP host.
+
+**Check a host's config before restarting it.** `--check-config` loads the file,
+prints exactly what it will and will not apply, and exits without binding a
+port, opening a database or contacting a provider:
+
+```bash
+/usr/local/bin/dojo-gateway -config /etc/dojo/config.yaml --check-config
+# exit 0 = the gateway will start on this file; exit 1 = it will not
+```
+
+### Keys the gateway does not recognise
+
+Unknown keys, and values whose shape does not fit, are **reported by name and
+line at every startup** and then ignored:
+
+```
+level=WARN msg=configuration detail="/etc/dojo/config.yaml: line 3: field data_dir not found in type config.Config — this key is not a gateway setting and has NO effect"
+```
+
+They are warnings rather than errors on purpose: several deployed config files
+carry keys that have never been parsed, and refusing to boot on them would take
+a working host down. A file that is not valid YAML at all *is* fatal — none of
+it can be applied, so pretending otherwise is what caused this class of bug.
+Values are redacted from these messages; only key names and line numbers appear.
 
 ### Provider API keys
 
@@ -92,6 +135,7 @@ The full set of variables is documented in [`.env.example`](./.env.example).
 | `AUTH_DB_DIR` | `.dojo/` (CWD-relative) | Auth DB directory — set absolute for deploys |
 | `MCP_CONFIG_PATH` | `gateway-config.yaml` | MCP host configuration file |
 | `MCP_APPS_ENABLED` | `false` | Enable the MCP Apps bridge |
+| `REGISTRATION_ENABLED` | `true` | Public sign-up on `POST /auth/register`. **The only way to close it** — see below |
 
 > **Relative DB paths bite.** A relative `MEMORY_DB_PATH` or `DOJO_CAS_PATH` silently creates a new empty database whenever the working directory changes (e.g. across restarts). Always use absolute paths in any non-local deployment.
 
@@ -227,7 +271,8 @@ curl https://gateway.trespies.dev/health
 ### Security
 
 - Generate a strong JWT secret: `openssl rand -hex 32` → **`JWT_SECRET`** in `/etc/dojo/env`. With `ENVIRONMENT=production` the gateway refuses to start without it (see [JWT signing secret](#jwt-signing-secret)). `DOJO_JWT_SECRET` is a deprecated alias — rename any host still using it.
-- Keep `registration_enabled: false` in production config; create the first admin out-of-band.
+- **Public registration is open by default and that is deliberate on this deployment** — anyone may sign up and use the chat. `POST /auth/register` issues a `role=user` JWT that can reach `/v1`, including the completion endpoints that spend `ANTHROPIC_API_KEY`, so keep the budget limits meaningful. The gateway states the setting on every boot (`user registration is OPEN|CLOSED`).
+- **To close registration, set `REGISTRATION_ENABLED=false` in `/etc/dojo/env`.** `registration_enabled:` in the YAML file can only *open* it: deployed copies of that file still carry `registration_enabled: false` from when no code parsed the key, and a restart must not close public sign-up on the strength of a line nobody knew was live. A file saying `false` is reported at startup and not applied. (Remove that asymmetry — `applyRegistrationFileValue` in `server/config/config.go` — once no host carries a stale `false`.)
 - The Docker image already runs as non-root (UID 65534) on a distroless base; the systemd unit adds `NoNewPrivileges`, `ProtectSystem=strict`, and `ProtectHome`.
 - Caddy sets HSTS, `X-Content-Type-Options`, `X-Frame-Options`, and `Referrer-Policy`; keep only ports 80/443 open in the firewall.
 
