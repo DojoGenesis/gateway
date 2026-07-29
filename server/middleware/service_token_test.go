@@ -18,7 +18,7 @@ import (
 // issuance side.
 func signClaims(t *testing.T, claims GatewayClaims) string {
 	t.Helper()
-	s, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(jwtSecret)
+	s, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(currentJWTSecret())
 	require.NoError(t, err)
 	return s
 }
@@ -392,7 +392,7 @@ func TestIssueServiceToken_Constraints(t *testing.T) {
 		require.NoError(t, err)
 
 		claims := &GatewayClaims{}
-		_, err = jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) { return jwtSecret, nil })
+		_, err = jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) { return currentJWTSecret(), nil })
 		require.NoError(t, err)
 		require.NotNil(t, claims.ExpiresAt)
 

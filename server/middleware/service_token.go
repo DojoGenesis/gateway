@@ -265,7 +265,7 @@ func IssueServiceToken(name string, ttl time.Duration) (token string, jti string
 		Role: ServiceRole,
 	}
 
-	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(jwtSecret)
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(currentJWTSecret())
 	if err != nil {
 		return "", "", fmt.Errorf("failed to sign service token: %w", err)
 	}
@@ -286,12 +286,4 @@ func ServiceNameFromSubject(subject string) string {
 		return ""
 	}
 	return strings.TrimPrefix(subject, ServiceSubjectPrefix)
-}
-
-// UsingDefaultJWTSecret reports whether this process is signing and verifying
-// with the built-in development fallback rather than a configured JWT_SECRET.
-// The offline minting CLI refuses to issue a token when this is true: a token
-// signed with a publicly known secret is forgeable by anyone.
-func UsingDefaultJWTSecret() bool {
-	return subtle.ConstantTimeCompare(jwtSecret, []byte(defaultJWTSecret)) == 1
 }
