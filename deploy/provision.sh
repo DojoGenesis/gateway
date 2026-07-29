@@ -5,7 +5,14 @@ DRY_RUN=false
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true
 
 DOMAIN="gateway.trespies.dev"
-GATEWAY_VERSION="v3.3.1"
+# Pinned deliberately: an unpinned "latest" here has previously reverted a
+# security fix on re-provision. Bump this ONLY together with a published
+# release — provision.sh downloads a GitHub release tarball, so a version with
+# no release 404s the whole run.
+#   v3.3.1 -> v3.3.2: service-token auth for machine clients, JWT-secret
+#   config honesty + production fail-closed, and the config file actually
+#   being read. Re-provisioning on v3.3.1 would revert all three.
+GATEWAY_VERSION="v3.3.2"
 GATEWAY_PORT=7340
 GATEWAY_USER="dojo"
 GATEWAY_HOME="/opt/dojo"
