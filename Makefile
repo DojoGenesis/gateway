@@ -1,4 +1,4 @@
-.PHONY: build build-spa build-chat-spa test test-cover vet lint docker docker-compose-up docker-compose-down clean generate-openapi
+.PHONY: build build-spa build-chat-spa test test-server test-cover vet lint docker docker-compose-up docker-compose-down clean generate-openapi service-token
 
 # Build the Workflow Builder SPA and embed it into the Go binary.
 # Must be run before `make build` when the SPA has changed.
@@ -27,10 +27,19 @@ build:
 	@go build -o bin/agentic-gateway main.go
 	@echo "Build complete: bin/agentic-gateway"
 
-# Run all tests with race detector
-test:
+# Run all tests with race detector.
+#
+# `go test ./...` covers ONLY the root module. server/ is a separate module in
+# go.work, so it is not matched by ./... from here — which meant the auth
+# middleware was not covered by this gate at all. It is run explicitly below.
+test: test-server
 	@echo "Running tests..."
 	@go test -race ./...
+
+# Tests for the server module (auth middleware, router, handlers).
+test-server:
+	@echo "Running server module tests..."
+	@cd server && go test -race ./...
 
 # Run tests with coverage report
 test-cover:
@@ -81,6 +90,23 @@ docker-compose-down:
 	@echo "Stopping docker-compose stack..."
 	@docker-compose -f docker-compose.yaml down
 	@echo "Stack stopped."
+
+# Mint a long-lived service token for a machine client (offline operator tool).
+#
+# Run this on the gateway host with the gateway's own environment loaded, so it
+# signs with the SAME JWT_SECRET the running server verifies against. It refuses
+# to mint if JWT_SECRET is unset (that would produce a token signed with the
+# publicly known development fallback).
+#
+#   make service-token SERVICE=pdi
+#   make service-token SERVICE=pdi TTL=720h
+#
+# The token is printed to stdout and nothing else; all diagnostics, including
+# the jti you need in order to revoke it later, go to stderr. Pipe stdout
+# straight into your secret store — never into a file in this repo.
+service-token:
+	@test -n "$(SERVICE)" || (echo "SERVICE is required, e.g. make service-token SERVICE=pdi" >&2 && exit 1)
+	@cd server && go run ./cmd/servicetoken -service "$(SERVICE)" $(if $(TTL),-ttl "$(TTL)",)
 
 # Clean build artifacts
 clean:

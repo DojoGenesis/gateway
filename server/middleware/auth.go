@@ -11,9 +11,14 @@ import (
 	"github.com/google/uuid"
 )
 
+// defaultJWTSecret is the development fallback used when JWT_SECRET is unset.
+// It is publicly known, so anything signed with it is forgeable by anyone —
+// see UsingDefaultJWTSecret, which the service-token minting CLI checks.
+const defaultJWTSecret = "dev-secret-change-in-production"
+
 // jwtSecret is loaded once from the environment.
 // In production, JWT_SECRET must be set to a strong random value.
-var jwtSecret = []byte(getEnvDefault("JWT_SECRET", "dev-secret-change-in-production"))
+var jwtSecret = []byte(getEnvDefault("JWT_SECRET", defaultJWTSecret))
 
 // isDevelopment returns true when ENVIRONMENT != "production".
 func isDevelopment() bool {
@@ -71,7 +76,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		userID, err := validateToken(token)
+		userID, claims, err := validateTokenWithClaims(token)
 		if err != nil {
 			slog.Warn("token validation failed", "error", err)
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -84,6 +89,26 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		c.Set("user_id", userID)
 		c.Set("token", token)
+
+		// Attribute machine traffic distinctly from human traffic. claims is
+		// nil only for the development-only legacy shim tokens, which are never
+		// service credentials.
+		if claims != nil && claims.Role == ServiceRole {
+			c.Set("auth_type", "service")
+			c.Set("service_name", ServiceNameFromSubject(userID))
+			c.Set("token_id", claims.ID)
+			// jti is an identifier, not a credential — logging it is what lets
+			// the operator find the token to revoke. The token itself is never
+			// logged.
+			slog.Info("service token authenticated",
+				"subject", userID,
+				"jti", claims.ID,
+				"method", c.Request.Method,
+				"path", c.Request.URL.Path,
+			)
+		} else {
+			c.Set("auth_type", "user")
+		}
 
 		c.Next()
 	}
@@ -193,16 +218,31 @@ func OptionalAuthMiddleware() gin.HandlerFunc {
 // validateToken parses and validates a JWT token.
 // In development mode, also accepts legacy test tokens for backward compatibility.
 func validateToken(tokenString string) (string, error) {
-	// Development-only: accept legacy test tokens
+	subject, _, err := validateTokenWithClaims(tokenString)
+	return subject, err
+}
+
+// validateTokenWithClaims is validateToken plus the parsed claims, which callers
+// need in order to tell a machine credential from a human session.
+//
+// The returned claims are nil for the development-only legacy shim tokens,
+// which are not JWTs at all.
+func validateTokenWithClaims(tokenString string) (string, *GatewayClaims, error) {
+	// Development-only: accept legacy test tokens.
+	//
+	// UNCHANGED by the service-token work, and deliberately NOT extended to it:
+	// production sets ENVIRONMENT=production, which makes this block dead code
+	// there. A service token is a real signed JWT and takes the same signature
+	// verification path as every human session below.
 	if isDevelopment() {
 		if tokenString == "test-token" {
-			return "test-user", nil
+			return "test-user", nil, nil
 		}
 		if strings.HasPrefix(tokenString, "user-") {
-			return tokenString, nil
+			return tokenString, nil, nil
 		}
 		if strings.HasPrefix(tokenString, "admin-") {
-			return tokenString, nil
+			return tokenString, nil, nil
 		}
 	}
 
@@ -216,20 +256,30 @@ func validateToken(tokenString string) (string, error) {
 		return jwtSecret, nil
 	})
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	if !token.Valid {
-		return "", jwt.ErrSignatureInvalid
+		return "", nil, jwt.ErrSignatureInvalid
 	}
 
 	// Extract user ID from subject claim
 	subject, err := claims.GetSubject()
 	if err != nil || subject == "" {
-		return "", jwt.ErrTokenInvalidSubject
+		return "", nil, jwt.ErrTokenInvalidSubject
 	}
 
-	return subject, nil
+	// Machine credentials carry extra constraints — a mandatory jti, a bounded
+	// lifetime, a namespaced subject, and the revocation denylist. These run
+	// AFTER the signature check above, never instead of it, and can only
+	// reject a token the signature check already accepted.
+	if claims.Role == ServiceRole {
+		if err := validateServiceClaims(claims, subject); err != nil {
+			return "", nil, err
+		}
+	}
+
+	return subject, claims, nil
 }
 
 // validateAdminRole checks if the token holder has admin privileges.
@@ -254,6 +304,17 @@ func validateAdminRole(tokenString string, userID string) (bool, error) {
 	})
 	if err != nil {
 		return false, err
+	}
+
+	// Least privilege: a machine credential is NEVER an admin. Two independent
+	// checks, so that neither a future widening of the role test below nor a
+	// mis-minted token carrying role="admin" on a service subject can produce
+	// an admin machine credential.
+	if claims.Role == ServiceRole {
+		return false, nil
+	}
+	if subject, _ := claims.GetSubject(); IsServiceSubject(subject) {
+		return false, nil
 	}
 
 	return claims.Role == "admin", nil
