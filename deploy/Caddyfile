@@ -1,3 +1,23 @@
+# Caddyfile — THE FULL SET OF SITES THIS HOST SERVES.
+#
+# provision.sh copies this file over /etc/caddy/Caddyfile verbatim, so anything
+# missing here is DELETED from production on the next provision run.
+#
+# Reconciled 2026-07-29 from the live host. Until then this file declared only
+# gateway.trespies.dev (364 bytes) while production served five sites (1939
+# bytes): the four PDI blocks had been added by hand and never came back to the
+# repo. A re-provision would have replaced five site blocks with one and taken
+# every policydatainfrastructure.com route offline — the API, the app, apex and
+# www — while reporting success.
+#
+# If you add a site on the box, add it HERE in the same change. This file is not
+# a starting point; it is the whole description of the edge.
+
+{
+    email cruz@trespiesdesign.com
+}
+
+# Dojo Gateway — primary access via gateway.trespies.dev
 gateway.trespies.dev {
     reverse_proxy localhost:7340
 
@@ -12,4 +32,59 @@ gateway.trespies.dev {
         output file /var/log/caddy/gateway.log
         format json
     }
+}
+
+# Legacy redirect — pdi.trespies.dev was a misnomer (served Gateway, not PDI)
+pdi.trespies.dev {
+    redir https://gateway.trespies.dev{uri} permanent
+}
+
+# PDI API — policydatainfrastructure.com
+# TLS: internal certs. Cloudflare proxy terminates real TLS at the edge.
+# If Cloudflare SSL mode changes to "Full (Strict)", switch to real certs
+# via DNS challenge or set Cloudflare to DNS-only for api subdomain.
+api.policydatainfrastructure.com {
+    tls internal
+
+    header /static/* Cache-Control "no-cache, must-revalidate"
+
+    reverse_proxy localhost:8340
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    log {
+        output file /var/log/caddy/pdi-api.log
+        format json
+    }
+}
+
+# PDI root domain
+policydatainfrastructure.com {
+    tls internal
+
+    header /static/* Cache-Control "no-cache, must-revalidate"
+
+    reverse_proxy localhost:8340
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    log {
+        output file /var/log/caddy/pdi-root.log
+        format json
+    }
+}
+
+www.policydatainfrastructure.com {
+    tls internal
+    redir https://policydatainfrastructure.com{uri} permanent
 }
