@@ -1,4 +1,3 @@
-version: '3.8'
 
 # Production stack — Hetzner VPS + Named Cloudflare Tunnel
 #
@@ -7,8 +6,22 @@ version: '3.8'
 #   bridge   — ghcr.io/dojogenesis/dojo-bridge:latest      (CI deploy workflow)
 #   tunnel   — cloudflare/cloudflared                           (named tunnel, permanent URL)
 #
+# Host: dojo-bridge (37.27.182.173) — deployed at /opt/dojo/docker-compose.yml.
+#
+# THIS FILE IS THE WHOLE DESCRIPTION OF THAT BOX. Reconciled 2026-08-03 from the
+# live host: it was missing mcp-http, memory-db, and the memory-db-data volume,
+# so a rebuild from this repo would have silently dropped the public MCP
+# endpoint (mcp.trespiesdesign.com) and the Memory Hub. If you add or change a
+# service on the box, change it HERE in the same commit.
+#
+# Note: provision.sh does NOT write this file (it writes only the Caddyfile,
+# gateway config, and systemd unit), so /opt/dojo edits are safe from
+# re-provisioning — but they are also invisible until copied back here.
+#
 # Secrets: source .env before running (Infisical bootstrap vars only).
 # All channel credentials live in Infisical — not in this file.
+# Required in /opt/dojo/.env: MEMORY_DB_PASSWORD, DOJO_MCP_API_KEYS,
+# DOJO_MEMORY_DB_URL_RO, DOJO_GATEWAY_URL, DOJO_GATEWAY_TOKEN.
 #
 # First deploy:
 #   1. Run scripts/server-setup.sh on the VPS
@@ -24,13 +37,10 @@ services:
     image: ghcr.io/dojogenesis/dojo-bridge:latest
     restart: unless-stopped
     environment:
-      DOJO_CREDENTIAL_BACKEND: "${DOJO_CREDENTIAL_BACKEND:-infisical}"
-      DOJO_INFISICAL_PROJECT_ID: "${DOJO_INFISICAL_PROJECT_ID}"
-      DOJO_INFISICAL_CLIENT_ID: "${DOJO_INFISICAL_CLIENT_ID}"
-      DOJO_INFISICAL_CLIENT_SECRET: "${DOJO_INFISICAL_CLIENT_SECRET}"
-      DOJO_INFISICAL_SITE_URL: "${DOJO_INFISICAL_SITE_URL:-https://app.infisical.com}"
-      DOJO_INFISICAL_ENVIRONMENT: "${DOJO_INFISICAL_ENVIRONMENT:-prod}"
-      DOJO_INFISICAL_SECRET_PATH: "${DOJO_INFISICAL_SECRET_PATH:-/channel}"
+      # Infisical removed 2026-07-26: unused backend (bws is the org store) and the
+      # client secret could not be rotated -- no Infisical account. "env" is the
+      # default per cmd/dojo/bridge.go; adapters missing creds are skipped, not fatal.
+      DOJO_CREDENTIAL_BACKEND: "env"
       DOJO_BRIDGE_PORT: "8090"
       DOJO_DATA_DIR: "/app/data"
     volumes:
@@ -38,7 +48,7 @@ services:
     networks:
       - dojo-prod
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/health 2>/dev/null || exit 0"]
+      test: ["NONE"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -70,10 +80,13 @@ services:
       - "127.0.0.1:7340:7340"  # localhost only — expose via SSH tunnel for remote CLI
     environment:
       PORT: "7340"
+      HOME: "/app/data"
       ENVIRONMENT: "production"
       MCP_CONFIG_PATH: "/etc/gateway/gateway-config.yaml"
       MCP_BY_DOJO_BINARY: "/opt/mcp-servers/mcp-by-dojo-genesis"
       MEMORY_DB_PATH: "/app/data/dojo_memory.db"
+      # Passed through to the spawned mcp_by_dojo stdio server (OCH-132 §6.4)
+      DOJO_MEMORY_DB_URL_RO: "${DOJO_MEMORY_DB_URL_RO:-}"
       OTEL_ENABLED: "${OTEL_ENABLED:-false}"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
       OTEL_SERVICE_NAME: "agentic-gateway"
@@ -81,6 +94,7 @@ services:
       - ./gateway-config.yaml:/etc/gateway/gateway-config.yaml:ro
       - mcp-bin:/opt/mcp-servers:ro
       - gateway-data:/app/data
+      - /opt/dojo/coworkplugins:/opt/coworkplugins:ro
     depends_on:
       mcp-by-dojo:
         condition: service_completed_successfully
@@ -94,18 +108,54 @@ services:
       start_period: 40s
 
   # ─── MCP Binary Provider ───────────────────────────────────────────────────
+  # Canonical image (DojoGenesis/mcp CI), DIGEST-PINNED — retires the old
+  # manually-pushed mcpbydojogenesis:latest (OCH-132). Bump digest to deploy.
   mcp-by-dojo:
-    image: ghcr.io/dojogenesis/mcpbydojogenesis:latest
+    image: ghcr.io/dojogenesis/mcp@sha256:70189d313063286b88017f8035ec367686176aa647936747ec4f7a1c308784d4
+    user: "0:0"
     volumes:
       - mcp-bin:/opt/mcp-servers
     entrypoint: ["sh", "-c", "cp /app/server /opt/mcp-servers/mcp-by-dojo-genesis && chmod +x /opt/mcp-servers/mcp-by-dojo-genesis"]
     networks:
       - dojo-prod
 
+  # ─── Public dojo MCP endpoint (OCH-132 Lane B) ─────────────────────────────
+  # Streamable-HTTP MCP behind Bearer-key auth. Ingress ONLY via the named
+  # Cloudflare tunnel (mcp.trespiesdesign.com) — never port-published.
+  # DIGEST-PINNED on purpose: the 03:00 auto-pull must not surprise-deploy a
+  # new public surface. Bumping the digest here IS the deliberate deploy act.
+  mcp-http:
+    image: ghcr.io/dojogenesis/mcp@sha256:70189d313063286b88017f8035ec367686176aa647936747ec4f7a1c308784d4
+    restart: unless-stopped
+    environment:
+      DOJO_HTTP_ADDR: ":8091"
+      DOJO_MCP_API_KEYS: "${DOJO_MCP_API_KEYS}"
+      DOJO_DISPATCH_ALLOWED_LABELS: "${DOJO_DISPATCH_ALLOWED_LABELS:-}"
+      DOJO_DISPATCH_RATE_PER_MIN: "${DOJO_DISPATCH_RATE_PER_MIN:-6}"
+      DOJO_MEMORY_DB_URL: "${DOJO_MEMORY_DB_URL_RO}"
+      DOJO_GATEWAY_URL: "${DOJO_GATEWAY_URL:-http://gateway:7340}"
+      DOJO_GATEWAY_TOKEN: "${DOJO_GATEWAY_TOKEN:-}"
+      DOJO_SKILLS_PATH: "/opt/coworkplugins"
+      DOJO_ADR_PATH: "/app/decisions"
+    volumes:
+      - /opt/dojo/coworkplugins:/opt/coworkplugins:ro
+      - /opt/dojo/mcp-adrs:/app/decisions
+    networks:
+      - dojo-prod
+    depends_on:
+      memory-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8091/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   # ─── OTEL Collector ────────────────────────────────────────────────────────
   # Optional — set OTEL_ENABLED=true in .env to activate telemetry.
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.115.0
     restart: unless-stopped
     volumes:
       - ./otel-config.yaml:/etc/otel/config.yaml:ro
@@ -155,11 +205,33 @@ services:
     profiles:
       - observability
 
+  # --- Memory Hub: Postgres memory DB (additive 2026-06-22, Route B; localhost :5433) ---
+  memory-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dojo_memory
+      POSTGRES_PASSWORD: "${MEMORY_DB_PASSWORD:?set MEMORY_DB_PASSWORD in /opt/dojo/.env}"
+      POSTGRES_DB: dojo_memory
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - memory-db-data:/var/lib/postgresql/data
+    networks:
+      - dojo-prod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dojo_memory -d dojo_memory"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 networks:
   dojo-prod:
     driver: bridge
 
 volumes:
+  memory-db-data:
   bridge-data:
   gateway-data:
   mcp-bin:
