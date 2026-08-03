@@ -70,42 +70,14 @@ services:
       bridge:
         condition: service_started
 
-  # ─── Agentic Gateway ───────────────────────────────────────────────────────
-  # Core LLM routing (Anthropic, Google, Kimi). Port 7340 — not exposed publicly.
-  # Accessible from VPS localhost and over SSH tunnel for CLI use.
-  gateway:
-    image: ghcr.io/dojogenesis/agentic-gateway:latest
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:7340:7340"  # localhost only — expose via SSH tunnel for remote CLI
-    environment:
-      PORT: "7340"
-      HOME: "/app/data"
-      ENVIRONMENT: "production"
-      MCP_CONFIG_PATH: "/etc/gateway/gateway-config.yaml"
-      MCP_BY_DOJO_BINARY: "/opt/mcp-servers/mcp-by-dojo-genesis"
-      MEMORY_DB_PATH: "/app/data/dojo_memory.db"
-      # Passed through to the spawned mcp_by_dojo stdio server (OCH-132 §6.4)
-      DOJO_MEMORY_DB_URL_RO: "${DOJO_MEMORY_DB_URL_RO:-}"
-      OTEL_ENABLED: "${OTEL_ENABLED:-false}"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
-      OTEL_SERVICE_NAME: "agentic-gateway"
-    volumes:
-      - ./gateway-config.yaml:/etc/gateway/gateway-config.yaml:ro
-      - mcp-bin:/opt/mcp-servers:ro
-      - gateway-data:/app/data
-      - /opt/dojo/coworkplugins:/opt/coworkplugins:ro
-    depends_on:
-      mcp-by-dojo:
-        condition: service_completed_successfully
-    networks:
-      - dojo-prod
-    healthcheck:
-      test: ["CMD", "/agentic-gateway", "--health-check"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+  # ─── Agentic Gateway — REMOVED 2026-08-03 (DGS-104) ────────────────────────
+  # This box ran a SECOND gateway (v3.3.2) that crash-looped 6,586 times: it
+  # fails closed because JWT_SECRET is unset and it will not sign tokens with
+  # the development default committed to the repo. Production traffic is served
+  # by gateway.trespies.dev on pdi-dojo-1 (v1.1.0), so this one had no consumer
+  # once mcp-http was repointed. Full service definition is in git history:
+  # DojoGenesis/gateway, deployments/prod/docker-compose.yml before this change.
+  # The gateway-data and mcp-bin volumes are left declared so nothing is orphaned.
 
   # ─── MCP Binary Provider ───────────────────────────────────────────────────
   # Canonical image (DojoGenesis/mcp CI), DIGEST-PINNED — retires the old
@@ -133,7 +105,7 @@ services:
       DOJO_DISPATCH_ALLOWED_LABELS: "${DOJO_DISPATCH_ALLOWED_LABELS:-}"
       DOJO_DISPATCH_RATE_PER_MIN: "${DOJO_DISPATCH_RATE_PER_MIN:-6}"
       DOJO_MEMORY_DB_URL: "${DOJO_MEMORY_DB_URL_RO}"
-      DOJO_GATEWAY_URL: "${DOJO_GATEWAY_URL:-http://gateway:7340}"
+      DOJO_GATEWAY_URL: "${DOJO_GATEWAY_URL:-https://gateway.trespies.dev}"
       DOJO_GATEWAY_TOKEN: "${DOJO_GATEWAY_TOKEN:-}"
       DOJO_SKILLS_PATH: "/opt/coworkplugins"
       DOJO_ADR_PATH: "/app/decisions"
