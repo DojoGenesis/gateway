@@ -19,7 +19,34 @@
 
 # Dojo Gateway — primary access via gateway.trespies.dev
 gateway.trespies.dev {
-    reverse_proxy localhost:7340
+    # ---- SEV-1 EDGE MITIGATION — DGS-108, applied 2026-08-04 ----------------
+    # /api/* is served WITHOUT authentication by the Gateway: those routes are
+    # registered on the root Gin router (server/router.go:179-192) and on a bare
+    # http.ServeMux (workflow/api/handler.go:30-33), neither of which carries
+    # AuthMiddleware. The global OptionalAuthMiddleware never rejects.
+    #
+    # POST /api/workflows + POST /api/workflows/:name/execute reach a real shell
+    # (server/workflow_skill_runner.go -> tools.RunCommand ->
+    # exec.CommandContext(shell, "-c", cmd), tools/system.go:45-47) behind only a
+    # five-pattern denylist. The spawned shell inherits the unit environment,
+    # which includes JWT_SECRET (deploy/gateway.service EnvironmentFile).
+    # Confirmed live: GET /api/workflows returned 200 unauthenticated on this
+    # host while /v1/gateway/tools correctly returned 401.
+    #
+    # DO NOT REMOVE THIS BLOCK until /api/* carries auth in code (DGS-103
+    # Track 0). Removing it without the code fix re-opens unauthenticated RCE.
+    #
+    # Known cost: the workflow-builder SPA calls /api/workflows* from the
+    # browser and is broken by this. Reach it locally instead:
+    #     ssh -L 7340:localhost:7340 dojo-gateway   ->   http://localhost:7340/workflow
+    handle /api/* {
+        respond "Forbidden" 403
+    }
+
+    handle {
+        reverse_proxy localhost:7340
+    }
+    # ---- end SEV-1 edge mitigation -----------------------------------------
 
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"

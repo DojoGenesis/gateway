@@ -203,6 +203,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// DGS-108: workflow steps may execute shell commands on this host when
+	// explicitly enabled. That is a legitimate choice on a closed host and a
+	// critical exposure on an open one, so it is never allowed to be quiet.
+	// Unlike the JWT gate above this does not refuse to start — the operator
+	// has said what they want, and the default already fails closed.
+	if warning := srv.RunCommandStartupWarning(); warning != "" {
+		slog.Warn(warning)
+	}
+
 	// ─── Initialize OTEL (if enabled) ────────────────────────────────
 	var tracerProvider *sdktrace.TracerProvider
 	if cfg.OTEL.Enabled {
