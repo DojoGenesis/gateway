@@ -26,9 +26,25 @@ func NewCommandSkillRunner() *CommandSkillRunner {
 
 // RunSkill executes a named skill. Currently only "run_command" is supported;
 // all other skill names return an error.
+//
+// The gate below is the boundary where a workflow definition that arrived over
+// the network becomes a process on this host. It is checked here, before
+// dispatch, rather than inside runCommand or tools.RunCommand, because this is
+// the narrowest point that covers the DGS-108 chain without touching the
+// authenticated agent tool-calling path, which also reaches tools.RunCommand
+// through the tool registry and has a different threat model. See
+// workflow_run_command_gate.go for why this is a capability gate and not an
+// authentication fix.
 func (r *CommandSkillRunner) RunSkill(ctx context.Context, skillName string, input map[string]string) (string, error) {
 	switch skillName {
 	case "run_command":
+		if !workflowRunCommandEnabled() {
+			slog.Warn("workflow: run_command blocked by capability gate",
+				"env_var", EnvWorkflowRunCommand,
+				"command", input["command"],
+			)
+			return "", errRunCommandDisabled()
+		}
 		return r.runCommand(ctx, input)
 	default:
 		return "", fmt.Errorf("skill runner: unsupported skill %q (only run_command is implemented)", skillName)
