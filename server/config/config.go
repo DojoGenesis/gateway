@@ -25,11 +25,16 @@ type Config struct {
 
 	// RegistrationEnabled opens POST /auth/register to anonymous callers.
 	//
-	// The default is TRUE — open. Open registration is deliberate on this
-	// deployment: anyone may sign up and use the chat. The default matches
-	// the behaviour the gateway has always had in practice (the server used
-	// to hardcode it), so upgrading a host cannot close a door the operator
-	// wants open.
+	// The default is TRUE — open. That default is about upgrade safety, not
+	// policy: it matches the behaviour the gateway has always had in practice
+	// (the server used to hardcode it), so upgrading a host cannot close a
+	// door the operator wants open.
+	//
+	// It is NOT what gateway.trespies.dev runs. That host closed registration
+	// on 2026-08-04 via REGISTRATION_ENABLED=false in /etc/dojo/env (DGS-101):
+	// a completed sign-up called issueToken(userID, "user", …), which is a
+	// working /v1 credential — provider spend — and re-entry for anything
+	// gated on authentication alone.
 	//
 	// Until this release the key did not exist on the struct at all, so a
 	// config file setting it — either way — was silently discarded. It is now
@@ -281,18 +286,21 @@ func (c *Config) loadFromYAML(path string) ([]string, error) {
 // config *file* may open registration but may not close it.
 //
 // The reason is a live upgrade hazard, not a policy preference. Deployed config
-// files were written when this key was silently discarded — the production host
-// carries `registration_enabled: false` in a file that has never once been read
-// — so the moment the file starts being honoured, a restart would close a
-// service the operator deliberately runs open. Nobody wrote that `false` with
-// the knowledge that it would take effect.
+// files were written when this key was silently discarded, so the moment the
+// file starts being honoured, a restart could close a service on the strength
+// of a line nobody knew was live. Nobody wrote that `false` with the knowledge
+// that it would take effect.
 //
 // REGISTRATION_ENABLED in the environment is applied later, unconditionally, in
 // both directions: it is the supported way to close registration, and it cannot
 // have been set by an older deploy that did not know about it.
 //
-// Remove this guard once no deployed config file still carries a stale
-// `registration_enabled: false` (see deploy/gateway-config.yaml).
+// Removing this guard: the condition is that no deployed config file still
+// carries a stale `registration_enabled: false`. Verified 2026-08-04 —
+// gateway.trespies.dev's /etc/dojo/config.yaml carries `true`, so the guard is
+// inert on that host and registration there is closed by the environment
+// instead (DGS-101). Check the other deployed hosts before deleting it; this
+// was checked on one.
 func (c *Config) applyRegistrationFileValue(path, expandedData string, prior bool) []string {
 	var probe struct {
 		RegistrationEnabled *bool `yaml:"registration_enabled"`

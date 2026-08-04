@@ -9,16 +9,21 @@ port: 7340
 environment: production
 data_dir: /var/lib/dojo
 
-# Public sign-up is deliberate on this deployment: anyone may register and use
-# the chat. This key used to read `false` while no Go code parsed it, so the
-# gateway ran open regardless — the file said one thing and the service did
-# another for months. It is parsed now, so it states what is actually wanted.
+# REGISTRATION IS CLOSED ON gateway.trespies.dev. It is closed by
+# REGISTRATION_ENABLED=false in /etc/dojo/env, not by this line (DGS-101,
+# 2026-08-04). A sign-up used to return a real role=user access token, which is
+# a working /v1 credential and re-entry for anything gated on auth alone.
 #
-# A config file can only OPEN registration; to close it, set
-# REGISTRATION_ENABLED=false in /etc/dojo/env. That asymmetry exists because
-# already-deployed copies of this file still say `false` from when the key was
-# inert, and a restart must not close a service on the strength of a line
-# nobody knew was live. See applyRegistrationFileValue in server/config.
+# This key stays `true` on purpose. A config file can only OPEN registration —
+# see applyRegistrationFileValue in server/config — so writing `false` here
+# would be silently inert and would read as a closure that is not happening.
+# The asymmetry exists because already-deployed copies of this file said
+# `false` from when the key was unparsed, and a restart must not close a
+# service on the strength of a line nobody knew was live.
+#
+# To close registration on a host: set REGISTRATION_ENABLED=false in
+# /etc/dojo/env and restart. provision.sh never overwrites that file (it only
+# creates it when absent), so the setting survives a re-provision.
 registration_enabled: true
 
 providers:
