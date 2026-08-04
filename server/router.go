@@ -216,7 +216,17 @@ func (s *Server) setupRoutes() {
 			casGroup.DELETE("/tags/:name/:version", s.handleCASDeleteTag)
 			casGroup.GET("/content/:ref", s.handleCASGetContent)
 			casGroup.POST("/content", s.handleCASPutContent)
-			casGroup.POST("/gc", s.handleCASGarbageCollect)
+
+			// DGS-100: /gc calls workflowCAS.GC(), which DELETES content, and
+			// the /api/cas group carries no middleware — so this was an
+			// unauthenticated destructive operation on a publicly reachable
+			// gateway. Admin-gated here rather than left open pending the
+			// broader /api auth design, because it has no caller to break:
+			// no SPA (chat-ui and workflow-builder call only /api/workflows*
+			// and /api/skills), no `dojo` CLI (it uses /content and /tags),
+			// no MCP server, no worker. The path is deliberately unchanged so
+			// any undiscovered caller gets a diagnosable 401 rather than a 404.
+			casGroup.POST("/gc", middleware.AdminAuthMiddleware(), s.handleCASGarbageCollect)
 
 			// Gap 1: /api/cas/refs/* endpoints
 			casGroup.GET("/refs", s.handleCASListRefs)
