@@ -12,7 +12,12 @@ DOMAIN="gateway.trespies.dev"
 #   v3.3.1 -> v3.3.2: service-token auth for machine clients, JWT-secret
 #   config honesty + production fail-closed, and the config file actually
 #   being read. Re-provisioning on v3.3.1 would revert all three.
-GATEWAY_VERSION="v3.3.2"
+#   v3.3.2 -> v3.3.3: the run_command capability gate (DGS-108) and the
+#   admin gate on POST /api/cas/gc (DGS-100). v3.3.2 will execute an
+#   arbitrary shell command supplied through /api/workflows and will delete
+#   CAS content for an unauthenticated caller, so re-provisioning on it
+#   re-opens both. This is the version that must be on gateway.trespies.dev.
+GATEWAY_VERSION="v3.3.3"
 GATEWAY_PORT=7340
 GATEWAY_USER="dojo"
 GATEWAY_HOME="/opt/dojo"
