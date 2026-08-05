@@ -48,7 +48,11 @@ func (s *Server) setupRoutes() {
 	s.router.GET("/metrics", s.handleMetrics)
 
 	// ─── SSE (existing broadcaster) ──────────────────────────────────
-	s.router.GET("/events", handlers.HandleSSE)
+	// DGS-100 item 5. Gated: it streams broadcaster events to anyone who names
+	// a client_id, and it has no caller anywhere in this repo or the CLI — only
+	// this registration. /health and /metrics stay public: the deploy liveness
+	// probe in deploy/provision.sh hits /health unauthenticated by design.
+	s.router.GET("/events", middleware.AuthMiddleware(), handlers.HandleSSE)
 
 	// ─── OpenAI-Compatible API (/v1) ─────────────────────────────────
 	v1 := s.router.Group("/v1")
@@ -161,9 +165,48 @@ func (s *Server) setupRoutes() {
 		settings.GET("/providers", s.handleGetProviderSettings)
 	}
 
+	// ─── /api/* authentication (DGS-100) ────────────────────────────────
+	//
+	// Every /api/* route below carries AuthMiddleware explicitly, on BOTH
+	// handler paths. There is no /api group to hang it on: these routes are
+	// registered directly on s.router at several points, and the workflow CRUD
+	// routes are a bare http.ServeMux mounted through gin.WrapH — that mux
+	// cannot take gin middleware itself, but the gin route that WRAPS it can,
+	// which is why the middleware sits at the registration site rather than
+	// inside workflow/api/handler.go.
+	//
+	// WHY THIS COULD FINALLY LAND: DGS-100 was blocked from 2026-07-24 on the
+	// belief that gating these routes would break the workflow-builder SPA,
+	// which calls /api/workflows* from the browser with no token and streams
+	// execution over EventSource (which cannot send an Authorization header at
+	// all). That consumer does not exist in any deployed gateway: the embedded
+	// dist directories hold only .gitkeep, goreleaser's only before-hook is
+	// `go mod download`, and production answers 503 on /workflow and /chat. No
+	// released binary has ever contained the SPA.
+	//
+	// So the SPA's auth story is now a PREREQUISITE FOR SHIPPING IT, not a
+	// blocker on closing a live hole. When it does ship it needs a
+	// Secure/HttpOnly/SameSite cookie — see docs/api-route-disposition.md — and
+	// this is deliberately NOT weakened with an "allow anonymous /api" flag in
+	// the meantime: a switch that turns authentication off is the exact shape
+	// of defect DGS-112 was.
+	//
+	// Known cost, accepted: the `dojo` CLI attaches a bearer token only when
+	// one is configured, and that is not the default. A CLI with no token now
+	// gets 401 on /api/cas/* and /api/skills. The credential already exists
+	// (svc:dojo-cli); it has to be configured before this reaches a host the
+	// CLI talks to.
+	//
+	// /mesh/* and /.well-known/did.json are deliberately NOT covered: federation
+	// peers cannot hold a gateway JWT, so they need DID-signature auth, which is
+	// a separate design.
+
 	// ─── ADA Validation (Gap 20) ────────────────────────────────────
-	// Public endpoint — accessible from frontend without admin auth.
-	s.router.POST("/api/ada/validate", s.handleADAValidate)
+	// Was registered bare with a comment claiming the frontend called it
+	// without auth. Nothing calls it — no SPA, no CLI, no script, and it has no
+	// test file. Gated with everything else rather than left as the one open
+	// POST on the surface.
+	s.router.POST("/api/ada/validate", middleware.AuthMiddleware(), s.handleADAValidate)
 
 	// ─── Workflow API (Era 3) ────────────────────────────────────────
 	// CRUD: POST/GET /api/workflows, PUT/GET /api/workflows/:name/canvas,
@@ -176,20 +219,27 @@ func (s *Server) setupRoutes() {
 		mux := http.NewServeMux()
 		wfHandler.RegisterRoutes(mux)
 		ginMux := gin.WrapH(mux)
-		s.router.Any("/api/workflows", ginMux)
-		s.router.GET("/api/workflows/:name", ginMux)
-		s.router.GET("/api/workflows/:name/canvas", ginMux)
-		s.router.PUT("/api/workflows/:name/canvas", ginMux)
-		s.router.POST("/api/workflows/:name/validate", ginMux)
-		s.router.GET("/api/skills", ginMux)
+		s.router.Any("/api/workflows", middleware.AuthMiddleware(), ginMux)
+		s.router.GET("/api/workflows/:name", middleware.AuthMiddleware(), ginMux)
+		s.router.GET("/api/workflows/:name/canvas", middleware.AuthMiddleware(), ginMux)
+		s.router.PUT("/api/workflows/:name/canvas", middleware.AuthMiddleware(), ginMux)
+		s.router.POST("/api/workflows/:name/validate", middleware.AuthMiddleware(), ginMux)
+		s.router.GET("/api/skills", middleware.AuthMiddleware(), ginMux)
 	}
 
 	// Execution endpoints (always registered; handler returns 501 when CAS absent).
-	s.router.POST("/api/workflows/:name/execute", s.handleWorkflowExecute)
-	s.router.GET("/api/workflows/:name/execution", s.handleWorkflowExecutionStream)
+	// POST /execute is the route DGS-108 reached a shell through; it is now
+	// authenticated as well as capability-gated, and those are independent
+	// controls — neither replaces the other.
+	s.router.POST("/api/workflows/:name/execute", middleware.AuthMiddleware(), s.handleWorkflowExecute)
+	s.router.GET("/api/workflows/:name/execution", middleware.AuthMiddleware(), s.handleWorkflowExecutionStream)
 
 	// ─── WebSocket: real-time workflow execution events (Era 3) ──────
-	s.router.GET("/api/ws/workflow", s.wsHub.HandleWS)
+	// No production caller: neither SPA opens a WebSocket, and the CLI never
+	// dials it. A browser WebSocket cannot send an Authorization header either,
+	// so if the Phase 2 bridge is ever built it needs the same cookie the SPA
+	// will need.
+	s.router.GET("/api/ws/workflow", middleware.AuthMiddleware(), s.wsHub.HandleWS)
 
 	// ─── Workflow Builder SPA (Era 3) ────────────────────────────────
 	// Served from embedded dist/ compiled by `make build-spa`.
@@ -206,8 +256,17 @@ func (s *Server) setupRoutes() {
 	s.router.GET("/chat/*filepath", chatSPAHandler)
 
 	// ─── CAS API ────────────────────────────────────────────────────────
+	// DGS-100: the group carries AuthMiddleware now. It previously had no
+	// .Use() at all, so every route below — including durable writes via
+	// /content, /tags, /import and /batch — served anonymous callers.
+	//
+	// The only live consumer is the `dojo` CLI (cli/internal/commands/
+	// cmd_skill.go), which sends a bearer token only when one is configured.
+	// That is not the default, so a CLI without a configured token gets 401
+	// here. The svc:dojo-cli credential already exists and has to be wired up
+	// before this reaches a host the CLI talks to.
 	if s.workflowCAS != nil {
-		casGroup := s.router.Group("/api/cas")
+		casGroup := s.router.Group("/api/cas", middleware.AuthMiddleware())
 		{
 			// Existing content/tags endpoints
 			casGroup.GET("/tags", s.handleCASListTags)
