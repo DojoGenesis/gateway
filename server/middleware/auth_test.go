@@ -17,6 +17,12 @@ func setupAuthTestRouter() *gin.Engine {
 }
 
 func TestAuthMiddleware(t *testing.T) {
+	// This test authenticates with the unsigned shim tokens ("test-token",
+	// "user-12345"), which are an explicit opt-in since DGS-112. Asking for
+	// them here is deliberate: it keeps the dependency on a development-only
+	// backdoor visible in the test that relies on it.
+	enableDevTokens(t)
+
 	router := setupAuthTestRouter()
 
 	router.GET("/protected", AuthMiddleware(), func(c *gin.Context) {
@@ -114,6 +120,8 @@ func TestAuthMiddleware(t *testing.T) {
 }
 
 func TestOptionalAuthMiddleware(t *testing.T) {
+	enableDevTokens(t) // authenticates with unsigned shim tokens — see DGS-112
+
 	router := setupAuthTestRouter()
 
 	router.GET("/optional", OptionalAuthMiddleware(), func(c *gin.Context) {
@@ -274,6 +282,8 @@ func TestGuestIDIsConsistentAcrossRequest(t *testing.T) {
 }
 
 func TestUserTypeSetCorrectly(t *testing.T) {
+	enableDevTokens(t) // authenticates with unsigned shim tokens — see DGS-112
+
 	router := setupAuthTestRouter()
 
 	router.GET("/check", OptionalAuthMiddleware(), func(c *gin.Context) {
@@ -324,6 +334,8 @@ func TestUserTypeSetCorrectly(t *testing.T) {
 }
 
 func TestValidateToken(t *testing.T) {
+	enableDevTokens(t) // exercises the unsigned shim tokens — see DGS-112
+
 	tests := []struct {
 		name        string
 		token       string

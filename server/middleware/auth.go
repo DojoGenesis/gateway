@@ -3,7 +3,6 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -15,10 +14,10 @@ import (
 // all live in jwt_secret.go. Every sign and verify path below reads it through
 // currentJWTSecret() — do not reintroduce a package-level copy here.
 
-// isDevelopment returns true when ENVIRONMENT != "production".
-func isDevelopment() bool {
-	return os.Getenv("ENVIRONMENT") != "production"
-}
+// Whether the legacy development shim tokens are accepted is decided in
+// dev_tokens.go by devTokensEnabled(). It is an explicit opt-in
+// (GATEWAY_DEV_TOKENS), NOT "ENVIRONMENT is not production" — see DGS-112 for
+// why the old direction handed out admin on any unset or misspelled value.
 
 // GatewayClaims extends jwt.RegisteredClaims with application-specific fields.
 type GatewayClaims struct {
@@ -225,11 +224,15 @@ func validateToken(tokenString string) (string, error) {
 func validateTokenWithClaims(tokenString string) (string, *GatewayClaims, error) {
 	// Development-only: accept legacy test tokens.
 	//
-	// UNCHANGED by the service-token work, and deliberately NOT extended to it:
-	// production sets ENVIRONMENT=production, which makes this block dead code
-	// there. A service token is a real signed JWT and takes the same signature
-	// verification path as every human session below.
-	if isDevelopment() {
+	// These are not JWTs — no signature, no secret. They are accepted only when
+	// an operator has explicitly set GATEWAY_DEV_TOKENS on a non-production
+	// host (DGS-112); unset means off, so a forgotten or misspelled ENVIRONMENT
+	// can no longer enable them.
+	//
+	// Deliberately NOT extended to service tokens: a service token is a real
+	// signed JWT and takes the same signature verification path as every human
+	// session below.
+	if devTokensEnabled() {
 		if tokenString == "test-token" {
 			return "test-user", nil, nil
 		}
@@ -279,8 +282,11 @@ func validateTokenWithClaims(tokenString string) (string, *GatewayClaims, error)
 
 // validateAdminRole checks if the token holder has admin privileges.
 func validateAdminRole(tokenString string, userID string) (bool, error) {
-	// Development-only: legacy token support
-	if isDevelopment() {
+	// Development-only: legacy token support. Gated on the explicit
+	// GATEWAY_DEV_TOKENS opt-in — this block is what made `Bearer admin-x` a
+	// full admin credential on any host with an unset or misspelled
+	// ENVIRONMENT (DGS-112).
+	if devTokensEnabled() {
 		if tokenString == "test-token" {
 			return false, nil
 		}
