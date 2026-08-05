@@ -111,6 +111,18 @@ jobs:
         run: go build -o agentic-gateway main.go
 
       - name: Start gateway
+        # GATEWAY_DEV_TOKENS opts this throwaway runner into the unsigned
+        # development tokens ("admin-…"), which the admin check below
+        # authenticates with. Before DGS-112 it did not need asking: any host
+        # without ENVIRONMENT=production accepted them, which is precisely the
+        # defect — CI was silently depending on it.
+        #
+        # Legitimate here and nowhere else: this gateway lives for one job on an
+        # ephemeral runner, listens on localhost, and holds no real data. Never
+        # set this on a host anyone else can reach — it makes
+        # `Bearer admin-<anything>` a full admin credential.
+        env:
+          GATEWAY_DEV_TOKENS: "true"
         run: |
           ./agentic-gateway &
           sleep 3
@@ -131,8 +143,10 @@ jobs:
 
       - name: Verify admin endpoints
         run: |
-          # Admin routes require Bearer auth. In dev mode (no ENVIRONMENT=production),
-          # any token with the "admin-" prefix is accepted by AdminAuthMiddleware.
+          # Admin routes require Bearer auth. The "admin-" prefix is accepted by
+          # AdminAuthMiddleware only because the Start gateway step above sets
+          # GATEWAY_DEV_TOKENS on this runner (DGS-112) — it is no longer enough
+          # to merely not be production.
           curl -sf http://localhost:7340/admin/metrics/prometheus \
             -H "Authorization: Bearer admin-ci-test" || exit 1
 
