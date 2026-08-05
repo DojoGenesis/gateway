@@ -198,7 +198,12 @@ var ErrJWTSecretNotConfigured = errors.New("JWT signing secret is not configured
 // Development is deliberately unaffected: the built-in default keeps local runs
 // and the test suite working with no configuration at all.
 func EnsureJWTSecretConfigured(environment string) error {
-	if !strings.EqualFold(strings.TrimSpace(environment), "production") {
+	// isProductionString (dev_tokens.go) is the single definition of
+	// "production" in this codebase. Before DGS-112 this function and
+	// isDevelopment() disagreed: on a host with ENVIRONMENT="Production" this
+	// gate correctly demanded a real secret while the auth shim simultaneously
+	// treated the host as development and accepted `Bearer admin-x`.
+	if !isProductionString(environment) {
 		return nil
 	}
 	if !UsingDefaultJWTSecret() {

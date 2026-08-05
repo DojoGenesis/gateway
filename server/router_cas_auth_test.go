@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/DojoGenesis/gateway/runtime/cas"
+	"github.com/DojoGenesis/gateway/server/middleware"
 )
 
 // newRoutedCASTestServer is newRoutedTestServer plus a real in-memory CAS.
@@ -101,7 +102,10 @@ func TestDGS100_UnauthenticatedCASGarbageCollectIsRejected(t *testing.T) {
 // ADMIN tier rather than merely on authentication — a 401 here would mean the
 // route had fallen back to ordinary auth.
 func TestDGS100_ServiceTokenCannotGarbageCollect(t *testing.T) {
+	// "test-token" is a development shim token, which since DGS-112 requires an
+	// explicit opt-in rather than merely a non-production ENVIRONMENT.
 	t.Setenv("ENVIRONMENT", "development")
+	t.Setenv(middleware.EnvDevTokens, "true")
 
 	s := newRoutedCASTestServer(t)
 

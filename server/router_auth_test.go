@@ -27,6 +27,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/DojoGenesis/gateway/server/middleware"
 )
 
 // newRoutedTestServer builds a *Server carrying only what the routing layer
@@ -160,8 +162,11 @@ func TestDGS88_PublicRoutesStayReachable(t *testing.T) {
 // This test proves the second pass does not reject a request the first pass
 // accepted, and that a rejection still emits exactly one 401 body.
 func TestDGS88_DoubleAuthAttachmentIsHarmless(t *testing.T) {
-	// validateToken() accepts the "test-token" shim only outside production.
+	// validateToken() accepts the "test-token" shim only when explicitly opted
+	// in on a non-production host (DGS-112 — "not production" alone used to be
+	// enough, which made any unconfigured host hand out admin).
 	t.Setenv("ENVIRONMENT", "development")
+	t.Setenv(middleware.EnvDevTokens, "true")
 
 	s := newRoutedTestServer(t)
 

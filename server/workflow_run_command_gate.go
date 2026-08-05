@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/DojoGenesis/gateway/server/middleware"
 )
 
 // This file decides ONE thing: may a workflow step turn an API-supplied string
@@ -94,11 +96,12 @@ func workflowRunCommandEnabled() bool {
 	return resolveRunCommand().Enabled
 }
 
-// isProductionEnvironment matches middleware.isDevelopment's rule, inverted:
-// production is the exact string "production", case- and space-insensitive.
-// Any other value — including unset — is not production.
+// isProductionEnvironment delegates to the one definition of "production" in
+// the tree (middleware.IsProductionEnvironment). It is not re-implemented here:
+// DGS-112 was two functions in the same package disagreeing about what counts
+// as production, and a third copy is how that comes back.
 func isProductionEnvironment() bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv("ENVIRONMENT")), "production")
+	return middleware.IsProductionEnvironment()
 }
 
 // lookupNonBlankEnvVar treats unset, empty and whitespace-only as absent, so

@@ -41,6 +41,12 @@ func setupMemoryIntegrationTestRouter(t *testing.T) (*gin.Engine, *memory.Memory
 }
 
 func TestMemoryAPIWithAuthentication(t *testing.T) {
+	// Authenticates with the unsigned "test-token"/"user-…" shims, which since
+	// DGS-112 require an explicit opt-in rather than merely a non-production
+	// ENVIRONMENT.
+	t.Setenv("ENVIRONMENT", "development")
+	t.Setenv(middleware.EnvDevTokens, "true")
+
 	router, _, cleanup := setupMemoryIntegrationTestRouter(t)
 	defer cleanup()
 
@@ -189,6 +195,11 @@ func TestMemoryAPIWithAuthentication(t *testing.T) {
 }
 
 func TestMemoryAPIWithDifferentTokens(t *testing.T) {
+	// Same reason as TestMemoryAPIWithAuthentication: these are unsigned shim
+	// tokens, an explicit opt-in since DGS-112.
+	t.Setenv("ENVIRONMENT", "development")
+	t.Setenv(middleware.EnvDevTokens, "true")
+
 	router, _, cleanup := setupMemoryIntegrationTestRouter(t)
 	defer cleanup()
 

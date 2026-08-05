@@ -416,7 +416,11 @@ func TestDevelopmentBackdoorUnchanged(t *testing.T) {
 	cleanRevocations(t)
 
 	t.Run("still accepted outside production", func(t *testing.T) {
-		t.Setenv("ENVIRONMENT", "development")
+		// Since DGS-112 "outside production" is no longer sufficient on its
+		// own — the shims are an explicit opt-in. The behaviour this test
+		// guards (service tokens did not disturb the legacy shims) is
+		// unchanged; only the way you ask for them is.
+		enableDevTokens(t)
 		for token, want := range map[string]string{
 			"test-token":  "test-user",
 			"user-12345":  "user-12345",

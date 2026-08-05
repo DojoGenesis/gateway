@@ -203,6 +203,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// DGS-112: unsigned development shim tokens are an explicit opt-in now, but
+	// when they ARE on, `Bearer admin-<anything>` is a full admin credential and
+	// nothing about the running gateway looks different. Say so at startup.
+	if warning := middleware.DevTokensStartupWarning(); warning != "" {
+		slog.Warn(warning)
+	}
+
 	// DGS-108: workflow steps may execute shell commands on this host when
 	// explicitly enabled. That is a legitimate choice on a closed host and a
 	// critical exposure on an open one, so it is never allowed to be quiet.
