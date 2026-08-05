@@ -16,8 +16,18 @@ DOMAIN="gateway.trespies.dev"
 #   admin gate on POST /api/cas/gc (DGS-100). v3.3.2 will execute an
 #   arbitrary shell command supplied through /api/workflows and will delete
 #   CAS content for an unauthenticated caller, so re-provisioning on it
-#   re-opens both. This is the version that must be on gateway.trespies.dev.
-GATEWAY_VERSION="v3.3.3"
+#   re-opens both.
+#   v3.3.3 -> v3.3.4: authentication on all of /api/* and /events (DGS-100),
+#   and the development token shims become an explicit opt-in instead of the
+#   default on any host that is not exactly ENVIRONMENT=production (DGS-112).
+#   v3.3.3 still serves anonymous CAS reads and writes, anonymous workflow
+#   storage and execution, and the SSE broadcaster. This is the version that
+#   must be on gateway.trespies.dev.
+#
+#   NOTE for whoever runs this next: /api/* now needs a credential. The `dojo`
+#   CLI sends one only when configured — export DOJO_GATEWAY_TOKEN (see
+#   docs/api-route-disposition.md) or its skill and CAS commands will 401.
+GATEWAY_VERSION="v3.3.4"
 GATEWAY_PORT=7340
 GATEWAY_USER="dojo"
 GATEWAY_HOME="/opt/dojo"
