@@ -100,5 +100,33 @@ jobs:
             docker compose up -d --remove-orphans
             echo "==> Deploy complete at $(date)"
             docker compose ps
+
+            # A green deploy used to mean only "ssh and compose exited 0". That
+            # is not the same as "the services came up": DGS-104 was a container
+            # on this host that crash-looped 6,569 times while deploys reported
+            # success. Assert the end state instead of the command's exit code.
+            #
+            # Exited(0) is deliberately allowed — mcp-by-dojo is a one-shot that
+            # populates the shared bin volume and exits in ~200ms.
+            echo "==> Verifying container end state..."
+            BAD=""
+            for n in $(docker ps -a --filter "label=com.docker.compose.project=dojo" --format '{{.Names}}'); do
+              st=$(docker inspect "$n" --format '{{.State.Status}}:{{.State.ExitCode}}:{{.RestartCount}}')
+              case "$st" in
+                restarting:*)  BAD="${BAD}\n  $n is RESTARTING (crash-loop): $st" ;;
+                exited:0:*)    : ;;
+                exited:*)      BAD="${BAD}\n  $n EXITED non-zero: $st" ;;
+              esac
+            done
+            if [ -n "$BAD" ]; then
+              echo "!! deploy left containers unhealthy:"
+              printf "%b\n" "$BAD"
+              echo "-- recent logs from each --"
+              for n in $(docker ps -a --filter "label=com.docker.compose.project=dojo" --format '{{.Names}}'); do
+                echo "---- $n ----"; docker logs --tail 20 "$n" 2>&1 | tail -20
+              done
+              exit 1
+            fi
+            echo "==> All containers healthy"
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
