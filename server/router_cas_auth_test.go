@@ -15,10 +15,18 @@ package server
 // hand (as handle_cas_sync_test.go legitimately does, since it targets handler
 // behaviour) cannot observe this class of bug at all.
 //
-// Scope note: only /gc is gated. The rest of /api/cas has live callers — the
-// `dojo` CLI uses /content and /tags — so gating the group wholesale would
-// break them. That broader design is still open on DGS-100; the guard test
-// below is what makes the narrowness deliberate rather than accidental.
+// Scope note, updated: the whole /api/cas group now carries AuthMiddleware,
+// and /gc keeps AdminAuthMiddleware on top of it. This file originally gated
+// only /gc and carried a guard test asserting the rest of the group stayed
+// anonymous, because the `dojo` CLI calls /content and /tags with a token only
+// when one is configured — which is not the default.
+//
+// That guard fired when the group was gated, which is exactly what it was for.
+// The break is now a deliberate, recorded decision rather than an accident:
+// leaving durable unauthenticated writes open on a public gateway is worse than
+// requiring the CLI to carry the credential that already exists for it
+// (svc:dojo-cli). The guard has been rewritten below to assert the new
+// intent — and to keep the CLI fact visible, because it is the migration step.
 //
 // AdminAuthMiddleware's own accept/reject behaviour is covered in
 // server/middleware/service_token_test.go. What is proven here is that the
@@ -119,14 +127,27 @@ func TestDGS100_ServiceTokenCannotGarbageCollect(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "Admin privileges required")
 }
 
-// TestDGS100_LiveCASCallersAreNotBrokenByTheGCFix is the blast-radius guard.
+// TestDGS100_CASCallersMustNowCarryAToken replaces the blast-radius guard that
+// used to assert the opposite.
 //
-// The fix is deliberately narrow — one route, not the group — because the rest
-// of /api/cas has real callers today. Gating the group would break the `dojo`
-// CLI silently. This test makes that narrowness a checked invariant, so a
-// future "tidy-up" that promotes the middleware to the group has to fail here
-// and consciously deal with the CLI rather than discover it in production.
-func TestDGS100_LiveCASCallersAreNotBrokenByTheGCFix(t *testing.T) {
+// The original test existed so that widening the gate to the whole group could
+// not happen by accident — it demanded that whoever did it deal with the `dojo`
+// CLI consciously instead of discovering the breakage in production. When the
+// group was gated, it fired. This is that conscious dealing, recorded:
+//
+//   - The CLI (cli/internal/commands/cmd_skill.go, via internal/client) attaches
+//     `Authorization: Bearer <token>` only when c.token is non-empty, and the
+//     default from cli/internal/config is empty. So a CLI that has never been
+//     configured now gets 401 on these routes.
+//   - That is accepted. These are durable writes on an internet-reachable
+//     gateway; leaving them anonymous is worse than requiring the credential
+//     that already exists for this consumer (svc:dojo-cli).
+//   - Migration: set `gateway.token` in ~/.dojo/settings.json or export
+//     DOJO_GATEWAY_TOKEN before this reaches a host the CLI talks to.
+//
+// The list of paths is kept verbatim from the old guard so the diff shows
+// exactly which callers changed contract.
+func TestDGS100_CASCallersMustNowCarryAToken(t *testing.T) {
 	s := newRoutedCASTestServer(t)
 
 	cases := []struct {
@@ -140,28 +161,54 @@ func TestDGS100_LiveCASCallersAreNotBrokenByTheGCFix(t *testing.T) {
 		{http.MethodGet, "/api/cas/delta", "D1 sync"},
 	}
 
+	token, _, err := middleware.IssueServiceToken("dojo-cli", 0)
+	require.NoError(t, err)
+
 	for _, tc := range cases {
 		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
-			w := do(t, s, tc.method, tc.path, "")
-			assert.NotEqual(t, http.StatusUnauthorized, w.Code,
-				"%s %s still has a live caller (%s) and is NOT part of the DGS-100 /gc fix; a 401 here means the gate was widened to the group without addressing that caller",
+			anon := do(t, s, tc.method, tc.path, "")
+			assert.Equal(t, http.StatusUnauthorized, anon.Code,
+				"%s %s must refuse an anonymous caller (%s was the reason this stayed open; it now needs its token)",
 				tc.method, tc.path, tc.caller)
+
+			// ...and the configured caller must still get through, or this is a
+			// wall rather than a gate.
+			withToken := do(t, s, tc.method, tc.path, token)
+			assert.NotEqual(t, http.StatusUnauthorized, withToken.Code,
+				"%s %s rejected a valid svc:dojo-cli token — the documented migration would not actually work",
+				tc.method, tc.path)
 		})
 	}
 }
 
-// TestDGS100_SPARoutesStayAnonymous protects the reason DGS-100 was not fixed
-// wholesale in the first place: chat-ui and workflow-builder call these two
-// prefixes from the browser with no token, so they must stay anonymous until
-// the SPA auth story is designed.
-func TestDGS100_SPARoutesStayAnonymous(t *testing.T) {
+// TestDGS100_SPARoutesRequireAToken replaces a guard whose premise turned out
+// to be false.
+//
+// The old test asserted these routes must stay anonymous "because the SPAs call
+// them from the browser with no token" — the stated reason DGS-100 went unfixed
+// from 2026-07-24. That consumer does not exist in any deployed gateway:
+//
+//   - server/workflowui/dist and server/chatui/dist contain only .gitkeep; the
+//     SPA build is a separate `make build-spa` step,
+//   - goreleaser's only before-hook is `go mod download` — no npm — so no
+//     release has ever embedded them,
+//   - and gateway.trespies.dev answers 503 on /workflow and /chat, confirming
+//     the deployed binary has no SPA in it.
+//
+// So the SPA's auth story is a prerequisite for SHIPPING the workflow builder,
+// not a reason to serve /api/workflows to the whole internet. When it does
+// ship it needs a Secure/HttpOnly/SameSite cookie, because
+// workflow-builder/src/lib/api.ts subscribes to execution over EventSource,
+// which cannot send an Authorization header at all. That is recorded in
+// docs/api-route-disposition.md.
+func TestDGS100_SPARoutesRequireAToken(t *testing.T) {
 	s := newRoutedCASTestServer(t)
 
 	for _, path := range []string{"/api/workflows", "/api/skills"} {
 		t.Run(path, func(t *testing.T) {
 			w := do(t, s, http.MethodGet, path, "")
-			assert.NotEqual(t, http.StatusUnauthorized, w.Code,
-				"%s is called from the browser by the SPAs with no token; a 401 here breaks the workflow builder", path)
+			assert.Equal(t, http.StatusUnauthorized, w.Code,
+				"%s must require a token; the browser consumer that justified leaving it open has never shipped", path)
 		})
 	}
 }
