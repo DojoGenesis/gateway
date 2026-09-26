@@ -211,17 +211,21 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway, creds channel.Credenti
 			"hint", "set DOJO_DISCORD_BOT_TOKEN and DOJO_DISCORD_PUBLIC_KEY")
 	}
 
-	// Telegram: requires BOT_TOKEN
+	// Telegram: requires BOT_TOKEN + SECRET_TOKEN. SECRET_TOKEN gates the
+	// X-Telegram-Bot-Api-Secret-Token webhook check; without it the adapter
+	// would have no secret to verify against, so it is not registered at
+	// all rather than accepting unverified webhooks (DGS-115).
 	telegramToken := cred("telegram", "BOT_TOKEN")
-	if telegramToken != "" {
+	telegramSecret := cred("telegram", "SECRET_TOKEN")
+	if telegramToken != "" && telegramSecret != "" {
 		gw.Register("telegram", telegram.NewTelegramAdapter(
 			telegramToken,
-			cred("telegram", "SECRET_TOKEN"),
+			telegramSecret,
 		))
 		slog.Info("bridge: registered adapter", "platform", "telegram")
 	} else {
 		slog.Warn("bridge: skipping adapter (missing credentials)", "platform", "telegram",
-			"hint", "set DOJO_TELEGRAM_BOT_TOKEN")
+			"hint", "set DOJO_TELEGRAM_BOT_TOKEN and DOJO_TELEGRAM_SECRET_TOKEN")
 	}
 
 	// --- Phase 2 adapters ---
@@ -257,20 +261,25 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway, creds channel.Credenti
 			"hint", "set DOJO_SMS_ACCOUNT_SID and DOJO_SMS_AUTH_TOKEN")
 	}
 
-	// WhatsApp (Meta Cloud API): requires PHONE_NUMBER_ID + ACCESS_TOKEN
+	// WhatsApp (Meta Cloud API): requires PHONE_NUMBER_ID + ACCESS_TOKEN +
+	// APP_SECRET. APP_SECRET gates the X-Hub-Signature-256 webhook check;
+	// without it the adapter would have no secret to verify against, so it
+	// is not registered at all rather than accepting unverified webhooks
+	// (DGS-115).
 	waPhoneID := cred("whatsapp", "PHONE_NUMBER_ID")
 	waAccessToken := cred("whatsapp", "ACCESS_TOKEN")
-	if waPhoneID != "" && waAccessToken != "" {
+	waAppSecret := cred("whatsapp", "APP_SECRET")
+	if waPhoneID != "" && waAccessToken != "" && waAppSecret != "" {
 		gw.Register("whatsapp", whatsapp.NewWhatsAppAdapter(whatsapp.WhatsAppConfig{
 			PhoneNumberID: waPhoneID,
 			AccessToken:   waAccessToken,
 			VerifyToken:   cred("whatsapp", "VERIFY_TOKEN"),
-			AppSecret:     cred("whatsapp", "APP_SECRET"),
+			AppSecret:     waAppSecret,
 		}))
 		slog.Info("bridge: registered adapter", "platform", "whatsapp")
 	} else {
 		slog.Warn("bridge: skipping adapter (missing credentials)", "platform", "whatsapp",
-			"hint", "set DOJO_WHATSAPP_PHONE_NUMBER_ID and DOJO_WHATSAPP_ACCESS_TOKEN")
+			"hint", "set DOJO_WHATSAPP_PHONE_NUMBER_ID, DOJO_WHATSAPP_ACCESS_TOKEN, and DOJO_WHATSAPP_APP_SECRET")
 	}
 
 	// Teams (Microsoft Bot Framework): requires BOT_TOKEN + APP_ID

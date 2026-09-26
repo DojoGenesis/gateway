@@ -24,7 +24,11 @@ type WhatsAppConfig struct {
 	VerifyToken string
 
 	// AppSecret is used for HMAC-SHA256 payload signature verification.
-	// If empty, signature verification is skipped.
+	// It should not be empty in production: VerifySignature fails closed
+	// (rejects every request) when AppSecret is unset — see DGS-115. The
+	// bridge's registration gate (cmd/dojo/bridge.go) additionally refuses
+	// to register this adapter at all when DOJO_WHATSAPP_APP_SECRET is
+	// unset, mirroring the Discord/Teams/SMS pattern.
 	AppSecret string
 
 	// APIURL is the base URL for the WhatsApp Cloud API.

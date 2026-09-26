@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	platform          = "whatsapp"
-	signatureHeader   = "X-Hub-Signature-256"
-	signaturePrefix   = "sha256="
+	platform        = "whatsapp"
+	signatureHeader = "X-Hub-Signature-256"
+	signaturePrefix = "sha256="
 )
 
 // WhatsAppAdapter implements both channel.WebhookAdapter and channel.ActorAdapter
@@ -37,9 +37,9 @@ type WhatsAppAdapter struct {
 	httpClient *http.Client
 
 	// actor state (protected by mu)
-	mu          sync.RWMutex
-	connected   bool
-	msgHandler  func(*channel.ChannelMessage)
+	mu         sync.RWMutex
+	connected  bool
+	msgHandler func(*channel.ChannelMessage)
 }
 
 // NewWhatsAppAdapter returns a WhatsAppAdapter configured with the given config.
@@ -209,11 +209,14 @@ func (a *WhatsAppAdapter) Send(ctx context.Context, msg *channel.ChannelMessage)
 // ---------------------------------------------------------------------------
 
 // VerifySignature validates the X-Hub-Signature-256 header using HMAC-SHA256
-// of the raw request body and the configured AppSecret.
-// If AppSecret is empty, verification is skipped and nil is returned.
+// of the raw request body and the configured AppSecret, compared in constant
+// time via hmac.Equal.
+// If AppSecret is empty, verification fails closed — every request is
+// rejected — rather than being skipped (DGS-115: a missing secret must never
+// fail open).
 func (a *WhatsAppAdapter) VerifySignature(r *http.Request) error {
 	if a.cfg.AppSecret == "" {
-		return nil
+		return fmt.Errorf("whatsapp: no app secret configured — refusing to verify")
 	}
 
 	provided := r.Header.Get(signatureHeader)

@@ -266,14 +266,47 @@ func TestWhatsAppAdapter_VerifySignature_Invalid(t *testing.T) {
 		}
 	})
 
-	t.Run("no_secret_skips_verification", func(t *testing.T) {
+	// DGS-115: a missing AppSecret must fail closed, not skip verification.
+	t.Run("no_secret_rejected", func(t *testing.T) {
 		noSecret := NewWhatsAppAdapter(WhatsAppConfig{})
 		req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
-		// No header set — should still pass because AppSecret is empty.
-		if err := noSecret.VerifySignature(req); err != nil {
-			t.Errorf("expected nil when AppSecret is empty, got: %v", err)
+		// No header set, and no secret configured — must still be rejected.
+		if err := noSecret.VerifySignature(req); err == nil {
+			t.Error("expected error when AppSecret is empty, got nil (fail-open regression)")
 		}
 	})
+
+	t.Run("no_secret_rejected_even_with_header", func(t *testing.T) {
+		noSecret := NewWhatsAppAdapter(WhatsAppConfig{})
+		req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+		// Attacker-supplied header — still nothing valid to match against.
+		req.Header.Set(signatureHeader, hmacSig("guessed-secret", body))
+		if err := noSecret.VerifySignature(req); err == nil {
+			t.Error("expected error when AppSecret is empty, got nil (fail-open regression)")
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestWhatsAppAdapter_HandleWebhook_NoSecretConfigured — DGS-115 fail-closed
+// ---------------------------------------------------------------------------
+
+// TestWhatsAppAdapter_HandleWebhook_NoSecretConfigured proves the full
+// request path returns 401 (not 200) when the adapter has no AppSecret.
+func TestWhatsAppAdapter_HandleWebhook_NoSecretConfigured(t *testing.T) {
+	a := NewWhatsAppAdapter(WhatsAppConfig{PhoneNumberID: "phone-001"})
+
+	raw := mustMarshal(t, sampleTextPayload("phone-001", "15551112222", "wamid.forged001", "forged webhook call"))
+
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	a.HandleWebhook(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("HandleWebhook with no configured secret: status = %d, want 401 (fail-open regression)", rec.Code)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -314,13 +347,14 @@ func TestWhatsAppAdapter_HandleWebhook_Verification_WrongToken(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestWhatsAppAdapter_HandleWebhook_Message(t *testing.T) {
-	// Use no AppSecret so signature verification is skipped.
-	a := NewWhatsAppAdapter(WhatsAppConfig{PhoneNumberID: "phone-001"})
+	secret := "post-secret"
+	a := NewWhatsAppAdapter(WhatsAppConfig{PhoneNumberID: "phone-001", AppSecret: secret})
 
 	raw := mustMarshal(t, sampleTextPayload("phone-001", "15551112222", "wamid.post001", "webhook message test"))
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(signatureHeader, hmacSig(secret, raw))
 	rec := httptest.NewRecorder()
 
 	a.HandleWebhook(rec, req)
@@ -331,7 +365,8 @@ func TestWhatsAppAdapter_HandleWebhook_Message(t *testing.T) {
 }
 
 func TestWhatsAppAdapter_HandleWebhook_Message_WithHandler(t *testing.T) {
-	a := NewWhatsAppAdapter(WhatsAppConfig{})
+	secret := "handler-secret"
+	a := NewWhatsAppAdapter(WhatsAppConfig{AppSecret: secret})
 
 	var received *channel.ChannelMessage
 	a.OnMessage(func(msg *channel.ChannelMessage) {
@@ -340,6 +375,7 @@ func TestWhatsAppAdapter_HandleWebhook_Message_WithHandler(t *testing.T) {
 
 	raw := mustMarshal(t, sampleTextPayload("phone-003", "15553334444", "wamid.handler001", "dispatched to handler"))
 	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(raw))
+	req.Header.Set(signatureHeader, hmacSig(secret, raw))
 	rec := httptest.NewRecorder()
 
 	a.HandleWebhook(rec, req)
@@ -526,7 +562,8 @@ func TestWhatsAppAdapter_Disconnect(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestWhatsAppAdapter_OnMessage(t *testing.T) {
-	a := NewWhatsAppAdapter(WhatsAppConfig{})
+	secret := "onmsg-secret"
+	a := NewWhatsAppAdapter(WhatsAppConfig{AppSecret: secret})
 
 	var called bool
 	var receivedText string
@@ -539,6 +576,7 @@ func TestWhatsAppAdapter_OnMessage(t *testing.T) {
 	// Simulate receiving a message via the webhook handler.
 	raw := mustMarshal(t, sampleTextPayload("phone-on-msg", "15556667777", "wamid.onmsg001", "on message test"))
 	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(raw))
+	req.Header.Set(signatureHeader, hmacSig(secret, raw))
 	rec := httptest.NewRecorder()
 
 	a.HandleWebhook(rec, req)

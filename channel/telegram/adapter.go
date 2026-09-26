@@ -3,6 +3,7 @@ package telegram
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,8 +40,12 @@ type TelegramAdapter struct {
 }
 
 // NewTelegramAdapter returns a TelegramAdapter configured with the given bot
-// token and webhook secret. The token must not be empty; the secret may be
-// empty (signature verification is skipped when no secret is configured).
+// token and webhook secret. The token must not be empty. The secret should
+// also be non-empty in production: VerifySignature fails closed (rejects
+// every request) when no secret is configured — see DGS-115. The bridge's
+// registration gate (cmd/dojo/bridge.go) additionally refuses to register
+// this adapter at all when DOJO_TELEGRAM_SECRET_TOKEN is unset, mirroring
+// the Discord/Teams/SMS pattern.
 func NewTelegramAdapter(token, secret string) *TelegramAdapter {
 	return &TelegramAdapter{
 		token:      token,
@@ -76,17 +81,20 @@ func (a *TelegramAdapter) Capabilities() channel.AdapterCapabilities {
 }
 
 // VerifySignature validates the X-Telegram-Bot-Api-Secret-Token header against
-// the configured secret. If no secret is configured, verification is skipped
-// and nil is returned. Returns an error if the header is absent or mismatched.
+// the configured secret using a constant-time comparison. If no secret is
+// configured, verification fails closed — every request is rejected — rather
+// than being skipped (DGS-115: a missing secret must never fail open).
+// Returns an error if no secret is configured, or if the header is absent or
+// mismatched.
 func (a *TelegramAdapter) VerifySignature(r *http.Request) error {
 	if a.secret == "" {
-		return nil
+		return fmt.Errorf("telegram: no secret token configured — refusing to verify")
 	}
 	provided := r.Header.Get(secretTokenHeader)
 	if provided == "" {
 		return fmt.Errorf("telegram: missing %s header", secretTokenHeader)
 	}
-	if provided != a.secret {
+	if subtle.ConstantTimeCompare([]byte(provided), []byte(a.secret)) != 1 {
 		return fmt.Errorf("telegram: invalid secret token")
 	}
 	return nil

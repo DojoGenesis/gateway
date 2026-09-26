@@ -139,6 +139,35 @@ The full set of variables is documented in [`.env.example`](./.env.example).
 
 > **Relative DB paths bite.** A relative `MEMORY_DB_PATH` or `DOJO_CAS_PATH` silently creates a new empty database whenever the working directory changes (e.g. across restarts). Always use absolute paths in any non-local deployment.
 
+### Channel Bridge webhook credentials (`cmd/dojo bridge`, port 8090)
+
+The bridge's `/webhooks/*` HTTP server registers a platform adapter only when
+all of its required credentials are present (`channel.EnvCredentialStore`
+reads `DOJO_{PLATFORM}_{KEY}`). A platform missing a required credential is
+skipped at startup with a `WARN` log — it never crashes the process, but its
+webhook route is simply not mounted.
+
+As of DGS-115, the secret used to verify each platform's inbound webhook
+signature is a **required** credential, not an optional one — an adapter is
+no longer registered with signature verification silently disabled:
+
+| Platform | Required env vars |
+|----------|--------------------|
+| Telegram | `DOJO_TELEGRAM_BOT_TOKEN`, **`DOJO_TELEGRAM_SECRET_TOKEN`** |
+| WhatsApp | `DOJO_WHATSAPP_PHONE_NUMBER_ID`, `DOJO_WHATSAPP_ACCESS_TOKEN`, **`DOJO_WHATSAPP_APP_SECRET`** |
+| Discord | `DOJO_DISCORD_BOT_TOKEN`, `DOJO_DISCORD_PUBLIC_KEY` |
+| Teams | `DOJO_TEAMS_BOT_TOKEN`, `DOJO_TEAMS_APP_ID` |
+| SMS (Twilio) | `DOJO_SMS_ACCOUNT_SID`, `DOJO_SMS_AUTH_TOKEN` |
+
+**Before this change**, Telegram registered with only `BOT_TOKEN` (the
+webhook secret was optional) and WhatsApp registered with only
+`PHONE_NUMBER_ID` + `ACCESS_TOKEN` (`APP_SECRET` was optional) — in both
+cases, an adapter with no configured secret verified nothing and accepted
+every inbound webhook request as authentic. A deployment that relies on
+either webhook and has not set the now-bolded variable above will see that
+platform's adapter skipped (`WARN … skipping adapter (missing credentials)`)
+until the secret is set.
+
 ### JWT signing secret
 
 The gateway signs and verifies **every** bearer token — human sessions and machine service tokens alike — with one HMAC secret.

@@ -291,9 +291,10 @@ func TestTelegramAdapter_HandleWebhook_InvalidSignature(t *testing.T) {
 }
 
 func TestTelegramAdapter_HandleWebhook_BadJSON(t *testing.T) {
-	a := NewTelegramAdapter("test-token", "")
+	a := NewTelegramAdapter("test-token", "test-secret")
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook/telegram", strings.NewReader("{not json"))
+	req.Header.Set(secretTokenHeader, "test-secret")
 	rec := httptest.NewRecorder()
 
 	a.HandleWebhook(rec, req)
@@ -304,16 +305,72 @@ func TestTelegramAdapter_HandleWebhook_BadJSON(t *testing.T) {
 }
 
 func TestTelegramAdapter_HandleWebhook_NoMessage(t *testing.T) {
-	a := NewTelegramAdapter("test-token", "")
+	a := NewTelegramAdapter("test-token", "test-secret")
 
 	raw := mustMarshal(t, Update{UpdateID: 999})
 	req := httptest.NewRequest(http.MethodPost, "/webhook/telegram", bytes.NewReader(raw))
+	req.Header.Set(secretTokenHeader, "test-secret")
 	rec := httptest.NewRecorder()
 
 	a.HandleWebhook(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for update without message, got %d", rec.Code)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 11. TestTelegramAdapter_VerifySignature_NoSecret — DGS-115 fail-closed
+// ---------------------------------------------------------------------------
+
+// TestTelegramAdapter_VerifySignature_NoSecretConfigured proves that an
+// adapter with no configured secret rejects every request instead of
+// skipping verification (the DGS-115 fail-open bug).
+func TestTelegramAdapter_VerifySignature_NoSecretConfigured(t *testing.T) {
+	a := NewTelegramAdapter("test-token", "")
+
+	t.Run("no_header", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook", nil)
+		if err := a.VerifySignature(req); err == nil {
+			t.Error("expected error when no secret is configured, got nil (fail-open regression)")
+		}
+	})
+
+	t.Run("attacker_supplied_header", func(t *testing.T) {
+		// Even if an attacker guesses/supplies a header value, an adapter with
+		// no configured secret must still reject — there is nothing valid to
+		// match against.
+		req := httptest.NewRequest(http.MethodPost, "/webhook", nil)
+		req.Header.Set(secretTokenHeader, "anything")
+		if err := a.VerifySignature(req); err == nil {
+			t.Error("expected error when no secret is configured, got nil (fail-open regression)")
+		}
+	})
+}
+
+// TestTelegramAdapter_HandleWebhook_NoSecretConfigured proves the full
+// request path returns 401 (not 200) when the adapter has no secret.
+func TestTelegramAdapter_HandleWebhook_NoSecretConfigured(t *testing.T) {
+	a := NewTelegramAdapter("test-token", "")
+
+	raw := mustMarshal(t, Update{
+		UpdateID: 1000,
+		Message: &Message{
+			MessageID: 1,
+			From:      &User{ID: 1, Username: "attacker"},
+			Chat:      &Chat{ID: 1, Type: "private"},
+			Date:      1712332800,
+			Text:      "forged webhook call",
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/webhook/telegram", bytes.NewReader(raw))
+	rec := httptest.NewRecorder()
+
+	a.HandleWebhook(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("HandleWebhook with no configured secret: status = %d, want 401 (fail-open regression)", rec.Code)
 	}
 }
 
