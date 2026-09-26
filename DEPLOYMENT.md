@@ -127,6 +127,7 @@ The full set of variables is documented in [`.env.example`](./.env.example).
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PORT` | `7340` | HTTP listen port |
+| `GATEWAY_BIND_HOST` | *(empty → `127.0.0.1`)* | Interface the HTTP server binds. Loopback-only unless set explicitly — see below |
 | `ENVIRONMENT` | `development` | `production` enables structured/JSON logging **and arms the JWT secret startup gate** |
 | `JWT_SECRET` | *(dev fallback)* | **Signing secret for every bearer token.** Required in production — see below |
 | `ALLOWED_ORIGINS` | (none) | Comma-separated CORS origins (each must include scheme) |
@@ -138,6 +139,8 @@ The full set of variables is documented in [`.env.example`](./.env.example).
 | `REGISTRATION_ENABLED` | `true` | Public sign-up on `POST /auth/register`. **The only way to close it** — see below |
 
 > **Relative DB paths bite.** A relative `MEMORY_DB_PATH` or `DOJO_CAS_PATH` silently creates a new empty database whenever the working directory changes (e.g. across restarts). Always use absolute paths in any non-local deployment.
+
+> **Bind address defaults to loopback (DGS-113).** `go run main.go` / `make build` and the systemd unit all listen on `127.0.0.1:<PORT>` unless `GATEWAY_BIND_HOST` is set. The gateway's Dockerfiles set `GATEWAY_BIND_HOST=0.0.0.0` because a container's published port needs a listener reachable from outside its own loopback; a bare-metal or VPS deploy behind a same-host reverse proxy (Caddy, nginx) should leave it unset.
 
 ### JWT signing secret
 

@@ -8,6 +8,11 @@ EXPOSE 7340
 # Docker Compose uses: ["/agentic-gateway", "--health-check"]
 # No curl/wget needed — works in distroless.
 
+# The gateway defaults to binding 127.0.0.1 only (DGS-113). This container's
+# whole job is to publish 7340 to the outside, so widen it explicitly rather
+# than relying on an operator to set it at `docker run` time.
+ENV GATEWAY_BIND_HOST=0.0.0.0
+
 # Run as non-root user (nobody)
 USER 65534:65534
 

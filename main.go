@@ -728,6 +728,7 @@ func main() {
 			Environment:         cfg.Environment,
 			ShutdownTimeout:     30 * time.Second,
 			RegistrationEnabled: cfg.RegistrationEnabled,
+			BindHost:            cfg.BindHost,
 		},
 		PluginManager:       pluginManager,
 		OrchestrationEngine: orchestrationEngine,

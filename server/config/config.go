@@ -43,6 +43,22 @@ type Config struct {
 	// deployed files predate this key being read. REGISTRATION_ENABLED=false
 	// in the environment closes it and always wins.
 	RegistrationEnabled bool `yaml:"registration_enabled"`
+
+	// BindHost is the network interface the HTTP server listens on.
+	//
+	// The default (empty) resolves to 127.0.0.1 — loopback only — in
+	// server.listenAddr. Every gateway process otherwise defaults to
+	// Environment="development" (which arms run_command) and
+	// RegistrationEnabled=true (open sign-up); binding all interfaces by
+	// default would make any host running the gateway reachable from the LAN
+	// with those defaults still in effect (DGS-113).
+	//
+	// It widens only when GATEWAY_BIND_HOST is set explicitly, e.g. "0.0.0.0"
+	// or "::" — the value a container's published port needs. The loopback
+	// default itself lives in one place: server.listenAddr. There is no YAML
+	// key for this on purpose: a config file is not the trusted source for
+	// widening exposure here, the environment is.
+	BindHost string `yaml:"-"`
 }
 
 // MCPAppsConfig configures MCP Apps host infrastructure (v1.1.0).
@@ -472,6 +488,13 @@ func (c *Config) applyEnvironmentOverrides() {
 	// older deployment can have set it by accident.
 	if registration := os.Getenv("REGISTRATION_ENABLED"); registration != "" {
 		c.RegistrationEnabled = registration == "true" || registration == "1"
+	}
+
+	// Bind host (DGS-113). Explicit opt-in only — see the BindHost field
+	// comment. An empty value here leaves BindHost empty, which
+	// server.listenAddr resolves to loopback.
+	if bindHost := os.Getenv("GATEWAY_BIND_HOST"); bindHost != "" {
+		c.BindHost = bindHost
 	}
 }
 

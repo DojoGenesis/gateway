@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -86,6 +87,10 @@ type ServerConfig struct {
 	// the environment. It was hardcoded true here and in main.go until the
 	// config key was made real; a deployment that wrote the key got nothing.
 	RegistrationEnabled bool
+	// BindHost is the interface Start() listens on. Empty defaults to
+	// loopback-only (127.0.0.1) — see listenAddr. main.go sets this from
+	// config.Config.BindHost, which reads GATEWAY_BIND_HOST (DGS-113).
+	BindHost string
 }
 
 // Server is the main HTTP server that ties all framework modules together.
@@ -311,12 +316,24 @@ func requestIDMiddleware() gin.HandlerFunc {
 	}
 }
 
+// listenAddr combines a bind host and port into a listen address for
+// http.Server, defaulting to loopback-only (127.0.0.1) when bindHost is
+// empty (DGS-113). Widening it — e.g. to "0.0.0.0" or "::" for a container's
+// published port — is an explicit opt-in via GATEWAY_BIND_HOST; see
+// ServerConfig.BindHost and config.Config.BindHost.
+func listenAddr(bindHost, port string) string {
+	if bindHost == "" {
+		bindHost = "127.0.0.1"
+	}
+	return net.JoinHostPort(bindHost, port)
+}
+
 // Start begins listening for HTTP requests.
 func (s *Server) Start() error {
 	s.startTime = time.Now()
 
 	s.httpServer = &http.Server{
-		Addr:              ":" + s.cfg.Port,
+		Addr:              listenAddr(s.cfg.BindHost, s.cfg.Port),
 		Handler:           s.router,
 		ReadTimeout:       15 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,

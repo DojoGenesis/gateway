@@ -212,6 +212,20 @@ func TestApplyEnvironmentOverrides(t *testing.T) {
 	assert.Equal(t, []string{"http://prod1.com", "http://prod2.com"}, cfg.AllowedOrigins)
 }
 
+// TestApplyEnvironmentOverrides_BindHost covers DGS-113: GATEWAY_BIND_HOST is
+// the only thing that populates BindHost.
+func TestApplyEnvironmentOverrides_BindHost(t *testing.T) {
+	os.Setenv("GATEWAY_BIND_HOST", "0.0.0.0")
+	defer os.Unsetenv("GATEWAY_BIND_HOST")
+
+	cfg := loadDefaults()
+	require.Empty(t, cfg.BindHost, "default BindHost must be empty (loopback) before overrides")
+
+	cfg.applyEnvironmentOverrides()
+
+	assert.Equal(t, "0.0.0.0", cfg.BindHost)
+}
+
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		name      string
