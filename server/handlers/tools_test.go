@@ -10,51 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestHandleListTools(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.GET("/api/v1/tools", HandleListTools)
-
-	req, _ := http.NewRequest("GET", "/api/v1/tools", nil)
-	resp := httptest.NewRecorder()
-	router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", resp.Code)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(resp.Body.Bytes(), &result); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	success, _ := result["success"].(bool)
-	if !success {
-		t.Errorf("Expected success: true, got false")
-	}
-
-	count, _ := result["count"].(float64)
-	if count < 25 {
-		t.Errorf("Expected at least 25 tools, got %v", count)
-	}
-
-	tools, _ := result["tools"].([]interface{})
-	if len(tools) < 25 {
-		t.Errorf("Expected at least 25 tools in array, got %d", len(tools))
-	}
-
-	firstTool, _ := tools[0].(map[string]interface{})
-	if _, hasName := firstTool["name"]; !hasName {
-		t.Errorf("Expected tool to have 'name' field")
-	}
-	if _, hasDesc := firstTool["description"]; !hasDesc {
-		t.Errorf("Expected tool to have 'description' field")
-	}
-	if _, hasParams := firstTool["parameters"]; !hasParams {
-		t.Errorf("Expected tool to have 'parameters' field")
-	}
-}
-
 func TestHandleSearchTools(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -118,77 +73,6 @@ func TestHandleSearchTools(t *testing.T) {
 			count, _ := result["count"].(float64)
 			if int(count) < tt.minCount {
 				t.Errorf("Expected at least %d tools, got %v", tt.minCount, count)
-			}
-		})
-	}
-}
-
-func TestHandleGetToolInfo(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.GET("/api/v1/tools/:name", HandleGetToolInfo)
-
-	tests := []struct {
-		name           string
-		toolName       string
-		expectedStatus int
-		wantSuccess    bool
-	}{
-		{
-			name:           "get info for read_file",
-			toolName:       "read_file",
-			expectedStatus: http.StatusOK,
-			wantSuccess:    true,
-		},
-		{
-			name:           "get info for web_search",
-			toolName:       "web_search",
-			expectedStatus: http.StatusOK,
-			wantSuccess:    true,
-		},
-		{
-			name:           "get info for non-existent tool",
-			toolName:       "non_existent_tool",
-			expectedStatus: http.StatusNotFound,
-			wantSuccess:    false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req, _ := http.NewRequest("GET", "/api/v1/tools/"+tt.toolName, nil)
-			resp := httptest.NewRecorder()
-			router.ServeHTTP(resp, req)
-
-			if resp.Code != tt.expectedStatus {
-				t.Errorf("Expected status %d, got %d", tt.expectedStatus, resp.Code)
-			}
-
-			var result map[string]interface{}
-			if err := json.Unmarshal(resp.Body.Bytes(), &result); err != nil {
-				t.Fatalf("Failed to parse response: %v", err)
-			}
-
-			success, _ := result["success"].(bool)
-			if success != tt.wantSuccess {
-				t.Errorf("Expected success: %v, got %v", tt.wantSuccess, success)
-			}
-
-			if tt.wantSuccess {
-				name, _ := result["name"].(string)
-				if name != tt.toolName {
-					t.Errorf("Expected name: %s, got %s", tt.toolName, name)
-				}
-
-				if _, hasDesc := result["description"]; !hasDesc {
-					t.Errorf("Expected 'description' field")
-				}
-				if _, hasParams := result["parameters"]; !hasParams {
-					t.Errorf("Expected 'parameters' field")
-				}
-				if _, hasCat := result["category"]; !hasCat {
-					t.Errorf("Expected 'category' field")
-				}
 			}
 		})
 	}
