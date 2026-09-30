@@ -198,6 +198,10 @@ func main() {
 	slog.Info("JWT signing secret resolved",
 		"source", jwtSecretStatus.SourceLabel(),
 		"using_built_in_default", jwtSecretStatus.UsingDefault)
+	// One answer to "is this production", for every gate in the process: the
+	// resolved config value (YAML, overridden by ENVIRONMENT). Set before
+	// anything that asks.
+	middleware.SetResolvedEnvironment(cfg.Environment)
 	if err := middleware.EnsureJWTSecretConfigured(cfg.Environment); err != nil {
 		slog.Error("refusing to start", "error", err)
 		os.Exit(1)

@@ -201,11 +201,7 @@ func New(deps ServerDeps) *Server {
 		cfg.RefreshTokenTTL = 7 * 24 * time.Hour
 	}
 
-	if cfg.Environment == "production" {
-		gin.SetMode(gin.ReleaseMode)
-	} else {
-		gin.SetMode(gin.DebugMode)
-	}
+	gin.SetMode(ginModeFor(cfg.Environment))
 
 	s := &Server{
 		router:                gin.New(),
@@ -335,6 +331,16 @@ func requestIDMiddleware() gin.HandlerFunc {
 // "localhost") binds BOTH 127.0.0.1 and ::1, because production clients dial
 // "localhost:7340" and that resolves to ::1 first on the production host.
 const DefaultBindHost = "127.0.0.1"
+
+// ginModeFor picks gin's mode for an environment string, through the one
+// shared definition of "production" (it used to be an exact ==, so a host set
+// to "Production" ran gin in debug mode).
+func ginModeFor(env string) string {
+	if middleware.IsProductionString(env) {
+		return gin.ReleaseMode
+	}
+	return gin.DebugMode
+}
 
 // Start begins listening for HTTP requests.
 //

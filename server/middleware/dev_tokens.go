@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // This file decides ONE thing: may this process accept the legacy development
@@ -42,8 +43,8 @@ import (
 const EnvDevTokens = "GATEWAY_DEV_TOKENS"
 
 // envEnvironment names the deployment environment. It is read in exactly one
-// place — isProductionString, below — so the codebase cannot again hold two
-// disagreeing opinions about what "production" means.
+// place, the fallback in IsProductionEnvironment below; every other decision
+// uses the resolved value main records with SetResolvedEnvironment.
 const envEnvironment = "ENVIRONMENT"
 
 // devTokensEnabled reports whether unsigned shim tokens may authenticate.
@@ -69,11 +70,47 @@ func devTokensEnabled() bool {
 	return err == nil && v
 }
 
+// resolvedEnvironment is the process's environment as the config resolved it:
+// config.yaml's `environment:`, overridden by the ENVIRONMENT env var (the
+// documented config order). main sets it once at startup, before any request.
+//
+// It exists because "production" used to have two sources. The JWT startup
+// gate read the resolved config; this file read the raw env var. On a host
+// whose production setting lived in config.yaml alone, the JWT gate said
+// production and the dev-token and run_command refusals did not, so an
+// explicit GATEWAY_DEV_TOKENS=true handed out unsigned admin tokens.
+var resolvedEnvironment atomic.Pointer[string]
+
+// SetResolvedEnvironment records the process's resolved environment. Call it
+// once at startup with the config's final Environment value. An empty string
+// clears it (tests), restoring the env-var fallback below.
+func SetResolvedEnvironment(env string) {
+	if env == "" {
+		resolvedEnvironment.Store(nil)
+		return
+	}
+	resolvedEnvironment.Store(&env)
+}
+
 // IsProductionEnvironment reports whether this process considers itself
-// production. Exported so that every caller in the tree — the JWT startup gate
-// here, the workflow run_command gate in package server — shares one answer.
+// production. Every production decision in the tree goes through here or
+// through IsProductionString: the JWT startup gate, the dev-token and
+// workflow run_command refusals, gin's mode and HSTS.
+//
+// It answers from the resolved environment when main has set one, and falls
+// back to the ENVIRONMENT env var otherwise (unit tests, and any binary that
+// never loads the gateway config).
 func IsProductionEnvironment() bool {
+	if p := resolvedEnvironment.Load(); p != nil {
+		return isProductionString(*p)
+	}
 	return isProductionString(os.Getenv(envEnvironment))
+}
+
+// IsProductionString applies the single definition of "production" to a
+// value the caller already holds (gin's mode, HSTS).
+func IsProductionString(s string) bool {
+	return isProductionString(s)
 }
 
 // isProductionString is the single definition of "production" in this codebase.

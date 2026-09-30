@@ -13,6 +13,7 @@ package logging
 import (
 	"log/slog"
 	"os"
+	"strings"
 )
 
 // Init configures the global slog logger.
@@ -20,7 +21,10 @@ import (
 func Init(environment string) {
 	var handler slog.Handler
 
-	if environment == "production" {
+	// Same rule as middleware.IsProductionString (case- and
+	// space-insensitive). Restated here because this leaf package must not
+	// import middleware; the test pins that the two agree.
+	if strings.EqualFold(strings.TrimSpace(environment), "production") {
 		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: slog.LevelInfo,
 		})

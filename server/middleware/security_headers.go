@@ -9,7 +9,8 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 
-		if c.GetString("environment") == "production" {
+		// The shared predicate, not ==: "Production" is production here too.
+		if isProductionString(c.GetString("environment")) {
 			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
 
