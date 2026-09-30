@@ -27,7 +27,7 @@ DOMAIN="gateway.trespies.dev"
 #   NOTE for whoever runs this next: /api/* now needs a credential. The `dojo`
 #   CLI sends one only when configured — export DOJO_GATEWAY_TOKEN (see
 #   docs/api-route-disposition.md) or its skill and CAS commands will 401.
-GATEWAY_VERSION="v3.3.4"
+GATEWAY_VERSION="v3.3.5"
 GATEWAY_PORT=7340
 GATEWAY_USER="dojo"
 GATEWAY_HOME="/opt/dojo"
