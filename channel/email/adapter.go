@@ -2,8 +2,8 @@ package email
 
 import (
 	"bytes"
-	"crypto/subtle"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -59,7 +59,7 @@ func (a *EmailAdapter) Capabilities() channel.AdapterCapabilities {
 
 // VerifySignature satisfies channel.WebhookAdapter. It checks for the
 // X-Webhook-Secret header and compares it to the configured WebhookSecret.
-// If WebhookSecret is empty the check is skipped (useful for development).
+// If WebhookSecret is empty every request is refused (DGS-115 follow-up).
 func (a *EmailAdapter) VerifySignature(r *http.Request) error {
 	// Fail CLOSED when no secret is configured, like Telegram and WhatsApp
 	// (DGS-115). cmd/dojo already refuses to register email without

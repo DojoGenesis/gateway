@@ -13,13 +13,16 @@ package integration
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -54,6 +57,26 @@ func newSmokeGateway(t *testing.T) (*channel.WebhookGateway, func() []string) {
 
 // postToGateway sends a POST to path on the given test server and returns
 // the HTTP response code.
+// twilioSignature computes X-Twilio-Signature the way Twilio does: base64
+// HMAC-SHA1, keyed by the auth token, over the full URL followed by every POST
+// parameter's key and value in key order.
+func twilioSignature(authToken, fullURL string, params url.Values) string {
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	b.WriteString(fullURL)
+	for _, k := range keys {
+		b.WriteString(k)
+		b.WriteString(params.Get(k))
+	}
+	mac := hmac.New(sha1.New, []byte(authToken)) //nolint:gosec // Twilio's scheme
+	mac.Write([]byte(b.String()))
+	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
 func postToGateway(srv *httptest.Server, path, contentType string, body []byte, headers map[string]string) int {
 	req, err := http.NewRequest(http.MethodPost, srv.URL+path, bytes.NewReader(body))
 	if err != nil {
@@ -72,15 +95,17 @@ func postToGateway(srv *httptest.Server, path, contentType string, body []byte, 
 }
 
 // ---------------------------------------------------------------------------
-// Email (SendGrid Inbound Parse) — empty WebhookSecret bypasses signature check
+// Email (SendGrid Inbound Parse) — X-Webhook-Secret required (DGS-115 follow-up)
 // ---------------------------------------------------------------------------
 
 func TestPhase2_Email_Smoke(t *testing.T) {
 	gw, publishedSubjects := newSmokeGateway(t)
 
-	// Empty WebhookSecret → signature verification skipped.
+	// An empty WebhookSecret used to skip verification; since the DGS-115
+	// follow-up (f1621e3) it refuses everything, so the smoke test
+	// authenticates like a real sender.
 	adapter := email.New(email.EmailConfig{
-		WebhookSecret:  "",
+		WebhookSecret:  "smoke-email-secret",
 		SendGridAPIKey: "test-key",
 		FromAddress:    "noreply@test.example",
 		FromName:       "Test",
@@ -103,7 +128,8 @@ func TestPhase2_Email_Smoke(t *testing.T) {
 	}
 	body, _ := json.Marshal(emailPayload)
 
-	status := postToGateway(srv, "/webhooks/email", "application/json", body, nil)
+	status := postToGateway(srv, "/webhooks/email", "application/json", body,
+		map[string]string{"X-Webhook-Secret": "smoke-email-secret"})
 
 	if status != http.StatusOK {
 		t.Errorf("email smoke: status = %d, want 200", status)
@@ -124,16 +150,18 @@ func TestPhase2_Email_Smoke(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SMS (Twilio) — empty AuthToken bypasses HMAC-SHA1 signature check
+// SMS (Twilio) — X-Twilio-Signature (HMAC-SHA1) required (DGS-115 follow-up)
 // ---------------------------------------------------------------------------
 
 func TestPhase2_SMS_Smoke(t *testing.T) {
 	gw, publishedSubjects := newSmokeGateway(t)
 
-	// Empty AuthToken → signature verification skipped.
+	// An empty AuthToken used to skip verification; since the DGS-115
+	// follow-up (f1621e3) it refuses everything, so the smoke test signs the
+	// request exactly as Twilio does.
 	adapter := sms.NewSMSAdapter(sms.SMSConfig{
 		AccountSID: "ACtest123",
-		AuthToken:  "", // bypass
+		AuthToken:  "smoke-sms-token",
 		FromNumber: "+15550000000",
 	})
 	gw.Register("sms", adapter)
@@ -152,7 +180,7 @@ func TestPhase2_SMS_Smoke(t *testing.T) {
 	status := postToGateway(srv, "/webhooks/sms",
 		"application/x-www-form-urlencoded",
 		[]byte(form.Encode()),
-		nil,
+		map[string]string{"X-Twilio-Signature": twilioSignature("smoke-sms-token", srv.URL+"/webhooks/sms", form)},
 	)
 
 	if status != http.StatusOK {
