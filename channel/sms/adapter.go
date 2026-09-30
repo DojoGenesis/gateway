@@ -75,8 +75,11 @@ func (a *SMSAdapter) Capabilities() channel.AdapterCapabilities {
 // Twilio computes: HMAC-SHA1(authToken, fullURL + sorted POST params).
 // See https://www.twilio.com/docs/usage/webhooks/webhooks-security
 func (a *SMSAdapter) VerifySignature(r *http.Request) error {
+	// DGS-115: fail CLOSED, like Telegram and WhatsApp. cmd/dojo already
+	// refuses to register SMS without AUTH_TOKEN; this keeps any other caller
+	// of the adapter from inheriting a skip-verification default.
 	if a.cfg.AuthToken == "" {
-		return nil
+		return fmt.Errorf("sms: no auth token configured; refusing unverifiable request")
 	}
 
 	provided := r.Header.Get(sigHeader)

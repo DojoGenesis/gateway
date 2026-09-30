@@ -2,6 +2,7 @@ package email
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -60,14 +61,18 @@ func (a *EmailAdapter) Capabilities() channel.AdapterCapabilities {
 // X-Webhook-Secret header and compares it to the configured WebhookSecret.
 // If WebhookSecret is empty the check is skipped (useful for development).
 func (a *EmailAdapter) VerifySignature(r *http.Request) error {
+	// Fail CLOSED when no secret is configured, like Telegram and WhatsApp
+	// (DGS-115). cmd/dojo already refuses to register email without
+	// WEBHOOK_SECRET; this keeps any other caller from inheriting a
+	// skip-verification default.
 	if a.cfg.WebhookSecret == "" {
-		return nil
+		return fmt.Errorf("email: no webhook secret configured; refusing unverifiable request")
 	}
 	got := r.Header.Get("X-Webhook-Secret")
 	if got == "" {
 		return fmt.Errorf("email: missing X-Webhook-Secret header")
 	}
-	if got != a.cfg.WebhookSecret {
+	if subtle.ConstantTimeCompare([]byte(got), []byte(a.cfg.WebhookSecret)) != 1 {
 		return fmt.Errorf("email: invalid webhook secret")
 	}
 	return nil

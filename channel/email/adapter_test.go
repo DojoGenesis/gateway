@@ -201,6 +201,20 @@ func TestEmailAdapter_VerifySignature_Valid(t *testing.T) {
 	}
 }
 
+// TestEmailAdapter_VerifySignature_NoSecret: with no WebhookSecret configured,
+// every request is refused, including one that sends an empty header (DGS-115).
+func TestEmailAdapter_VerifySignature_NoSecret(t *testing.T) {
+	a := New(EmailConfig{SendGridAPIKey: "SG.test-key"})
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/email", nil)
+	if err := a.VerifySignature(req); err == nil {
+		t.Error("VerifySignature() expected error with no secret configured; got nil")
+	}
+	req.Header.Set("X-Webhook-Secret", "")
+	if err := a.VerifySignature(req); err == nil {
+		t.Error("VerifySignature() expected error for an empty secret header; got nil")
+	}
+}
+
 func TestEmailAdapter_VerifySignature_Invalid(t *testing.T) {
 	a := newAdapter()
 

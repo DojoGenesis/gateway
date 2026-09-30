@@ -177,12 +177,24 @@ func TestSMSAdapter_VerifySignature_Invalid(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// TestSMSAdapter_VerifySignature_NoToken — DGS-115: no auth token, no entry.
+func TestSMSAdapter_VerifySignature_NoToken(t *testing.T) {
+	a := NewSMSAdapter(SMSConfig{})
+	req := httptest.NewRequest(http.MethodPost, "/webhook/sms", strings.NewReader("Body=forged"))
+	if err := a.VerifySignature(req); err == nil {
+		t.Error("expected an error with no auth token configured, got nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // 7. TestSMSAdapter_HandleWebhook
 // ---------------------------------------------------------------------------
 
 func TestSMSAdapter_HandleWebhook(t *testing.T) {
-	// Use an adapter with no auth token so signature check is skipped.
-	a := NewSMSAdapter(SMSConfig{})
+	// Signed like Twilio does: since DGS-115 an adapter with no auth token
+	// refuses every request (see TestSMSAdapter_VerifySignature_NoToken).
+	authToken := "test-auth-token" //nolint:gosec // test constant
+	a := NewSMSAdapter(SMSConfig{AuthToken: authToken})
 
 	form := url.Values{}
 	form.Set("MessageSid", "SM789")
@@ -194,6 +206,9 @@ func TestSMSAdapter_HandleWebhook(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/webhook/sms",
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set(sigHeader, computeTwilioSignature(authToken, "https://example.com/webhook/sms", form))
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Host = "example.com"
 	rec := httptest.NewRecorder()
 
 	a.HandleWebhook(rec, req)
