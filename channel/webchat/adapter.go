@@ -68,7 +68,8 @@ func (a *WebChatAdapter) Capabilities() channel.AdapterCapabilities {
 }
 
 // VerifySignature checks that the Authorization header contains the expected
-// Bearer token. If no token is configured, verification is skipped.
+// Bearer token. If no token is configured it fails closed with
+// ErrNoTokenConfigured rather than skipping verification (DGS-142).
 func (a *WebChatAdapter) VerifySignature(r *http.Request) error {
 	if strings.TrimSpace(a.token) == "" {
 		return ErrNoTokenConfigured
