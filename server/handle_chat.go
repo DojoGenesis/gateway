@@ -59,12 +59,49 @@ type OpenAIChatRequest struct {
 	Stop             interface{}         `json:"stop,omitempty"`
 	User             string              `json:"user,omitempty"`
 	Metadata         map[string]string   `json:"metadata,omitempty"`
+	// Tools and ToolChoice are OpenAI function calling (DGS-141). They used
+	// to be dropped on decode, because the struct had no field for them.
+	Tools      []OpenAITool    `json:"tools,omitempty"`
+	ToolChoice json.RawMessage `json:"tool_choice,omitempty"`
+}
+
+// OpenAITool is one entry of a request's `tools` array.
+type OpenAITool struct {
+	Type     string            `json:"type"`
+	Function OpenAIFunctionDef `json:"function"`
+}
+
+// OpenAIFunctionDef describes a callable function.
+type OpenAIFunctionDef struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Parameters  map[string]interface{} `json:"parameters,omitempty"`
+}
+
+// OpenAIToolCall is a function call the model made. On the wire the
+// arguments are a JSON-encoded STRING, not an object. Index is set only in
+// streaming deltas.
+type OpenAIToolCall struct {
+	Index    *int               `json:"index,omitempty"`
+	ID       string             `json:"id,omitempty"`
+	Type     string             `json:"type,omitempty"`
+	Function OpenAIFunctionCall `json:"function"`
+}
+
+// OpenAIFunctionCall is the name and JSON-string arguments of a tool call.
+type OpenAIFunctionCall struct {
+	Name      string `json:"name,omitempty"`
+	Arguments string `json:"arguments"`
 }
 
 // OpenAIChatMessage represents a message in OpenAI format.
 type OpenAIChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+	// ToolCalls: an assistant turn that called tools (request history and
+	// responses). ToolCallID: a role "tool" turn answering one of them.
+	ToolCalls  []OpenAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"`
 }
 
 // OpenAIChatResponse is the non-streaming chat completion response (OpenAI format).
@@ -147,6 +184,9 @@ func (s *Server) nonStreamChatCompletions(c *gin.Context, ctx context.Context, r
 
 	completionID := "chatcmpl-" + uuid.New().String()[:12]
 	finishReason := "stop"
+	if len(resp.ToolCalls) > 0 {
+		finishReason = "tool_calls"
+	}
 
 	openAIResp := OpenAIChatResponse{
 		ID:      completionID,
@@ -157,8 +197,9 @@ func (s *Server) nonStreamChatCompletions(c *gin.Context, ctx context.Context, r
 			{
 				Index: 0,
 				Message: &OpenAIChatMessage{
-					Role:    "assistant",
-					Content: resp.Content,
+					Role:      "assistant",
+					Content:   resp.Content,
+					ToolCalls: toOpenAIToolCalls(resp.ToolCalls, false),
 				},
 				FinishReason: &finishReason,
 			},
@@ -176,6 +217,15 @@ func (s *Server) nonStreamChatCompletions(c *gin.Context, ctx context.Context, r
 func (s *Server) streamChatCompletions(c *gin.Context, ctx context.Context, req *OpenAIChatRequest) {
 	completionReq, _, prov, ok := s.prepareCompletion(c, ctx, req, true)
 	if !ok {
+		return
+	}
+	// Provider stream chunks carry text only (provider.CompletionChunk has no
+	// tool calls), so a streamed request with tools would lose every call the
+	// model makes. Serve it with one non-streaming call and emit the result
+	// as spec-valid SSE instead. It arrives all at once, not token by token;
+	// that is the honest trade for not dropping the calls.
+	if len(completionReq.Tools) > 0 {
+		s.streamToolCompletion(c, ctx, req, completionReq, prov)
 		return
 	}
 
@@ -308,9 +358,10 @@ func (s *Server) prepareCompletion(c *gin.Context, ctx context.Context, req *Ope
 		}
 	}
 
-	messages := make([]provider.Message, len(req.Messages))
-	for i, m := range req.Messages {
-		messages[i] = provider.Message{Role: m.Role, Content: m.Content}
+	messages, tools, toolChoice, convErr := convertToolFields(req)
+	if convErr != nil {
+		s.errorResponse(c, http.StatusBadRequest, "invalid_request", convErr.Error())
+		return nil, "", nil, false
 	}
 	temp := 0.7
 	if req.Temperature != nil {
@@ -332,7 +383,121 @@ func (s *Server) prepareCompletion(c *gin.Context, ctx context.Context, req *Ope
 		Temperature: temp,
 		MaxTokens:   maxTokens,
 		Stream:      stream,
+		Tools:       tools,
+		ToolChoice:  toolChoice,
 	}, name, prov, true
+}
+
+// streamToolCompletion answers a streamed request that carries tools: one
+// non-streaming provider call, emitted as the OpenAI SSE sequence (role chunk,
+// content and/or tool_calls delta, finish chunk, [DONE]).
+func (s *Server) streamToolCompletion(c *gin.Context, ctx context.Context, req *OpenAIChatRequest, completionReq *provider.CompletionRequest, prov provider.ModelProvider) {
+	completionReq.Stream = false
+	resp, err := prov.GenerateCompletion(ctx, completionReq)
+	if err != nil {
+		s.errorResponse(c, http.StatusInternalServerError, "provider_error", "Completion failed: "+err.Error())
+		return
+	}
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Streaming not supported")
+		return
+	}
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+
+	id := "chatcmpl-" + uuid.New().String()[:12]
+	created := time.Now().Unix()
+	chunk := func(delta *OpenAIChatMessage, finish *string) OpenAIStreamChunk {
+		return OpenAIStreamChunk{ID: id, Object: "chat.completion.chunk", Created: created, Model: req.Model,
+			Choices: []OpenAIChatChoice{{Index: 0, Delta: delta, FinishReason: finish}}}
+	}
+	s.writeSSEChunk(c.Writer, flusher, chunk(&OpenAIChatMessage{Role: "assistant"}, nil))
+	if resp.Content != "" || len(resp.ToolCalls) > 0 {
+		s.writeSSEChunk(c.Writer, flusher, chunk(&OpenAIChatMessage{
+			Content:   resp.Content,
+			ToolCalls: toOpenAIToolCalls(resp.ToolCalls, true),
+		}, nil))
+	}
+	finish := "stop"
+	if len(resp.ToolCalls) > 0 {
+		finish = "tool_calls"
+	}
+	s.writeSSEChunk(c.Writer, flusher, chunk(&OpenAIChatMessage{}, &finish))
+	fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
+	flusher.Flush()
+}
+
+// convertToolFields maps the OpenAI wire's tool fields onto the provider
+// layer, which already supports all of them. Anything it cannot carry
+// faithfully is a 400 naming the field, never a silent drop (DGS-141).
+func convertToolFields(req *OpenAIChatRequest) ([]provider.Message, []provider.Tool, string, error) {
+	messages := make([]provider.Message, len(req.Messages))
+	for i, m := range req.Messages {
+		pm := provider.Message{Role: m.Role, Content: m.Content, ToolCallID: m.ToolCallID}
+		for j, tc := range m.ToolCalls {
+			args := map[string]interface{}{}
+			if strings.TrimSpace(tc.Function.Arguments) != "" {
+				if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+					return nil, nil, "", fmt.Errorf("messages[%d].tool_calls[%d].function.arguments must be a JSON object encoded as a string: %v", i, j, err)
+				}
+			}
+			pm.ToolCalls = append(pm.ToolCalls, provider.ToolCall{ID: tc.ID, Name: tc.Function.Name, Arguments: args})
+		}
+		messages[i] = pm
+	}
+
+	var tools []provider.Tool
+	for i, t := range req.Tools {
+		if t.Type != "" && t.Type != "function" {
+			return nil, nil, "", fmt.Errorf("tools[%d].type %q is not supported; only \"function\"", i, t.Type)
+		}
+		if strings.TrimSpace(t.Function.Name) == "" {
+			return nil, nil, "", fmt.Errorf("tools[%d].function.name is required", i)
+		}
+		tools = append(tools, provider.Tool{Name: t.Function.Name, Description: t.Function.Description, Parameters: t.Function.Parameters})
+	}
+
+	toolChoice := ""
+	if raw := strings.TrimSpace(string(req.ToolChoice)); raw != "" && raw != "null" {
+		var choice string
+		if err := json.Unmarshal(req.ToolChoice, &choice); err != nil {
+			return nil, nil, "", fmt.Errorf("tool_choice naming a specific function is not supported by this gateway; use \"auto\", \"none\" or \"required\"")
+		}
+		switch choice {
+		case "auto", "none", "required":
+			toolChoice = choice
+		default:
+			return nil, nil, "", fmt.Errorf("tool_choice %q is not one of \"auto\", \"none\", \"required\"", choice)
+		}
+	}
+	return messages, tools, toolChoice, nil
+}
+
+// toOpenAIToolCalls renders provider tool calls on the OpenAI wire: type
+// "function" and arguments as a JSON string. withIndex adds the index a
+// streaming delta requires.
+func toOpenAIToolCalls(calls []provider.ToolCall, withIndex bool) []OpenAIToolCall {
+	if len(calls) == 0 {
+		return nil
+	}
+	out := make([]OpenAIToolCall, len(calls))
+	for i, tc := range calls {
+		args := []byte("{}")
+		if tc.Arguments != nil {
+			if b, err := json.Marshal(tc.Arguments); err == nil {
+				args = b
+			}
+		}
+		out[i] = OpenAIToolCall{ID: tc.ID, Type: "function", Function: OpenAIFunctionCall{Name: tc.Name, Arguments: string(args)}}
+		if withIndex {
+			idx := i
+			out[i].Index = &idx
+		}
+	}
+	return out
 }
 
 func (s *Server) writeSSEChunk(w http.ResponseWriter, flusher http.Flusher, chunk OpenAIStreamChunk) {
