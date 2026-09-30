@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -125,85 +126,8 @@ func (s *Server) handleChatCompletions(c *gin.Context) {
 }
 
 func (s *Server) nonStreamChatCompletions(c *gin.Context, ctx context.Context, req *OpenAIChatRequest) {
-	if s.pluginManager == nil {
-		s.errorResponse(c, http.StatusServiceUnavailable, "server_error", "No providers configured")
-		return
-	}
-
-	// Get the last user message for the agent query
-	lastUserMsg := ""
-	for i := len(req.Messages) - 1; i >= 0; i-- {
-		if req.Messages[i].Role == "user" {
-			lastUserMsg = req.Messages[i].Content
-			break
-		}
-	}
-
-	if lastUserMsg == "" {
-		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "No user message found")
-		return
-	}
-
-	// ─── Route bypass: X-Route: direct skips all injection ───────────
-	directRoute := c.GetHeader("X-Route") == "direct"
-
-	// ─── Base system prompt injection ──────────────────────────────────
-	// Prepends a system message from SYSTEM_PROMPT or SYSTEM_PROMPT_FILE env vars.
-	// Skipped when: (a) caller already sent a system message (Route E), or
-	// (b) X-Route: direct header is set (Route A).
-	if !directRoute && !hasCallerSystemMessage(req.Messages) {
-		if sysPrompt := loadSystemPrompt(); sysPrompt != "" {
-			sysMsg := OpenAIChatMessage{Role: "system", Content: sysPrompt}
-			req.Messages = append([]OpenAIChatMessage{sysMsg}, req.Messages...)
-			slog.Debug("base system prompt injected", "chars", len(sysPrompt))
-		}
-	}
-
-	// ─── RAG context injection ──────────────────────────────────
-	if !directRoute {
-		if userID, ok := getUserIDFromContext(c); ok && s.authDB != nil {
-			ragCtx, ragErr := s.BuildRAGContext(ctx, userID, lastUserMsg, 5)
-			if ragErr != nil {
-				slog.Warn("rag context retrieval failed", "error", ragErr)
-			} else if ragCtx != "" {
-				// Prepend RAG context as a system message
-				ragMsg := OpenAIChatMessage{Role: "system", Content: ragCtx}
-				req.Messages = append([]OpenAIChatMessage{ragMsg}, req.Messages...)
-				slog.Debug("rag context injected", "user_id", userID, "chars", len(ragCtx))
-			}
-		}
-	}
-
-	// Build provider completion request directly
-	messages := make([]provider.Message, len(req.Messages))
-	for i, m := range req.Messages {
-		messages[i] = provider.Message{
-			Role:    m.Role,
-			Content: m.Content,
-		}
-	}
-
-	temp := 0.7
-	if req.Temperature != nil {
-		temp = *req.Temperature
-	}
-	maxTokens := 4096
-	if req.MaxTokens != nil {
-		maxTokens = *req.MaxTokens
-	}
-
-	completionReq := &provider.CompletionRequest{
-		Model:       req.Model,
-		Messages:    messages,
-		Temperature: temp,
-		MaxTokens:   maxTokens,
-		Stream:      false,
-	}
-
-	// Try to find the right provider for the model
-	prov, err := s.resolveProvider(req.Model)
-	if err != nil {
-		s.errorResponse(c, http.StatusBadRequest, "model_not_found", "Model not available: "+err.Error())
+	completionReq, provName, prov, ok := s.prepareCompletion(c, ctx, req, false)
+	if !ok {
 		return
 	}
 
@@ -213,7 +137,6 @@ func (s *Server) nonStreamChatCompletions(c *gin.Context, ctx context.Context, r
 
 	// Record latency for provider history tracking
 	if s.latencyTracker != nil {
-		provName := s.resolveProviderName(req.Model)
 		s.latencyTracker.Record(provName, latencyMs, err != nil)
 	}
 
@@ -251,75 +174,8 @@ func (s *Server) nonStreamChatCompletions(c *gin.Context, ctx context.Context, r
 }
 
 func (s *Server) streamChatCompletions(c *gin.Context, ctx context.Context, req *OpenAIChatRequest) {
-	if s.pluginManager == nil {
-		s.errorResponse(c, http.StatusServiceUnavailable, "server_error", "No providers configured")
-		return
-	}
-
-	// ─── Route bypass: X-Route: direct skips all injection ───────────
-	directRoute := c.GetHeader("X-Route") == "direct"
-
-	// ─── Base system prompt injection ──────────────────────────────────
-	// Skipped when: (a) caller already sent a system message (Route E), or
-	// (b) X-Route: direct header is set (Route A).
-	if !directRoute && !hasCallerSystemMessage(req.Messages) {
-		if sysPrompt := loadSystemPrompt(); sysPrompt != "" {
-			sysMsg := OpenAIChatMessage{Role: "system", Content: sysPrompt}
-			req.Messages = append([]OpenAIChatMessage{sysMsg}, req.Messages...)
-			slog.Debug("base system prompt injected", "chars", len(sysPrompt))
-		}
-	}
-
-	// ─── RAG context injection ──────────────────────────────────
-	// Extract last user message for RAG query
-	lastUserMsg := ""
-	for i := len(req.Messages) - 1; i >= 0; i-- {
-		if req.Messages[i].Role == "user" {
-			lastUserMsg = req.Messages[i].Content
-			break
-		}
-	}
-	if !directRoute {
-		if userID, ok := getUserIDFromContext(c); ok && s.authDB != nil && lastUserMsg != "" {
-			ragCtx, ragErr := s.BuildRAGContext(ctx, userID, lastUserMsg, 5)
-			if ragErr != nil {
-				slog.Warn("rag context retrieval failed", "error", ragErr)
-			} else if ragCtx != "" {
-				ragMsg := OpenAIChatMessage{Role: "system", Content: ragCtx}
-				req.Messages = append([]OpenAIChatMessage{ragMsg}, req.Messages...)
-				slog.Debug("rag context injected", "user_id", userID, "chars", len(ragCtx))
-			}
-		}
-	}
-
-	messages := make([]provider.Message, len(req.Messages))
-	for i, m := range req.Messages {
-		messages[i] = provider.Message{
-			Role:    m.Role,
-			Content: m.Content,
-		}
-	}
-
-	temp := 0.7
-	if req.Temperature != nil {
-		temp = *req.Temperature
-	}
-	maxTokens := 4096
-	if req.MaxTokens != nil {
-		maxTokens = *req.MaxTokens
-	}
-
-	completionReq := &provider.CompletionRequest{
-		Model:       req.Model,
-		Messages:    messages,
-		Temperature: temp,
-		MaxTokens:   maxTokens,
-		Stream:      true,
-	}
-
-	prov, err := s.resolveProvider(req.Model)
-	if err != nil {
-		s.errorResponse(c, http.StatusBadRequest, "model_not_found", "Model not available: "+err.Error())
+	completionReq, _, prov, ok := s.prepareCompletion(c, ctx, req, true)
+	if !ok {
 		return
 	}
 
@@ -403,94 +259,157 @@ func (s *Server) streamChatCompletions(c *gin.Context, ctx context.Context, req 
 	flusher.Flush()
 }
 
+// prepareCompletion is the one place a /v1/chat/completions request becomes
+// model input, for both the streaming and the non-streaming path. It used to
+// be written twice, and the copies had drifted: only the non-stream copy
+// refused a request with no user message. On failure it has already written
+// the error response and returns ok=false.
+//
+// Injection rules (DGS-141 documents why they matter to callers that log
+// every model input):
+//   - X-Route: direct skips every injection below.
+//   - The base system prompt (SYSTEM_PROMPT / SYSTEM_PROMPT_FILE) is
+//     prepended only when the caller sent no system message.
+//   - RAG context is prepended whenever the request carries a user ID and
+//     the auth DB is available, even when the caller sent a system message.
+func (s *Server) prepareCompletion(c *gin.Context, ctx context.Context, req *OpenAIChatRequest, stream bool) (*provider.CompletionRequest, string, provider.ModelProvider, bool) {
+	if s.pluginManager == nil {
+		s.errorResponse(c, http.StatusServiceUnavailable, "server_error", "No providers configured")
+		return nil, "", nil, false
+	}
+
+	lastUserMsg := ""
+	for i := len(req.Messages) - 1; i >= 0; i-- {
+		if req.Messages[i].Role == "user" {
+			lastUserMsg = req.Messages[i].Content
+			break
+		}
+	}
+	if lastUserMsg == "" {
+		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "No user message found")
+		return nil, "", nil, false
+	}
+
+	if c.GetHeader("X-Route") != "direct" {
+		if !hasCallerSystemMessage(req.Messages) {
+			if sysPrompt := loadSystemPrompt(); sysPrompt != "" {
+				req.Messages = append([]OpenAIChatMessage{{Role: "system", Content: sysPrompt}}, req.Messages...)
+				slog.Debug("base system prompt injected", "chars", len(sysPrompt))
+			}
+		}
+		if userID, ok := getUserIDFromContext(c); ok && s.authDB != nil {
+			ragCtx, ragErr := s.BuildRAGContext(ctx, userID, lastUserMsg, 5)
+			if ragErr != nil {
+				slog.Warn("rag context retrieval failed", "error", ragErr)
+			} else if ragCtx != "" {
+				req.Messages = append([]OpenAIChatMessage{{Role: "system", Content: ragCtx}}, req.Messages...)
+				slog.Debug("rag context injected", "user_id", userID, "chars", len(ragCtx))
+			}
+		}
+	}
+
+	messages := make([]provider.Message, len(req.Messages))
+	for i, m := range req.Messages {
+		messages[i] = provider.Message{Role: m.Role, Content: m.Content}
+	}
+	temp := 0.7
+	if req.Temperature != nil {
+		temp = *req.Temperature
+	}
+	maxTokens := 4096
+	if req.MaxTokens != nil {
+		maxTokens = *req.MaxTokens
+	}
+
+	name, prov, err := s.resolveProvider(req.Model)
+	if err != nil {
+		s.errorResponse(c, http.StatusBadRequest, "model_not_found", "Model not available: "+err.Error())
+		return nil, "", nil, false
+	}
+	return &provider.CompletionRequest{
+		Model:       req.Model,
+		Messages:    messages,
+		Temperature: temp,
+		MaxTokens:   maxTokens,
+		Stream:      stream,
+	}, name, prov, true
+}
+
 func (s *Server) writeSSEChunk(w http.ResponseWriter, flusher http.Flusher, chunk OpenAIStreamChunk) {
 	data, _ := json.Marshal(chunk)
 	fmt.Fprintf(w, "data: %s\n\n", data)
 	flusher.Flush()
 }
 
-// resolveProvider finds the appropriate ModelProvider for a given model name.
-func (s *Server) resolveProvider(model string) (provider.ModelProvider, error) {
+// modelPrefixes maps a registered provider name to the model-id prefixes it
+// serves. The names must be the ones services.RegisterProviders registers —
+// DeepSeek is "deepseek-api", and this table used to say "deepseek", so the
+// prefix never matched and deepseek-* requests fell through to the fallback.
+var modelPrefixes = []struct {
+	provider string
+	prefixes []string
+}{
+	{"anthropic", []string{"claude-"}},
+	{"openai", []string{"gpt-", "o1-", "o3", "o4-", "chatgpt-"}},
+	{"google", []string{"gemini-"}},
+	{"groq", []string{"llama-", "mixtral-"}},
+	{"mistral", []string{"mistral-", "codestral-"}},
+	{"deepseek-api", []string{"deepseek-"}},
+	{"kimi", []string{"moonshot-", "kimi-"}},
+}
+
+// resolveProvider finds the provider for a model and returns its registered
+// name with it (the name is what latency tracking records). Order:
+//  1. a provider whose ListModels lists the model exactly;
+//  2. the model-id prefix table above;
+//  3. the first provider by name.
+//
+// Every step walks providers in name order. They used to walk a Go map, so
+// with two candidates the answer could change from one request to the next.
+func (s *Server) resolveProvider(model string) (string, provider.ModelProvider, error) {
 	if s.pluginManager == nil {
-		return nil, fmt.Errorf("no plugin manager configured")
+		return "", nil, fmt.Errorf("no plugin manager configured")
 	}
-
-	// If model is empty, use the first available provider.
-	if model == "" {
-		providers := s.pluginManager.GetProviders()
-		for _, prov := range providers {
-			return prov, nil
-		}
-		return nil, fmt.Errorf("no providers available")
-	}
-
-	// Step 1: Exact model match — ask each provider if it has this model.
 	providers := s.pluginManager.GetProviders()
-	for _, prov := range providers {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		models, err := prov.ListModels(ctx)
-		cancel()
-		if err != nil {
-			continue
-		}
-		for _, m := range models {
-			if m.ID == model || m.Name == model {
-				return prov, nil
+	names := make([]string, 0, len(providers))
+	for name := range providers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return "", nil, fmt.Errorf("no providers available")
+	}
+
+	if model != "" {
+		for _, name := range names {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			models, err := providers[name].ListModels(ctx)
+			cancel()
+			if err != nil {
+				continue
+			}
+			for _, m := range models {
+				if m.ID == model || m.Name == model {
+					return name, providers[name], nil
+				}
 			}
 		}
-	}
 
-	// Step 2: Model-prefix-to-provider inference.
-	lowerModel := strings.ToLower(model)
-	prefixMap := map[string][]string{
-		"anthropic": {"claude-"},
-		"openai":    {"gpt-", "o1-", "o3", "o4-", "chatgpt-"},
-		"google":    {"gemini-"},
-		"groq":      {"llama-", "mixtral-"},
-		"mistral":   {"mistral-", "codestral-"},
-		"deepseek":  {"deepseek-"},
-		"kimi":      {"moonshot-", "kimi-"},
-	}
-	for providerName, prefixes := range prefixMap {
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(lowerModel, prefix) {
-				if prov, ok := providers[providerName]; ok {
-					return prov, nil
+		lowerModel := strings.ToLower(model)
+		for _, row := range modelPrefixes {
+			prov, ok := providers[row.provider]
+			if !ok {
+				continue
+			}
+			for _, prefix := range row.prefixes {
+				if strings.HasPrefix(lowerModel, prefix) {
+					return row.provider, prov, nil
 				}
 			}
 		}
 	}
 
-	// Step 3: Fallback — try the first available provider.
-	for _, prov := range providers {
-		return prov, nil
-	}
-
-	return nil, fmt.Errorf("no provider available for model %q", model)
-}
-
-// resolveProviderName returns the provider name for a given model string,
-// used for latency tracking attribution. Falls back to "unknown" if the model
-// cannot be matched to a specific provider.
-func (s *Server) resolveProviderName(model string) string {
-	if s.pluginManager == nil {
-		return "unknown"
-	}
-	providers := s.pluginManager.GetProviders()
-	for name, prov := range providers {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		models, err := prov.ListModels(ctx)
-		cancel()
-		if err != nil {
-			continue
-		}
-		for _, m := range models {
-			if m.ID == model || m.Name == model {
-				return name
-			}
-		}
-	}
-	return "unknown"
+	return names[0], providers[names[0]], nil
 }
 
 // errorResponse sends a consistent error response.
