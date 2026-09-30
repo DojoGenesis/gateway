@@ -1,33 +1,30 @@
 package main
 
 import (
-	"net"
 	"testing"
+
+	"github.com/DojoGenesis/gateway/pkg/netbind"
 )
 
 // DGS-136: the bridge webhook server bound ":" + port — every interface — the
 // same class as the gateway's DGS-113. It must default to loopback and widen
-// only when DOJO_BRIDGE_HOST says so.
+// only when DOJO_BRIDGE_HOST says so. The rule itself is pkg/netbind's and is
+// tested there; these pin that the bridge feeds it DOJO_BRIDGE_HOST.
+
+func bridgePlan() netbind.Plan { return netbind.Resolve(bridgeBindHost(), "8090") }
 
 func TestDGS136_BridgeDefaultBindIsLoopback(t *testing.T) {
 	t.Setenv("DOJO_BRIDGE_HOST", "")
-	addr := bridgeListenAddr("8090")
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		t.Fatalf("bridge addr %q is not host:port: %v", addr, err)
-	}
-	if port != "8090" {
-		t.Fatalf("port = %q, want 8090", port)
-	}
-	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
-		t.Fatalf("default bridge bind host = %q (addr %q); want loopback — an empty host binds every interface", host, addr)
+	p := bridgePlan()
+	if p.Widened || p.Addrs[0] != "127.0.0.1:8090" {
+		t.Fatalf("default bridge plan = %+v; want loopback starting 127.0.0.1:8090", p)
 	}
 }
 
 func TestDGS136_BridgeBlankHostStaysLoopback(t *testing.T) {
 	t.Setenv("DOJO_BRIDGE_HOST", "   ")
-	if got, want := bridgeListenAddr("8090"), "127.0.0.1:8090"; got != want {
-		t.Fatalf("addr = %q, want %q", got, want)
+	if p := bridgePlan(); p.Widened || p.Addrs[0] != "127.0.0.1:8090" {
+		t.Fatalf("blank DOJO_BRIDGE_HOST plan = %+v; want loopback", p)
 	}
 }
 
@@ -35,7 +32,7 @@ func TestDGS136_BridgeExplicitHostWidens(t *testing.T) {
 	// The prod container sets this: cloudflared reaches the bridge over the
 	// compose network at bridge:8090, which loopback would refuse.
 	t.Setenv("DOJO_BRIDGE_HOST", "0.0.0.0")
-	if got, want := bridgeListenAddr("8090"), "0.0.0.0:8090"; got != want {
-		t.Fatalf("addr = %q, want %q", got, want)
+	if p := bridgePlan(); !p.Widened || len(p.Addrs) != 1 || p.Addrs[0] != "0.0.0.0:8090" {
+		t.Fatalf("DOJO_BRIDGE_HOST=0.0.0.0 plan = %+v; want exactly 0.0.0.0:8090, widened", p)
 	}
 }

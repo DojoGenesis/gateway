@@ -119,3 +119,33 @@ func TestDGS113_BindFailureIsReturned(t *testing.T) {
 		t.Fatalf("Start on an occupied port returned nil; want a bind error")
 	}
 }
+
+// ipv6LoopbackAvailable reports whether this machine can bind [::1] at all.
+func ipv6LoopbackAvailable() bool {
+	l, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		return false
+	}
+	_ = l.Close()
+	return true
+}
+
+// TestDefaultBindAnswersOnIPv6Loopback: in production both consumers of the
+// gateway, Caddy and PDI, dial "localhost:7340", and on pdi-dojo-1 localhost
+// resolves to ::1 FIRST (observed 2026-09-30: the one live peer on :7340 was
+// [::1]). A default bind of 127.0.0.1 alone would leave every one of their
+// requests depending on the dialer's IPv4 fallback. Loopback must mean what
+// localhost means on the box: both families.
+func TestDefaultBindAnswersOnIPv6Loopback(t *testing.T) {
+	if !ipv6LoopbackAvailable() {
+		t.Skip("no IPv6 loopback on this machine")
+	}
+	port := freePort(t)
+	startTestListener(t, &ServerConfig{Port: port, Environment: "test"})
+
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort("::1", port), time.Second)
+	if err != nil {
+		t.Fatalf("dial [::1]:%s with the default bind: %v — localhost clients that try ::1 first get refused", port, err)
+	}
+	_ = conn.Close()
+}

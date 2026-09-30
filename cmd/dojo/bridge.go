@@ -18,6 +18,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/DojoGenesis/gateway/pkg/netbind"
+
 	"github.com/DojoGenesis/gateway/channel"
 	"github.com/DojoGenesis/gateway/channel/discord"
 	"github.com/DojoGenesis/gateway/channel/email"
@@ -132,31 +134,31 @@ func runBridgeCommand(args []string) error {
 	port := bridgePort()
 	mux := http.NewServeMux()
 	mux.Handle("/webhooks/", gw)
+	// Bind before serving so a bad address or a port clash stops the process
+	// instead of being logged from a goroutine while it waits forever for a
+	// signal with nothing listening. Where to bind is pkg/netbind's decision.
+	lns, plan, err := netbind.Listen(bridgeBindHost(), port)
+	if err != nil {
+		return fmt.Errorf("bridge: listen on %v: %w", plan.Addrs, err)
+	}
+	if plan.Widened {
+		slog.Warn("bridge: listening beyond loopback — reachable from other machines on this network",
+			"addrs", plan.Addrs,
+			"hint", "intended inside a container; unset DOJO_BRIDGE_HOST to bind loopback only")
+	}
 	srv := &http.Server{
-		Addr:              bridgeListenAddr(port),
+		Addr:              plan.Addrs[0],
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-
-	// Bind before serving so a bad address or a port clash stops the process
-	// instead of being logged from a goroutine while it waits forever for a
-	// signal with nothing listening.
-	ln, err := net.Listen("tcp", srv.Addr)
-	if err != nil {
-		return fmt.Errorf("bridge: listen on %s: %w", srv.Addr, err)
+	slog.Info("bridge: HTTP server listening", "addrs", plan.Addrs)
+	for _, ln := range lns {
+		go func(ln net.Listener) {
+			if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+				slog.Error("bridge: HTTP server error", "addr", ln.Addr().String(), "error", err)
+			}
+		}(ln)
 	}
-	if host, _, _ := net.SplitHostPort(srv.Addr); host != bridgeDefaultHost {
-		slog.Warn("bridge: listening beyond loopback — reachable from other machines on this network",
-			"addr", srv.Addr,
-			"hint", "intended inside a container; unset DOJO_BRIDGE_HOST to bind 127.0.0.1 only")
-	}
-
-	go func() {
-		slog.Info("bridge: HTTP server listening", "addr", srv.Addr)
-		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
-			slog.Error("bridge: HTTP server error", "error", err)
-		}
-	}()
 
 	// Wait for shutdown signal.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -332,23 +334,13 @@ func bridgePort() string {
 
 // bridgeDefaultHost is where the webhook server listens unless DOJO_BRIDGE_HOST
 // names something else: loopback only (DGS-136).
-const bridgeDefaultHost = "127.0.0.1"
-
-// bridgeListenAddr returns the address the webhook server binds.
-//
-// It used to be ":" + port — every interface — so a bridge run as a bare
-// binary answered webhook traffic from the LAN (DGS-136, the same class as the
-// gateway's DGS-113). Widening is now explicit: DOJO_BRIDGE_HOST=0.0.0.0. The
-// bridge image sets exactly that, because in production cloudflared reaches
-// the bridge over the compose network at bridge:8090 and loopback would refuse
-// it; the container is never port-published, so that is the only ingress.
-// A blank value counts as unset.
-func bridgeListenAddr(port string) string {
-	host := strings.TrimSpace(os.Getenv("DOJO_BRIDGE_HOST"))
-	if host == "" {
-		host = bridgeDefaultHost
-	}
-	return net.JoinHostPort(host, port)
+// bridgeBindHost is the configured bind host (DGS-136). Unset or blank means
+// loopback in both families, per pkg/netbind. The bridge image sets
+// DOJO_BRIDGE_HOST=0.0.0.0: in production cloudflared reaches the bridge over
+// the compose network at bridge:8090, which loopback would refuse, and the
+// container is never port-published, so that is its only ingress.
+func bridgeBindHost() string {
+	return os.Getenv("DOJO_BRIDGE_HOST")
 }
 
 // envOr returns the value of the environment variable key, or fallback if unset.

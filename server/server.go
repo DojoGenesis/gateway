@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DojoGenesis/gateway/pkg/netbind"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -328,18 +330,11 @@ func requestIDMiddleware() gin.HandlerFunc {
 // usual because /health, /metrics and /auth/* are public by design and the
 // development JWT secret is publicly known — its only protection off
 // production is not being reachable. Unset must be the safe branch.
+//
+// The bind itself is pkg/netbind's decision: unset (or this value, or
+// "localhost") binds BOTH 127.0.0.1 and ::1, because production clients dial
+// "localhost:7340" and that resolves to ::1 first on the production host.
 const DefaultBindHost = "127.0.0.1"
-
-// listenAddr resolves the address the HTTP server binds. An empty or
-// whitespace-only BindHost is treated as unset, so a blank line in an env file
-// cannot widen the bind.
-func (s *Server) listenAddr() string {
-	host := strings.TrimSpace(s.cfg.BindHost)
-	if host == "" {
-		host = DefaultBindHost
-	}
-	return net.JoinHostPort(host, s.cfg.Port)
-}
 
 // Start begins listening for HTTP requests.
 //
@@ -350,16 +345,20 @@ func (s *Server) listenAddr() string {
 func (s *Server) Start() error {
 	s.startTime = time.Now()
 
-	addr := s.listenAddr()
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("listen on %s: %w", addr, err)
+	host := strings.TrimSpace(s.cfg.BindHost)
+	if host == DefaultBindHost {
+		host = "" // the default means loopback in both families (pkg/netbind)
 	}
+	lns, plan, err := netbind.Listen(host, s.cfg.Port)
+	if err != nil {
+		return fmt.Errorf("listen on %v: %w", plan.Addrs, err)
+	}
+	addr := plan.Addrs[0]
 
-	if host, _, _ := net.SplitHostPort(addr); !isLoopbackHost(host) {
+	if plan.Widened {
 		slog.Warn("gateway is listening beyond loopback — reachable from other machines on this network",
 			"addr", addr,
-			"hint", "intended inside a container or behind a firewall; unset GATEWAY_BIND_HOST to bind 127.0.0.1 only")
+			"hint", "intended inside a container or behind a firewall; unset GATEWAY_BIND_HOST to bind loopback only")
 	}
 
 	s.httpServer = &http.Server{
@@ -374,25 +373,19 @@ func (s *Server) Start() error {
 
 	slog.Info("starting Agentic Gateway",
 		"version", Version,
-		"addr", s.httpServer.Addr,
+		"addrs", plan.Addrs,
 		"environment", s.cfg.Environment)
 
-	go func() {
-		if err := s.httpServer.Serve(ln); err != nil && err != http.ErrServerClosed {
-			slog.Error("HTTP server error", "error", err)
-		}
-	}()
+	// One http.Server serves every listener; Shutdown closes them all.
+	for _, ln := range lns {
+		go func(ln net.Listener) {
+			if err := s.httpServer.Serve(ln); err != nil && err != http.ErrServerClosed {
+				slog.Error("HTTP server error", "addr", ln.Addr().String(), "error", err)
+			}
+		}(ln)
+	}
 
 	return nil
-}
-
-// isLoopbackHost reports whether host names only the loopback interface.
-func isLoopbackHost(host string) bool {
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }
 
 // Stop gracefully shuts down the server.
