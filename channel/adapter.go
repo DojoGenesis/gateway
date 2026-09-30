@@ -45,6 +45,22 @@ type WebhookAdapter interface {
 	VerifySignature(r *http.Request) error
 }
 
+// HandshakeAdapter is implemented by a WebhookAdapter whose platform confirms a
+// webhook subscription with a request it does not sign — Meta's WhatsApp
+// verification GET (hub.mode / hub.verify_token / hub.challenge) is the case.
+//
+// When IsHandshake reports true, WebhookGateway skips VerifySignature and hands
+// the request straight to HandleWebhook, which then carries the whole burden of
+// authenticating it (for WhatsApp: a constant-time match against a non-empty
+// verify token). Without this the gateway ran the unsigned GET through
+// VerifySignature and answered 401 before the adapter ever saw it (DGS-137).
+//
+// IsHandshake must be narrow: whatever it accepts bypasses signature checks at
+// the gateway. It must never be true for a request that can carry a message.
+type HandshakeAdapter interface {
+	IsHandshake(r *http.Request) bool
+}
+
 // ActorAdapter extends ChannelAdapter for persistent-connection platforms
 // (Discord Gateway WebSocket, WhatsApp Cloud API sessions). Each live
 // session is managed as a supervised actor (ADR-014).

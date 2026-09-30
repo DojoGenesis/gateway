@@ -83,6 +83,15 @@ func (gw *WebhookGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = io.NopCloser(strings.NewReader(string(body)))
 
+	// Adapter-declared handshakes (e.g. the WhatsApp verification GET) are
+	// unsigned by design; the adapter authenticates them itself. Before this
+	// check existed they fell through to VerifySignature and were refused, so
+	// the handshake handler was unreachable (DGS-137).
+	if ha, ok := adapter.(HandshakeAdapter); ok && ha.IsHandshake(r) {
+		adapter.HandleWebhook(w, r)
+		return
+	}
+
 	// Detect handshake payloads (e.g. Slack url_verification). These are not
 	// signed by the platform, so they must be handled before VerifySignature.
 	if isHandshakePayload(body) {

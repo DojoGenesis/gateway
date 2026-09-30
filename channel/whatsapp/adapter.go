@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -272,17 +273,42 @@ func (a *WhatsAppAdapter) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// Compile-time check: if this stops satisfying HandshakeAdapter the gateway
+// silently goes back to refusing the verification GET (DGS-137).
+var _ channel.HandshakeAdapter = (*WhatsAppAdapter)(nil)
+
+// IsHandshake implements channel.HandshakeAdapter. Meta's subscription check is
+// the only GET this platform sends, it carries no message, and Meta does not
+// sign it — so a GET goes to handleVerification without passing through
+// VerifySignature (DGS-137). Every POST still requires the HMAC.
+func (a *WhatsAppAdapter) IsHandshake(r *http.Request) bool {
+	return r.Method == http.MethodGet
+}
+
 // handleVerification responds to the GET webhook verification challenge.
+//
+// The verify token is the only thing authenticating this request. An unset
+// token must therefore never match: the old `token != a.cfg.VerifyToken`
+// accepted a request that simply omitted hub.verify_token when none was
+// configured ("" == ""), echoing the caller's challenge (DGS-137).
 func (a *WhatsAppAdapter) handleVerification(w http.ResponseWriter, r *http.Request) {
 	mode := r.URL.Query().Get("hub.mode")
 	token := r.URL.Query().Get("hub.verify_token")
 	challenge := r.URL.Query().Get("hub.challenge")
 
+	a.mu.RLock()
+	want := a.cfg.VerifyToken
+	a.mu.RUnlock()
+
 	if mode != "subscribe" {
 		http.Error(w, "invalid hub.mode", http.StatusForbidden)
 		return
 	}
-	if token != a.cfg.VerifyToken {
+	if strings.TrimSpace(want) == "" {
+		http.Error(w, "webhook verification is not configured", http.StatusForbidden)
+		return
+	}
+	if subtle.ConstantTimeCompare([]byte(token), []byte(want)) != 1 {
 		http.Error(w, "invalid verify token", http.StatusForbidden)
 		return
 	}
