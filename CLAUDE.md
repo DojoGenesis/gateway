@@ -87,10 +87,9 @@ main.go              entry point — wires all subsystems, starts server
 server/
   server.go          Server struct, Start/Stop
   router.go          ALL Gin route registration — read this first
-  router_gaps_patch.go  doc artifact — route correction history (Gap 1,3,5)
   config/config.go   Config struct + loadDefaults() — port 7340 lives here
   handle_*.go        handler files (one concern per file)
-  handlers/          additional handler structs (chat, memory, health, etc.)
+  handlers/          additional handler structs (chat, memory, models, SSE, tools)
   middleware/        auth, logging, security headers
 orchestration/       standalone orchestration engine (DAG, planner)
 workflow/api/        http.ServeMux workflow handler — SECOND handler path

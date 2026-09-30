@@ -77,17 +77,6 @@ type RoutingConfig struct {
 	HandlerMapping        map[string]string `yaml:"handler_mapping"` // Maps logical handler names to provider names
 }
 
-// ResolveHandler maps a logical intent handler name (e.g. "llm-fast", "llm-reasoning")
-// to a real provider plugin name. Falls back to default_provider if no mapping exists.
-func (rc *RoutingConfig) ResolveHandler(handler string) string {
-	if rc.HandlerMapping != nil {
-		if provider, ok := rc.HandlerMapping[handler]; ok {
-			return provider
-		}
-	}
-	return rc.DefaultProvider
-}
-
 type BudgetConfig struct {
 	QueryLimit   int `yaml:"query_limit"`
 	SessionLimit int `yaml:"session_limit"`
