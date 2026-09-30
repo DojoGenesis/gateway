@@ -252,14 +252,15 @@ func TestPhase2_WhatsApp_Smoke(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// WebChat (embedded widget) — empty token bypasses Bearer check
+// WebChat (embedded widget) — Bearer token required (DGS-142)
 // ---------------------------------------------------------------------------
 
 func TestPhase2_WebChat_Smoke(t *testing.T) {
 	gw, publishedSubjects := newSmokeGateway(t)
 
-	// Empty token → no auth required.
-	adapter := webchat.NewWebChatAdapter("")
+	// An empty token used to bypass the Bearer check; since DGS-142 it
+	// refuses everything, so the smoke test authenticates like a real client.
+	adapter := webchat.NewWebChatAdapter("smoke-webchat-token")
 	gw.Register("webchat", adapter)
 
 	srv := httptest.NewServer(gw)
@@ -267,7 +268,7 @@ func TestPhase2_WebChat_Smoke(t *testing.T) {
 
 	payload := `{"text":"hello webchat smoke test","user_id":"u_test","session_id":"sess_test"}`
 	status := postToGateway(srv, "/webhooks/webchat", "application/json",
-		[]byte(payload), nil)
+		[]byte(payload), map[string]string{"Authorization": "Bearer smoke-webchat-token"})
 
 	if status != http.StatusOK {
 		t.Errorf("webchat smoke: status = %d, want 200", status)

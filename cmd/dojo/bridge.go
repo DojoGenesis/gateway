@@ -307,9 +307,18 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway, creds channel.Credenti
 			"hint", "set DOJO_TEAMS_BOT_TOKEN and DOJO_TEAMS_APP_ID")
 	}
 
-	// WebChat (embedded widget): TOKEN is optional — always registered.
-	gw.Register("webchat", webchat.NewWebChatAdapter(cred("webchat", "TOKEN")))
-	slog.Info("bridge: registered adapter", "platform", "webchat")
+	// WebChat (embedded widget): requires TOKEN. It used to be optional and
+	// always registered, and with no token every anonymous POST was accepted
+	// and published (DGS-142). The adapter now refuses without one; not
+	// registering it turns a stream of silent 401s into one startup warning.
+	webchatToken := cred("webchat", "TOKEN")
+	if strings.TrimSpace(webchatToken) != "" {
+		gw.Register("webchat", webchat.NewWebChatAdapter(webchatToken))
+		slog.Info("bridge: registered adapter", "platform", "webchat")
+	} else {
+		slog.Warn("bridge: skipping adapter (missing credentials)", "platform", "webchat",
+			"hint", "set DOJO_WEBCHAT_TOKEN; clients send it as `Authorization: Bearer <token>`")
+	}
 }
 
 // bridgePort returns the HTTP port for the bridge server.

@@ -2,7 +2,9 @@ package webchat
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +13,11 @@ import (
 
 	"github.com/DojoGenesis/gateway/channel"
 )
+
+// ErrNoTokenConfigured is returned by VerifySignature when the adapter has no
+// token. Refusing is the only safe answer: an unauthenticated webchat POST is
+// published to the bus like any other channel message (DGS-142).
+var ErrNoTokenConfigured = errors.New("webchat: no token configured; refusing unauthenticated request")
 
 const (
 	platform         = "webchat"
@@ -32,13 +39,14 @@ type inboundPayload struct {
 // Construction: use NewWebChatAdapter — do not create the struct directly.
 type WebChatAdapter struct {
 	// token is the shared Bearer token checked on every inbound request.
-	// If empty, signature verification is skipped (not recommended in
-	// production).
+	// If empty (or whitespace), every request is refused with
+	// ErrNoTokenConfigured (DGS-142; it used to skip verification).
 	token string
 }
 
 // NewWebChatAdapter returns a WebChatAdapter configured with the given
-// Bearer token. The token may be empty to disable verification.
+// Bearer token. An empty token does NOT disable verification: the adapter
+// then refuses every request (DGS-142).
 func NewWebChatAdapter(token string) *WebChatAdapter {
 	return &WebChatAdapter{token: token}
 }
@@ -62,8 +70,8 @@ func (a *WebChatAdapter) Capabilities() channel.AdapterCapabilities {
 // VerifySignature checks that the Authorization header contains the expected
 // Bearer token. If no token is configured, verification is skipped.
 func (a *WebChatAdapter) VerifySignature(r *http.Request) error {
-	if a.token == "" {
-		return nil
+	if strings.TrimSpace(a.token) == "" {
+		return ErrNoTokenConfigured
 	}
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
@@ -73,7 +81,7 @@ func (a *WebChatAdapter) VerifySignature(r *http.Request) error {
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
 		return fmt.Errorf("webchat: Authorization header must use Bearer scheme")
 	}
-	if parts[1] != a.token {
+	if subtle.ConstantTimeCompare([]byte(parts[1]), []byte(a.token)) != 1 {
 		return fmt.Errorf("webchat: invalid Bearer token")
 	}
 	return nil

@@ -2,6 +2,7 @@ package webchat
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -182,5 +183,25 @@ func assertField(t *testing.T, name, got, want string) {
 	t.Helper()
 	if got != want {
 		t.Errorf("%s = %q, want %q", name, got, want)
+	}
+}
+
+// TestWebChatAdapter_VerifySignature_NoTokenRefuses (DGS-142): an adapter with
+// no token used to skip verification entirely. It must refuse every request,
+// including one whose bearer is itself empty, which a plain string compare
+// against an empty token would accept.
+func TestWebChatAdapter_VerifySignature_NoTokenRefuses(t *testing.T) {
+	for _, token := range []string{"", "   "} {
+		a := NewWebChatAdapter(token)
+		for _, auth := range []string{"", "Bearer ", "Bearer    ", "Bearer x"} {
+			req := httptest.NewRequest(http.MethodPost, "/webhooks/webchat", strings.NewReader(`{"text":"hi"}`))
+			if auth != "" {
+				req.Header.Set("Authorization", auth)
+			}
+			err := a.VerifySignature(req)
+			if !errors.Is(err, ErrNoTokenConfigured) {
+				t.Errorf("token %q, Authorization %q: err = %v, want ErrNoTokenConfigured", token, auth, err)
+			}
+		}
 	}
 }
