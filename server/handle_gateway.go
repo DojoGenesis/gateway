@@ -367,7 +367,7 @@ func (s *Server) handleGatewayAgentChatStream(c *gin.Context, agentID string, re
 		}
 	}
 	if llmProvider == nil {
-		llmProvider, err = s.resolveProvider(req.Model)
+		_, llmProvider, err = s.resolveProvider(req.Model)
 		if err != nil {
 			s.writeSSEEvent(c.Writer, flusher, events.NewErrorEvent(err.Error(), "PROVIDER_ERROR"))
 			fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
@@ -690,7 +690,7 @@ func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 		}
 	}
 	if llmProvider == nil {
-		llmProvider, err = s.resolveProvider(req.Model)
+		_, llmProvider, err = s.resolveProvider(req.Model)
 		if err != nil {
 			s.errorResponse(c, http.StatusServiceUnavailable, "provider_unavailable", fmt.Sprintf("No LLM provider available: %v", err))
 			return
