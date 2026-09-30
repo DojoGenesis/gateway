@@ -112,6 +112,10 @@ type OpenAIChatResponse struct {
 	Model   string             `json:"model"`
 	Choices []OpenAIChatChoice `json:"choices"`
 	Usage   OpenAIUsage        `json:"usage"`
+	// DojoInjected is present only when the caller asked for the echo. A
+	// pointer so "asked, nothing injected" serializes as [] and "not asked"
+	// omits the field.
+	DojoInjected *[]InjectedMessage `json:"dojo_injected,omitempty"`
 }
 
 // OpenAIChatChoice represents a choice in the response.
@@ -120,6 +124,16 @@ type OpenAIChatChoice struct {
 	Message      *OpenAIChatMessage `json:"message,omitempty"`
 	Delta        *OpenAIChatMessage `json:"delta,omitempty"`
 	FinishReason *string            `json:"finish_reason"`
+}
+
+// InjectedMessage is one message the gateway prepended to a caller's
+// conversation (DGS-141). Echoed only when the request asks with
+// X-Dojo-Echo-Injected; the X-Dojo-Injected response header names the
+// sources on every response.
+type InjectedMessage struct {
+	Source  string `json:"source"` // "base_system_prompt" or "rag"
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 // OpenAIUsage represents token usage in OpenAI format.
@@ -136,6 +150,8 @@ type OpenAIStreamChunk struct {
 	Created int64              `json:"created"`
 	Model   string             `json:"model"`
 	Choices []OpenAIChatChoice `json:"choices"`
+	// DojoInjected rides on the first chunk only, when the caller asked.
+	DojoInjected *[]InjectedMessage `json:"dojo_injected,omitempty"`
 }
 
 // handleChatCompletions handles POST /v1/chat/completions (OpenAI-compatible).
@@ -211,6 +227,7 @@ func (s *Server) nonStreamChatCompletions(c *gin.Context, ctx context.Context, r
 		},
 	}
 
+	openAIResp.DojoInjected = injectedEcho(c)
 	c.JSON(http.StatusOK, openAIResp)
 }
 
@@ -266,6 +283,7 @@ func (s *Server) streamChatCompletions(c *gin.Context, ctx context.Context, req 
 			},
 		},
 	}
+	initialChunk.DojoInjected = injectedEcho(c)
 	s.writeSSEChunk(c.Writer, flusher, initialChunk)
 
 	for chunk := range chunkChan {
@@ -340,10 +358,13 @@ func (s *Server) prepareCompletion(c *gin.Context, ctx context.Context, req *Ope
 		return nil, "", nil, false
 	}
 
+	// injected mirrors, in message order, every message prepended below.
+	injected := []InjectedMessage{}
 	if c.GetHeader("X-Route") != "direct" {
 		if !hasCallerSystemMessage(req.Messages) {
 			if sysPrompt := loadSystemPrompt(); sysPrompt != "" {
 				req.Messages = append([]OpenAIChatMessage{{Role: "system", Content: sysPrompt}}, req.Messages...)
+				injected = append([]InjectedMessage{{Source: "base_system_prompt", Role: "system", Content: sysPrompt}}, injected...)
 				slog.Debug("base system prompt injected", "chars", len(sysPrompt))
 			}
 		}
@@ -353,9 +374,24 @@ func (s *Server) prepareCompletion(c *gin.Context, ctx context.Context, req *Ope
 				slog.Warn("rag context retrieval failed", "error", ragErr)
 			} else if ragCtx != "" {
 				req.Messages = append([]OpenAIChatMessage{{Role: "system", Content: ragCtx}}, req.Messages...)
+				injected = append([]InjectedMessage{{Source: "rag", Role: "system", Content: ragCtx}}, injected...)
 				slog.Debug("rag context injected", "user_id", userID, "chars", len(ragCtx))
 			}
 		}
+	}
+	// Every response names what was injected, so any caller can tell the
+	// model saw text it never sent. The full text is echoed on request.
+	sources := make([]string, len(injected))
+	for i, m := range injected {
+		sources[i] = m.Source
+	}
+	if len(sources) == 0 {
+		c.Header("X-Dojo-Injected", "none")
+	} else {
+		c.Header("X-Dojo-Injected", strings.Join(sources, ","))
+	}
+	if echoRequested(c) {
+		c.Set(injectedEchoKey, &injected)
 	}
 
 	messages, tools, toolChoice, convErr := convertToolFields(req)
@@ -414,7 +450,9 @@ func (s *Server) streamToolCompletion(c *gin.Context, ctx context.Context, req *
 		return OpenAIStreamChunk{ID: id, Object: "chat.completion.chunk", Created: created, Model: req.Model,
 			Choices: []OpenAIChatChoice{{Index: 0, Delta: delta, FinishReason: finish}}}
 	}
-	s.writeSSEChunk(c.Writer, flusher, chunk(&OpenAIChatMessage{Role: "assistant"}, nil))
+	first := chunk(&OpenAIChatMessage{Role: "assistant"}, nil)
+	first.DojoInjected = injectedEcho(c)
+	s.writeSSEChunk(c.Writer, flusher, first)
 	if resp.Content != "" || len(resp.ToolCalls) > 0 {
 		s.writeSSEChunk(c.Writer, flusher, chunk(&OpenAIChatMessage{
 			Content:   resp.Content,
@@ -498,6 +536,23 @@ func toOpenAIToolCalls(calls []provider.ToolCall, withIndex bool) []OpenAIToolCa
 		}
 	}
 	return out
+}
+
+const injectedEchoKey = "dojo_injected_echo"
+
+// echoRequested reports whether the caller asked for the injected text.
+func echoRequested(c *gin.Context) bool {
+	v := strings.ToLower(strings.TrimSpace(c.GetHeader("X-Dojo-Echo-Injected")))
+	return v == "1" || v == "true"
+}
+
+// injectedEcho returns the echo prepareCompletion stored, or nil when the
+// caller did not ask for one.
+func injectedEcho(c *gin.Context) *[]InjectedMessage {
+	if v, ok := c.Get(injectedEchoKey); ok {
+		return v.(*[]InjectedMessage)
+	}
+	return nil
 }
 
 func (s *Server) writeSSEChunk(w http.ResponseWriter, flusher http.Flusher, chunk OpenAIStreamChunk) {
