@@ -220,7 +220,8 @@ func TestTelegramAdapter_Normalize_CallbackQuery_NoMessage(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTelegramAdapter_HandleWebhook_CallbackQuery(t *testing.T) {
-	a := NewTelegramAdapter("test-token", "")
+	// Secret configured and sent — an adapter without one refuses (DGS-115).
+	a := NewTelegramAdapter("test-token", "test-secret")
 
 	raw := mustMarshal(t, Update{
 		UpdateID: 700,
@@ -238,6 +239,7 @@ func TestTelegramAdapter_HandleWebhook_CallbackQuery(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook/telegram", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(secretTokenHeader, "test-secret")
 	rec := httptest.NewRecorder()
 
 	a.HandleWebhook(rec, req)

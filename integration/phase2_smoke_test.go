@@ -12,6 +12,9 @@ package integration
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -170,18 +173,20 @@ func TestPhase2_SMS_Smoke(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// WhatsApp (Meta Cloud API) — empty AppSecret bypasses HMAC-SHA256 check
+// WhatsApp (Meta Cloud API) — signed with the app secret
 // ---------------------------------------------------------------------------
 
 func TestPhase2_WhatsApp_Smoke(t *testing.T) {
 	gw, publishedSubjects := newSmokeGateway(t)
 
-	// Empty AppSecret → signature verification skipped.
+	// This smoke test used to leave AppSecret empty to bypass the HMAC check.
+	// Since DGS-115 an empty AppSecret refuses every POST, so it signs instead.
+	const appSecret = "test-app-secret"
 	adapter := whatsapp.NewWhatsAppAdapter(whatsapp.WhatsAppConfig{
 		PhoneNumberID: "123456789",
 		AccessToken:   "test-access-token",
 		VerifyToken:   "test-verify-token",
-		AppSecret:     "", // bypass
+		AppSecret:     appSecret,
 	})
 	gw.Register("whatsapp", adapter)
 
@@ -223,7 +228,11 @@ func TestPhase2_WhatsApp_Smoke(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(payload)
-	status := postToGateway(srv, "/webhooks/whatsapp", "application/json", body, nil)
+	mac := hmac.New(sha256.New, []byte(appSecret))
+	mac.Write(body)
+	status := postToGateway(srv, "/webhooks/whatsapp", "application/json", body, map[string]string{
+		"X-Hub-Signature-256": "sha256=" + hex.EncodeToString(mac.Sum(nil)),
+	})
 
 	if status != http.StatusOK {
 		t.Errorf("whatsapp smoke: status = %d, want 200", status)

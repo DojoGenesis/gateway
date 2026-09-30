@@ -3,11 +3,14 @@ package telegram
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/DojoGenesis/gateway/channel"
@@ -39,8 +42,9 @@ type TelegramAdapter struct {
 }
 
 // NewTelegramAdapter returns a TelegramAdapter configured with the given bot
-// token and webhook secret. The token must not be empty; the secret may be
-// empty (signature verification is skipped when no secret is configured).
+// token and webhook secret. The token must not be empty. With an empty secret
+// the adapter can still send and long-poll, but it refuses every inbound
+// webhook (DGS-115) — register one with setWebhook's secret_token to receive.
 func NewTelegramAdapter(token, secret string) *TelegramAdapter {
 	return &TelegramAdapter{
 		token:      token,
@@ -75,18 +79,25 @@ func (a *TelegramAdapter) Capabilities() channel.AdapterCapabilities {
 	}
 }
 
+// ErrNoSecretConfigured is returned by VerifySignature when the adapter has no
+// webhook secret to check against. Such an adapter refuses every inbound
+// request: with nothing to compare, any caller could claim to be Telegram.
+var ErrNoSecretConfigured = errors.New("telegram: no webhook secret configured; refusing unverifiable request")
+
 // VerifySignature validates the X-Telegram-Bot-Api-Secret-Token header against
-// the configured secret. If no secret is configured, verification is skipped
-// and nil is returned. Returns an error if the header is absent or mismatched.
+// the configured secret, in constant time. Returns an error if the header is
+// absent or mismatched — and, since DGS-115, if no secret is configured at all.
+// It used to return nil in that case, so a bridge started with a bot token but
+// no SECRET_TOKEN accepted and published anything anyone POSTed.
 func (a *TelegramAdapter) VerifySignature(r *http.Request) error {
-	if a.secret == "" {
-		return nil
+	if strings.TrimSpace(a.secret) == "" {
+		return ErrNoSecretConfigured
 	}
 	provided := r.Header.Get(secretTokenHeader)
 	if provided == "" {
 		return fmt.Errorf("telegram: missing %s header", secretTokenHeader)
 	}
-	if provided != a.secret {
+	if subtle.ConstantTimeCompare([]byte(provided), []byte(a.secret)) != 1 {
 		return fmt.Errorf("telegram: invalid secret token")
 	}
 	return nil

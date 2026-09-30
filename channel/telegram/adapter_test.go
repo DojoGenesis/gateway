@@ -291,9 +291,12 @@ func TestTelegramAdapter_HandleWebhook_InvalidSignature(t *testing.T) {
 }
 
 func TestTelegramAdapter_HandleWebhook_BadJSON(t *testing.T) {
-	a := NewTelegramAdapter("test-token", "")
+	// A secret is configured and sent: this test is about parsing, and since
+	// DGS-115 an adapter with no secret refuses before it parses anything.
+	a := NewTelegramAdapter("test-token", "test-secret")
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook/telegram", strings.NewReader("{not json"))
+	req.Header.Set(secretTokenHeader, "test-secret")
 	rec := httptest.NewRecorder()
 
 	a.HandleWebhook(rec, req)
@@ -304,10 +307,11 @@ func TestTelegramAdapter_HandleWebhook_BadJSON(t *testing.T) {
 }
 
 func TestTelegramAdapter_HandleWebhook_NoMessage(t *testing.T) {
-	a := NewTelegramAdapter("test-token", "")
+	a := NewTelegramAdapter("test-token", "test-secret")
 
 	raw := mustMarshal(t, Update{UpdateID: 999})
 	req := httptest.NewRequest(http.MethodPost, "/webhook/telegram", bytes.NewReader(raw))
+	req.Header.Set(secretTokenHeader, "test-secret")
 	rec := httptest.NewRecorder()
 
 	a.HandleWebhook(rec, req)

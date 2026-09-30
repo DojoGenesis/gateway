@@ -7,11 +7,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,9 +21,9 @@ import (
 )
 
 const (
-	platform          = "whatsapp"
-	signatureHeader   = "X-Hub-Signature-256"
-	signaturePrefix   = "sha256="
+	platform        = "whatsapp"
+	signatureHeader = "X-Hub-Signature-256"
+	signaturePrefix = "sha256="
 )
 
 // WhatsAppAdapter implements both channel.WebhookAdapter and channel.ActorAdapter
@@ -37,9 +39,9 @@ type WhatsAppAdapter struct {
 	httpClient *http.Client
 
 	// actor state (protected by mu)
-	mu          sync.RWMutex
-	connected   bool
-	msgHandler  func(*channel.ChannelMessage)
+	mu         sync.RWMutex
+	connected  bool
+	msgHandler func(*channel.ChannelMessage)
 }
 
 // NewWhatsAppAdapter returns a WhatsAppAdapter configured with the given config.
@@ -208,12 +210,25 @@ func (a *WhatsAppAdapter) Send(ctx context.Context, msg *channel.ChannelMessage)
 // channel.WebhookAdapter
 // ---------------------------------------------------------------------------
 
+// ErrNoAppSecretConfigured is returned by VerifySignature when the adapter has
+// no Meta app secret. Such an adapter refuses every inbound POST: without the
+// key, a signature cannot be checked, and an unchecked payload is a forgery
+// as far as the bridge can tell.
+var ErrNoAppSecretConfigured = errors.New("whatsapp: no app secret configured; refusing unverifiable request")
+
 // VerifySignature validates the X-Hub-Signature-256 header using HMAC-SHA256
-// of the raw request body and the configured AppSecret.
-// If AppSecret is empty, verification is skipped and nil is returned.
+// of the raw request body and the configured AppSecret, compared in constant
+// time.
+//
+// With no AppSecret it refuses (DGS-115). It used to return nil, so a bridge
+// holding a phone number ID and access token but no APP_SECRET accepted and
+// published any POST from anyone.
 func (a *WhatsAppAdapter) VerifySignature(r *http.Request) error {
-	if a.cfg.AppSecret == "" {
-		return nil
+	a.mu.RLock()
+	secret := a.cfg.AppSecret
+	a.mu.RUnlock()
+	if strings.TrimSpace(secret) == "" {
+		return ErrNoAppSecretConfigured
 	}
 
 	provided := r.Header.Get(signatureHeader)
@@ -229,7 +244,7 @@ func (a *WhatsAppAdapter) VerifySignature(r *http.Request) error {
 	// Restore the body so downstream handlers can re-read it.
 	r.Body = io.NopCloser(bytes.NewReader(body))
 
-	mac := hmac.New(sha256.New, []byte(a.cfg.AppSecret))
+	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
 	expected := signaturePrefix + hex.EncodeToString(mac.Sum(nil))
 
