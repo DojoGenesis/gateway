@@ -311,10 +311,14 @@ func TestServiceToken_CannotBeExchangedForAHumanSession(t *testing.T) {
 
 // The workflow API is the repo's SECOND handler path — an http.ServeMux wrapped
 // with gin.WrapH, registered on s.router OUTSIDE the /v1 group. It shares no
-// middleware with /v1, so the service-token change must not have reached it.
-// The execution endpoints are always registered, so they are the observable
-// part of that path in this fixture (workflowCAS is nil here, which is why the
-// CRUD routes are absent).
+// middleware with /v1. The execution endpoints are always registered, so they
+// are the observable part of that path in this fixture (workflowCAS is nil
+// here, which is why the CRUD routes are absent).
+//
+// This test was written 2026-07-28 asserting these paths were NOT 401: that
+// was their posture then. DGS-100 (v3.3.4, 2026-08-05) deliberately put
+// /api/* behind auth, and from then on the test failed on every run. It now
+// pins the current posture: an anonymous request is refused.
 func TestServiceToken_WorkflowServeMuxPathUnaffected(t *testing.T) {
 	s := newRoutedTestServer(t)
 
@@ -324,8 +328,8 @@ func TestServiceToken_WorkflowServeMuxPathUnaffected(t *testing.T) {
 	} {
 		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
 			w := do(t, s, tc.method, tc.path, "")
-			assert.NotEqual(t, http.StatusUnauthorized, w.Code,
-				"%s is registered outside the /v1 group and must keep its existing auth posture; got 401", tc.path)
+			assert.Equal(t, http.StatusUnauthorized, w.Code,
+				"%s requires auth since DGS-100; an anonymous request got %d", tc.path, w.Code)
 		})
 	}
 }
