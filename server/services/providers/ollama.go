@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/DojoGenesis/gateway/provider"
@@ -17,6 +18,10 @@ import (
 type OllamaProvider struct {
 	BaseProvider
 	defaultModel string
+
+	// toolCapable caches, per model, whether Ollama reports the "tools"
+	// capability (/api/show). See modelSupportsTools.
+	toolCapable sync.Map // model name -> bool
 }
 
 func NewOllamaProvider() *OllamaProvider {
@@ -93,11 +98,40 @@ type ollamaRequest struct {
 	Messages []ollamaMessage `json:"messages"`
 	Stream   bool            `json:"stream"`
 	Options  *ollamaOptions  `json:"options,omitempty"`
+	// Tools are Ollama's native function calling. This field did not exist,
+	// so the "native" path silently dropped every tool (DGS-141).
+	Tools []ollamaTool `json:"tools,omitempty"`
 }
 
 type ollamaMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string           `json:"role"`
+	Content   string           `json:"content"`
+	ToolCalls []ollamaToolCall `json:"tool_calls,omitempty"`
+	// ToolName names the tool a role "tool" message answers; Ollama matches
+	// results by name.
+	ToolName string `json:"tool_name,omitempty"`
+}
+
+type ollamaTool struct {
+	Type     string             `json:"type"`
+	Function ollamaToolFunction `json:"function"`
+}
+
+type ollamaToolFunction struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Parameters  map[string]interface{} `json:"parameters,omitempty"`
+}
+
+// ollamaToolCall is Ollama's tool-call shape: arguments are a JSON OBJECT,
+// unlike OpenAI's JSON-encoded string.
+type ollamaToolCall struct {
+	ID       string `json:"id,omitempty"`
+	Function struct {
+		Index     int                    `json:"index,omitempty"`
+		Name      string                 `json:"name"`
+		Arguments map[string]interface{} `json:"arguments"`
+	} `json:"function"`
 }
 
 type ollamaOptions struct {
@@ -132,7 +166,7 @@ func (p *OllamaProvider) GenerateCompletion(ctx context.Context, req *provider.C
 	model := p.resolveModel(ctx, req.Model)
 
 	// Route through text-mode tool fallback for models without native tool support
-	if len(req.Tools) > 0 && !p.modelSupportsTools(model) {
+	if len(req.Tools) > 0 && !p.modelSupportsTools(ctx, model) {
 		return p.generateWithTextToolFallback(ctx, req)
 	}
 
@@ -140,6 +174,7 @@ func (p *OllamaProvider) GenerateCompletion(ctx context.Context, req *provider.C
 		Model:    model,
 		Messages: convertToOllamaMessages(req.Messages),
 		Stream:   false,
+		Tools:    convertToOllamaTools(req.Tools),
 	}
 	if req.Temperature > 0 || req.MaxTokens > 0 {
 		oReq.Options = &ollamaOptions{
@@ -161,8 +196,9 @@ func (p *OllamaProvider) GenerateCompletion(ctx context.Context, req *provider.C
 	}
 
 	return &provider.CompletionResponse{
-		Model:   oResp.Model,
-		Content: oResp.Message.Content,
+		Model:     oResp.Model,
+		Content:   oResp.Message.Content,
+		ToolCalls: convertFromOllamaToolCalls(oResp.Message.ToolCalls),
 	}, nil
 }
 
@@ -207,11 +243,49 @@ func (p *OllamaProvider) GenerateCompletionStream(ctx context.Context, req *prov
 	return ch, nil
 }
 
-// modelSupportsTools returns true when the resolved Ollama model name is known
-// to support native function/tool calling via the Ollama /api/chat tools field.
-// Models confirmed to support tools: llama3.1, llama3.2, mistral-nemo, firefunction-v2,
-// command-r, command-r-plus, smollm2. All others fall back to text-mode tool descriptions.
-func (p *OllamaProvider) modelSupportsTools(modelName string) bool {
+// modelSupportsTools reports whether Ollama takes native tools for a model.
+// Ollama's own answer comes first: /api/show lists a model's capabilities,
+// and "tools" means native function calling. It's cached per model. Only an
+// Ollama too old to report capabilities (or unreachable for /api/show) falls
+// back to the name list below, which used to be the whole decision and could
+// only ever be stale.
+func (p *OllamaProvider) modelSupportsTools(ctx context.Context, modelName string) bool {
+	if v, ok := p.toolCapable.Load(modelName); ok {
+		return v.(bool)
+	}
+	if capable, known := p.showToolCapability(ctx, modelName); known {
+		p.toolCapable.Store(modelName, capable)
+		return capable
+	}
+	return modelNameSuggestsTools(modelName)
+}
+
+// showToolCapability asks /api/show. known is false when Ollama gave no
+// capabilities list, so the caller must fall back.
+func (p *OllamaProvider) showToolCapability(ctx context.Context, modelName string) (capable, known bool) {
+	body, _ := json.Marshal(map[string]string{"model": modelName})
+	resp, err := p.DoRequest(ctx, "POST", "/api/show", bytes.NewReader(body), nil)
+	if err != nil {
+		return false, false
+	}
+	defer resp.Body.Close()
+	var show struct {
+		Capabilities []string `json:"capabilities"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&show); err != nil || show.Capabilities == nil {
+		return false, false
+	}
+	for _, c := range show.Capabilities {
+		if c == "tools" {
+			return true, true
+		}
+	}
+	return false, true
+}
+
+// modelNameSuggestsTools is the fallback name list for Ollama versions that
+// don't report capabilities.
+func modelNameSuggestsTools(modelName string) bool {
 	supported := []string{
 		"llama3.1", "llama3.2", "llama3.3",
 		"mistral-nemo", "mistral-large",
@@ -312,9 +386,64 @@ func (p *OllamaProvider) GenerateEmbedding(ctx context.Context, text string) ([]
 }
 
 func convertToOllamaMessages(msgs []provider.Message) []ollamaMessage {
+	// Ollama matches a tool result to its call by tool NAME, while the
+	// provider layer (and OpenAI) carry the call's ID. Resolve IDs to names
+	// from the assistant turns that made the calls.
+	nameByID := map[string]string{}
+	for _, m := range msgs {
+		for _, tc := range m.ToolCalls {
+			if tc.ID != "" {
+				nameByID[tc.ID] = tc.Name
+			}
+		}
+	}
 	result := make([]ollamaMessage, len(msgs))
 	for i, m := range msgs {
-		result[i] = ollamaMessage{Role: m.Role, Content: m.Content}
+		om := ollamaMessage{Role: m.Role, Content: m.Content}
+		for j, tc := range m.ToolCalls {
+			var call ollamaToolCall
+			call.ID = tc.ID
+			call.Function.Index = j
+			call.Function.Name = tc.Name
+			call.Function.Arguments = tc.Arguments
+			if call.Function.Arguments == nil {
+				call.Function.Arguments = map[string]interface{}{}
+			}
+			om.ToolCalls = append(om.ToolCalls, call)
+		}
+		if m.Role == "tool" {
+			om.ToolName = nameByID[m.ToolCallID]
+		}
+		result[i] = om
 	}
 	return result
+}
+
+func convertToOllamaTools(tools []provider.Tool) []ollamaTool {
+	if len(tools) == 0 {
+		return nil
+	}
+	out := make([]ollamaTool, len(tools))
+	for i, t := range tools {
+		out[i] = ollamaTool{Type: "function", Function: ollamaToolFunction{Name: t.Name, Description: t.Description, Parameters: t.Parameters}}
+	}
+	return out
+}
+
+// convertFromOllamaToolCalls maps Ollama's tool calls to the provider layer.
+// Older Ollama versions send no ID; one is minted so a caller can answer
+// the call with a tool_call_id.
+func convertFromOllamaToolCalls(calls []ollamaToolCall) []provider.ToolCall {
+	if len(calls) == 0 {
+		return nil
+	}
+	out := make([]provider.ToolCall, len(calls))
+	for i, c := range calls {
+		id := c.ID
+		if id == "" {
+			id = fmt.Sprintf("call_%d", i)
+		}
+		out[i] = provider.ToolCall{ID: id, Name: c.Function.Name, Arguments: c.Function.Arguments}
+	}
+	return out
 }
