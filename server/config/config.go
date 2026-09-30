@@ -324,7 +324,7 @@ func (c *Config) applyRegistrationFileValue(path, expandedData string, prior boo
 	if !prior {
 		return nil // already closed by a lower layer; nothing changed, nothing to say.
 	}
-	if v := os.Getenv("REGISTRATION_ENABLED"); v != "" && v != "true" && v != "1" {
+	if enabled, set := registrationEnvOverride(); set && !enabled {
 		// The environment override is applied after this and will close
 		// registration anyway. Announcing that the file is being overruled
 		// would contradict the state the gateway actually ends up in.
@@ -485,9 +485,21 @@ func (c *Config) applyEnvironmentOverrides() {
 	// Registration. Unlike the config file this is honoured in both
 	// directions — it is the supported way to close public sign-up, and no
 	// older deployment can have set it by accident.
-	if registration := os.Getenv("REGISTRATION_ENABLED"); registration != "" {
-		c.RegistrationEnabled = registration == "true" || registration == "1"
+	if enabled, set := registrationEnvOverride(); set {
+		c.RegistrationEnabled = enabled
 	}
+}
+
+// registrationEnvOverride is the one place REGISTRATION_ENABLED is read and
+// parsed. set is false when the variable is unset or empty; otherwise enabled
+// is true only for "true" or "1", so every other value (including "false")
+// reads as closed.
+func registrationEnvOverride() (enabled, set bool) {
+	v := os.Getenv("REGISTRATION_ENABLED")
+	if v == "" {
+		return false, false
+	}
+	return v == "true" || v == "1", true
 }
 
 func (c *Config) Validate() error {
