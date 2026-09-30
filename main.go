@@ -723,6 +723,7 @@ func main() {
 	server := srv.New(srv.ServerDeps{
 		Config: &srv.ServerConfig{
 			Port:                cfg.Port,
+			BindHost:            cfg.BindHost,
 			AllowedOrigins:      cfg.AllowedOrigins,
 			AuthMode:            "api_key",
 			Environment:         cfg.Environment,

@@ -10,10 +10,17 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "7340:7340"
+      # Loopback-only publish (DGS-113). "7340:7340" publishes on every host
+      # interface, i.e. the LAN. Put a reverse proxy in front, or change this
+      # deliberately, if other machines must reach the gateway.
+      - "127.0.0.1:7340:7340"
     environment:
       # Server configuration
       PORT: "7340"
+      # Inside the container the gateway must listen beyond loopback or the
+      # publish above has nothing to forward to. The image sets this too; it is
+      # repeated here so the compose file is the whole description.
+      GATEWAY_BIND_HOST: "0.0.0.0"
       ENVIRONMENT: "production"
 
       # MCP configuration

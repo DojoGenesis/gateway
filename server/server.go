@@ -3,9 +3,12 @@ package server
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,7 +69,13 @@ type AgentRuntime struct {
 
 // ServerConfig holds server-specific configuration.
 type ServerConfig struct {
-	Port            string
+	Port string
+	// BindHost is the interface the listener binds (DGS-113). Empty means
+	// DefaultBindHost — loopback. Widening it ("0.0.0.0", a LAN address) is an
+	// explicit operator act: main.go fills it from GATEWAY_BIND_HOST or the
+	// config file's bind_host, and container images set it because inside a
+	// container loopback is unreachable from the published port.
+	BindHost        string
 	AllowedOrigins  []string
 	AuthMode        string // "none", "api_key", "custom"
 	Environment     string // "development", "production"
@@ -311,12 +320,50 @@ func requestIDMiddleware() gin.HandlerFunc {
 	}
 }
 
+// DefaultBindHost is where the gateway listens when nothing says otherwise.
+//
+// It used to be every interface: Start built its address as ":" + port, so a
+// gateway run as a bare binary, via `go run`, or from any unit that did not
+// think about it answered on the LAN (DGS-113). That matters more here than
+// usual because /health, /metrics and /auth/* are public by design and the
+// development JWT secret is publicly known — its only protection off
+// production is not being reachable. Unset must be the safe branch.
+const DefaultBindHost = "127.0.0.1"
+
+// listenAddr resolves the address the HTTP server binds. An empty or
+// whitespace-only BindHost is treated as unset, so a blank line in an env file
+// cannot widen the bind.
+func (s *Server) listenAddr() string {
+	host := strings.TrimSpace(s.cfg.BindHost)
+	if host == "" {
+		host = DefaultBindHost
+	}
+	return net.JoinHostPort(host, s.cfg.Port)
+}
+
 // Start begins listening for HTTP requests.
+//
+// The listener is opened before Start returns, so a bind failure (port in use,
+// a bind host that is not an address on this machine) is returned to the
+// caller instead of being logged from a goroutine while the process keeps
+// running with nothing listening.
 func (s *Server) Start() error {
 	s.startTime = time.Now()
 
+	addr := s.listenAddr()
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen on %s: %w", addr, err)
+	}
+
+	if host, _, _ := net.SplitHostPort(addr); !isLoopbackHost(host) {
+		slog.Warn("gateway is listening beyond loopback — reachable from other machines on this network",
+			"addr", addr,
+			"hint", "intended inside a container or behind a firewall; unset GATEWAY_BIND_HOST to bind 127.0.0.1 only")
+	}
+
 	s.httpServer = &http.Server{
-		Addr:              ":" + s.cfg.Port,
+		Addr:              addr,
 		Handler:           s.router,
 		ReadTimeout:       15 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -331,12 +378,21 @@ func (s *Server) Start() error {
 		"environment", s.cfg.Environment)
 
 	go func() {
-		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("ListenAndServe error", "error", err)
+		if err := s.httpServer.Serve(ln); err != nil && err != http.ErrServerClosed {
+			slog.Error("HTTP server error", "error", err)
 		}
 	}()
 
 	return nil
+}
+
+// isLoopbackHost reports whether host names only the loopback interface.
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // Stop gracefully shuts down the server.

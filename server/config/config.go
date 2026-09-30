@@ -13,7 +13,18 @@ import (
 )
 
 type Config struct {
-	Port           string           `yaml:"port"`
+	Port string `yaml:"port"`
+
+	// BindHost is the interface the HTTP listener binds. Default 127.0.0.1.
+	//
+	// Until DGS-113 there was no such setting: the server hardcoded ":" + port,
+	// every interface, and nothing an operator could set changed it. Widening is
+	// now an explicit act — GATEWAY_BIND_HOST (wins) or bind_host in the config
+	// file. Container images set GATEWAY_BIND_HOST=0.0.0.0 because loopback
+	// inside a container is unreachable from the published port; what the host
+	// exposes is then decided by the port publish, not by the binary.
+	BindHost string `yaml:"bind_host"`
+
 	AllowedOrigins []string         `yaml:"allowed_origins"`
 	Environment    string           `yaml:"environment"`
 	PluginDir      string           `yaml:"plugin_dir"`
@@ -90,6 +101,12 @@ type OTELConfig struct {
 	SamplingRate float64 `json:"sampling_rate" yaml:"sampling_rate"`
 	ServiceName  string  `json:"service_name" yaml:"service_name"`
 }
+
+// DefaultBindHost is the listener's interface when neither GATEWAY_BIND_HOST
+// nor bind_host names one: loopback only (DGS-113). Keep in step with
+// server.DefaultBindHost, which guards callers that build a ServerConfig
+// without going through this package.
+const DefaultBindHost = "127.0.0.1"
 
 // DefaultConfigPath is consulted when neither -config nor CONFIG_PATH names a
 // file. It is relative to the process working directory, which is why a
@@ -199,6 +216,7 @@ func Load() *Config {
 func loadDefaults() *Config {
 	return &Config{
 		Port:           "7340",
+		BindHost:       DefaultBindHost,
 		AllowedOrigins: []string{"http://localhost:3000", "http://localhost:3003"},
 		Environment:    "development",
 		PluginDir:      "plugins",
@@ -424,6 +442,14 @@ func redactYAMLScalars(msg string) string {
 func (c *Config) applyEnvironmentOverrides() {
 	if port := os.Getenv("PORT"); port != "" {
 		c.Port = port
+	}
+	// Blank is treated as unset: an empty GATEWAY_BIND_HOST= line in an env
+	// file must not be the thing that widens the bind.
+	if host := strings.TrimSpace(os.Getenv("GATEWAY_BIND_HOST")); host != "" {
+		c.BindHost = host
+	}
+	if strings.TrimSpace(c.BindHost) == "" {
+		c.BindHost = DefaultBindHost
 	}
 	if env := os.Getenv("ENVIRONMENT"); env != "" {
 		c.Environment = env

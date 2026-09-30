@@ -25,6 +25,15 @@ EnvironmentFile=-/etc/dojo/env
 # unset makes both silently permissive.
 Environment="ENVIRONMENT=production"
 
+# Loopback only (DGS-113). Caddy on this host is the only intended client
+# (reverse_proxy localhost:7340); nothing should reach :7340 from off the box.
+# The binary defaults to this already; it is written here so the unit states
+# the intent. It does NOT stop /etc/dojo/env from widening it: per
+# systemd.exec(5), values from EnvironmentFile= override Environment= whatever
+# their order — so keep GATEWAY_BIND_HOST out of that file. Releases before the
+# DGS-113 fix ignore this variable and bind every interface.
+Environment="GATEWAY_BIND_HOST=127.0.0.1"
+
 Environment="SYSTEM_PROMPT_FILE=/etc/dojo/system-prompt.md"
 Environment="MEMORY_DB_PATH=/var/lib/dojo/memory.db"
 Environment="DOJO_CAS_PATH=/var/lib/dojo/skills.db"

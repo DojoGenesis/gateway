@@ -52,6 +52,12 @@ COPY --from=builder /agentic-gateway /agentic-gateway
 
 EXPOSE 7340
 
+# The binary binds 127.0.0.1 unless told otherwise (DGS-113). Inside a
+# container loopback is unreachable from a published port, so the image widens
+# the bind to the container's own interfaces. Host exposure is decided by the
+# port publish (compose uses "127.0.0.1:7340:7340"), not by this line.
+ENV GATEWAY_BIND_HOST=0.0.0.0
+
 # Health check: the binary supports --health-check flag (self-contained HTTP probe).
 # Docker Compose uses: ["/agentic-gateway", "--health-check"]
 # No curl/wget needed — works in distroless.

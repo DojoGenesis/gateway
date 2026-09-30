@@ -4,9 +4,12 @@ services:
   gateway:
     build: .
     ports:
-      - "7340:7340"
+      # Loopback-only publish (DGS-113); "7340:7340" would expose it to the LAN.
+      - "127.0.0.1:7340:7340"
     environment:
       PORT: "7340"
+      # Listen beyond loopback inside the container so the publish can reach it.
+      GATEWAY_BIND_HOST: "0.0.0.0"
       ENVIRONMENT: "production"
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
