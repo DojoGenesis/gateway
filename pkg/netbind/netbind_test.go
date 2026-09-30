@@ -91,7 +91,7 @@ func TestListenPortClashIsAnErrorAndLeavesNothingOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer taken.Close()
+	defer func() { _ = taken.Close() }()
 	_, port, _ := net.SplitHostPort(taken.Addr().String())
 
 	lns, _, err := Listen("", port)
@@ -114,7 +114,7 @@ func TestListenIPv6ClashIsNotSwallowed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer taken.Close()
+	defer func() { _ = taken.Close() }()
 	_, port, _ := net.SplitHostPort(taken.Addr().String())
 
 	lns, _, err := Listen("", port)
