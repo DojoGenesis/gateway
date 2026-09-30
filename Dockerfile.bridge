@@ -60,6 +60,14 @@ COPY --from=builder --chown=65534:65534 /app/data /app/data
 
 EXPOSE 8090
 
+# The bridge binds 127.0.0.1 unless told otherwise (DGS-136). In production
+# cloudflared reaches it over the compose network at bridge:8090, which a
+# loopback bind would refuse, so the image widens the bind to the container's
+# own interfaces. It is set in the IMAGE, not only in compose, on purpose:
+# deploy.yml pulls :latest on every push to main into a compose file that lives
+# on the host (/opt/dojo), and that file may not carry this variable yet.
+ENV DOJO_BRIDGE_HOST=0.0.0.0
+
 # Run as non-root user (nobody)
 USER 65534:65534
 

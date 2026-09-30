@@ -42,6 +42,12 @@ services:
       # default per cmd/dojo/bridge.go; adapters missing creds are skipped, not fatal.
       DOJO_CREDENTIAL_BACKEND: "env"
       DOJO_BRIDGE_PORT: "8090"
+      # The bridge binary binds 127.0.0.1 by default (DGS-136). cloudflared
+      # reaches it over this compose network as bridge:8090, so it must listen
+      # on the container's interfaces. Not port-published: the tunnel is the
+      # only ingress. The image sets this too; it is repeated so this file is
+      # the whole description of the box.
+      DOJO_BRIDGE_HOST: "0.0.0.0"
       DOJO_DATA_DIR: "/app/data"
     volumes:
       - bridge-data:/app/data
