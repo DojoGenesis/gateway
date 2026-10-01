@@ -7,9 +7,9 @@
 //	dojo skill install <ref>               — Install a skill (warns if unsigned)
 //	dojo skill install <ref> --verify      — Install with Cosign signature verification
 //	dojo skill install <ref> --force       — Install even if verification fails
-//	dojo skill publish <dir>               — Package and publish a skill from a directory
+//	dojo skill publish [--first-party] <dir> — Package and publish a skill from a directory
 //	dojo skill info <name> [version]       — Show skill metadata
-//	dojo skill package-all <plugins-dir>   — Batch-package all SKILL.md files under a directory
+//	dojo skill package-all [--first-party] <plugins-dir> — Batch-package all SKILL.md files under a directory
 //	dojo tunnel [port]                     — Start a cloudflared tunnel to expose localhost:<port> (default 8080)
 //	dojo tunnel stop                       — Stop the running tunnel
 package main
@@ -108,10 +108,12 @@ func runSkillCommand(action string, args []string) error {
 		return skill.InstallSkill(ctx, store, ref, verify, force)
 
 	case "publish":
-		if len(args) < 1 {
-			return fmt.Errorf("usage: dojo skill publish <dir>")
+		dir, firstParty, err := firstPartyArgs(args, "usage: dojo skill publish [--first-party] <dir>")
+		if err != nil {
+			return err
 		}
-		return skill.PublishSkill(ctx, store, args[0])
+		_, err = skill.PublishSkillWithOptions(ctx, store, dir, skill.PublishOptions{FirstParty: firstParty})
+		return err
 
 	case "info":
 		if len(args) < 1 {
@@ -180,10 +182,11 @@ func runSkillCommand(action string, args []string) error {
 		return skill.VerifySkillCmd(ctx, args[0])
 
 	case "package-all":
-		if len(args) < 1 {
-			return fmt.Errorf("usage: dojo skill package-all <plugins-dir>")
+		dir, firstParty, err := firstPartyArgs(args, "usage: dojo skill package-all [--first-party] <plugins-dir>")
+		if err != nil {
+			return err
 		}
-		return packageAll(ctx, store, args[0])
+		return packageAll(ctx, store, dir, firstParty)
 
 	default:
 		return fmt.Errorf("unknown skill action: %s", action)
@@ -192,7 +195,29 @@ func runSkillCommand(action string, args []string) error {
 
 // packageAll walks a plugins directory, finds all SKILL.md files, and packages
 // each skill directory into the CAS store.
-func packageAll(ctx context.Context, store *skill.SkillStore, pluginsDir string) error {
+// firstPartyArgs reads `[--first-party] <path>` in either order.
+func firstPartyArgs(args []string, usage string) (string, bool, error) {
+	var path string
+	firstParty := false
+	for _, a := range args {
+		switch {
+		case a == "--first-party":
+			firstParty = true
+		case strings.HasPrefix(a, "--"):
+			return "", false, fmt.Errorf("unknown flag %s; %s", a, usage)
+		case path == "":
+			path = a
+		default:
+			return "", false, fmt.Errorf("%s", usage)
+		}
+	}
+	if path == "" {
+		return "", false, fmt.Errorf("%s", usage)
+	}
+	return path, firstParty, nil
+}
+
+func packageAll(ctx context.Context, store *skill.SkillStore, pluginsDir string, firstParty bool) error {
 	var skillDirs []string
 
 	err := filepath.Walk(pluginsDir, func(path string, info os.FileInfo, walkErr error) error {
@@ -218,9 +243,20 @@ func packageAll(ctx context.Context, store *skill.SkillStore, pluginsDir string)
 	var succeeded, failed int
 	var errors []string
 
+	// First-party mode skips the third-party name checks, so it checks the
+	// one thing those also caught: two skills claiming the same name, which
+	// would silently replace each other in the store.
+	seen := map[string]string{}
 	for _, dir := range skillDirs {
 		relDir, _ := filepath.Rel(pluginsDir, dir)
-		err := skill.PublishSkill(ctx, store, dir)
+		name, err := skill.PublishSkillWithOptions(ctx, store, dir, skill.PublishOptions{FirstParty: firstParty})
+		if err == nil && firstParty {
+			if prev, dup := seen[name]; dup {
+				err = fmt.Errorf("duplicate skill name %q (also %s)", name, prev)
+			} else {
+				seen[name] = relDir
+			}
+		}
 		if err != nil {
 			failed++
 			errMsg := fmt.Sprintf("  FAIL  %s: %v", relDir, err)
@@ -263,13 +299,13 @@ Skill Actions:
   install <ref>                 Install a skill (warns if unsigned)
   install <ref> --verify        Install with Cosign signature verification
   install <ref> --force         Install even if verification fails
-  publish <dir>                 Package and publish a skill
+  publish [--first-party] <dir>  Package and publish a skill
   info <name> [version]         Show skill metadata
   yank <name> [ver] --reason R  Mark a skill version as yanked
   unyank <name> [version]       Reverse a yank
   report <name> --reason R      File an abuse report
   verify <ref>                  Verify Cosign signature
-  package-all <plugins-dir>     Batch-package all skills
+  package-all [--first-party] <plugins-dir>  Batch-package all skills (--first-party: DojoGenesis's own, may use reserved names)
 
 Tunnel:
   dojo tunnel                   Expose http://localhost:8080 via cloudflared
@@ -294,13 +330,13 @@ Actions:
   install <ref>                 Install a skill (warns if unsigned)
   install <ref> --verify        Install with Cosign signature verification
   install <ref> --force         Install even if verification fails
-  publish <dir>                 Package and publish a skill
+  publish [--first-party] <dir>  Package and publish a skill
   info <name> [version]         Show skill metadata
   yank <name> [ver] --reason R  Mark a skill version as yanked
   unyank <name> [version]       Reverse a yank
   report <name> --reason R      File an abuse report
   verify <ref>                  Verify Cosign signature
-  package-all <plugins-dir>     Batch-package all skills
+  package-all [--first-party] <plugins-dir>  Batch-package all skills (--first-party: DojoGenesis's own, may use reserved names)
 
 References:
   ./path/to/skill               Local directory

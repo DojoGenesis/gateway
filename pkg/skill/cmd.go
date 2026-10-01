@@ -168,33 +168,56 @@ func InstallSkill(ctx context.Context, store *SkillStore, ref string, verify, fo
 // Returns an error if the skill name is reserved (see MARKETPLACE_POLICY.md, §6).
 //
 // Can be wired into a cobra CLI command like: dojo skill publish <dir>
+// PublishOptions controls a publish.
+type PublishOptions struct {
+	// FirstParty marks DojoGenesis publishing its OWN skills. The reserved
+	// names (ADR-020) exist to keep third parties from squatting first-party
+	// names; applying them to the owner blocked DojoGenesis from packaging 45
+	// of its own 89 skills. FirstParty skips the name-safety check (reserved
+	// and near-reserved names). Duplicates within a first-party batch are the
+	// caller's check (see `dojo skill package-all --first-party`).
+	FirstParty bool
+}
+
+// PublishSkill packages a skill directory and installs it, with the full
+// third-party name-safety check. It is PublishSkillWithOptions with defaults.
 func PublishSkill(ctx context.Context, store *SkillStore, dirPath string) error {
+	_, err := PublishSkillWithOptions(ctx, store, dirPath, PublishOptions{})
+	return err
+}
+
+// PublishSkillWithOptions packages a skill directory and installs it into the
+// store, returning the manifest name.
+func PublishSkillWithOptions(ctx context.Context, store *SkillStore, dirPath string, opts PublishOptions) (string, error) {
 	manifest, configBlob, contentTar, err := PackSkill(dirPath)
 	if err != nil {
-		return fmt.Errorf("publish skill: pack %q: %w", dirPath, err)
+		return "", fmt.Errorf("publish skill: pack %q: %w", dirPath, err)
 	}
 
-	// Slopsquatting defense: check name against reserved corpus AND existing
-	// skills using both exact match and Levenshtein edit-distance (ADR-020).
-	existing, err := store.List(ctx)
-	if err != nil {
-		return fmt.Errorf("publish skill: list existing: %w", err)
-	}
-	existingNames := make([]string, len(existing))
-	for i, m := range existing {
-		existingNames[i] = m.Name
-	}
-	if err := CheckNameSafety(manifest.Name, existingNames, LoadReservedNames()); err != nil {
-		return fmt.Errorf("publish skill: %w", err)
+	if !opts.FirstParty {
+		// Slopsquatting defense: check name against reserved corpus AND
+		// existing skills using both exact match and Levenshtein edit-distance
+		// (ADR-020).
+		existing, err := store.List(ctx)
+		if err != nil {
+			return "", fmt.Errorf("publish skill: list existing: %w", err)
+		}
+		existingNames := make([]string, len(existing))
+		for i, m := range existing {
+			existingNames[i] = m.Name
+		}
+		if err := CheckNameSafety(manifest.Name, existingNames, LoadReservedNames()); err != nil {
+			return "", fmt.Errorf("publish skill: %w", err)
+		}
 	}
 
 	if err := store.Install(ctx, manifest, configBlob, contentTar); err != nil {
-		return fmt.Errorf("publish skill: install %q: %w", manifest.Name, err)
+		return "", fmt.Errorf("publish skill: install %q: %w", manifest.Name, err)
 	}
 
 	fmt.Printf("Published skill %s@%s (%d bytes config, %d bytes content)\n",
 		manifest.Name, manifest.Version, len(configBlob), len(contentTar))
-	return nil
+	return manifest.Name, nil
 }
 
 // YankSkill marks a skill version as yanked, preventing future installation

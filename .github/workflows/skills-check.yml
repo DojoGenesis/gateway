@@ -1,0 +1,66 @@
+# Skills Check
+#
+# Packages every first-party skill under plugins/*/skills/ with the real dojo
+# CLI and fails if any one of them can't be packaged, or if two claim one name.
+#
+# This replaced "Publish Skill" (2026-09-30), which failed on every release
+# tag since at least v3.3.2 and could never have published anything:
+# - It ran `dojo skill publish .` at the repo root, which has no SKILL.md.
+# - `dojo skill publish` writes to a LOCAL CAS store (the runner's disk); it
+#   has no registry push.
+# - Its "push" step only echoed, recorded `digest=sha256:placeholder`, and
+#   left the Cosign signing commented out, while its summary reported
+#   "Signed: Cosign".
+#
+# Publishing skills to an OCI registry (ghcr.io/dojo-skills) is a separate,
+# deliberate feature, and doesn't exist yet. When it does, it belongs in its
+# own workflow with a real digest and a real signature.
+
+name: Skills Check
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'plugins/**'
+      - 'pkg/skill/**'
+      - 'cmd/dojo/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  package-all:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build dojo CLI
+        run: go build -o dojo ./cmd/dojo/...
+
+      - name: Package every first-party skill
+        env:
+          DOJO_CAS_PATH: ${{ runner.temp }}/skills-check.db
+        run: |
+          set -o pipefail
+          # --first-party: these are DojoGenesis's own skills, so the
+          # reserved-names list (which keeps third parties off these names)
+          # doesn't apply. Duplicate names still fail the batch.
+          ./dojo skill package-all --first-party plugins | tee package-all.log
+          {
+            echo "## Skills Check"
+            echo ""
+            echo "$(grep -E '^Packaged ' package-all.log)"
+          } >> "$GITHUB_STEP_SUMMARY"
