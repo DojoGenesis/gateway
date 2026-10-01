@@ -1,47 +1,85 @@
 # Dojo Skill Marketplace — Reserved Names
-# Generated: 2026-04-05
+# Generated: 2026-10-01 (Official section regenerated from plugins/)
 # Purpose: Prevent slopsquatting (AI-hallucinated name pre-registration)
 # Review: Quarterly regeneration recommended
 #
 # Categories:
-# [official] - Current Dojo Platform skills (44)
+# [official] - Current Dojo Platform skills (89)
 # [platform] - Dojo Platform infrastructure names
 # [infra] - Third-party platform/service names
 # [slopsquat] - AI-hallucinated names (generated corpus)
 
-# === Official Skills (44) ===
+# === Official Skills (89) ===
+adversarial-reviewer
+agent-dispatch-playbook
+agent-performance-report
 agent-teaching
+analyze-agent-behavior
+async-agent-dispatch
+audit-sweep-dispatch
+batch-normalize-and-package
+budget-guard
+build-intelligence-map
+build-sweep
+claude-md-guardian
+codebase-audit-grounding
+codebase-cartography
 compression-ritual
 context-ingestion
+continuity-ledger
+convergence-gate
 debugging
 decision-propagation
+design-system-selector
 documentation-audit
 era-architecture
+figma-to-code
 file-management
 frontend-from-backend
+gap-audit-then-fix
+granular-visibility
 handoff-protocol
 health-audit
+hooks-reference
 implementation-prompt
+ingest-system-prompt
 iterative-scouting
+maestro-orchestration
+mcp-builder
+mcp-cloudflare-builder
+mcp-server-builder
 memory-garden
 multi-surface-strategy
+normalize-community-skill
+observability-dashboard
+observability-dashboard-spec
+orchestration-pattern-selector
+parallel-dispatch
 parallel-tracks
 patient-learning-protocol
+pdf-export
+pdf-typography
 planning-with-files
+pointer-directories
+pre-commission-alignment
 pre-implementation-checklist
 process-extraction
 product-positioning
 project-exploration
+reflect-and-learn
 release-specification
 repo-context-sync
 repo-status
 research-modes
 research-synthesis
 retrospective
+scan-community-repos
 seed-extraction
 seed-library
 seed-to-skill-converter
 semantic-clusters
+session-compression
+session-lifecycle-automation
 skill-audit-upgrade
 skill-creation
 skill-maintenance
@@ -51,7 +89,14 @@ status-template
 status-writing
 strategic-scout
 strategic-to-tactical-workflow
+supply-chain-refresh
+system-prompt-archaeology
+tldr-code-analysis
+tool-intercept-logger
+voice-before-structure
 web-research
+web-research-external
+workflow-router
 workspace-navigation
 zenflow-prompt-writer
 
