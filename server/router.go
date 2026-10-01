@@ -272,7 +272,11 @@ func (s *Server) setupRoutes() {
 			casGroup.GET("/tags", s.handleCASListTags)
 			casGroup.GET("/tags/:name/:version", s.handleCASResolveTag)
 			casGroup.POST("/tags", s.handleCASCreateTag)
-			casGroup.DELETE("/tags/:name/:version", s.handleCASDeleteTag)
+			// DGS-111: catch-all so slash-containing names ("workflow/foo") are
+			// addressable; the handler splits name/version on the last slash.
+			// gin keeps one tree per method, so this does not collide with the
+			// GET /tags/:name/:version route above.
+			casGroup.DELETE("/tags/*tagpath", s.handleCASDeleteTag)
 			casGroup.GET("/content/:ref", s.handleCASGetContent)
 			casGroup.POST("/content", s.handleCASPutContent)
 

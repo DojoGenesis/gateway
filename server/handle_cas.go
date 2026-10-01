@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -192,10 +193,22 @@ func (s *Server) handleCASCreateTag(c *gin.Context) {
 }
 
 // handleCASDeleteTag removes a tag by name and version.
-// DELETE /api/cas/tags/:name/:version
+// DELETE /api/cas/tags/*tagpath
+//
+// The path is "<name>/<version>" where name may itself contain slashes (e.g.
+// "workflow/foo"), so it is split on the LAST slash (DGS-111).
 func (s *Server) handleCASDeleteTag(c *gin.Context) {
-	name := c.Param("name")
-	version := c.Param("version")
+	tagPath := strings.TrimPrefix(c.Param("tagpath"), "/")
+	idx := strings.LastIndex(tagPath, "/")
+	if idx < 0 {
+		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "Tag path must be <name>/<version>")
+		return
+	}
+	name, version := tagPath[:idx], tagPath[idx+1:]
+	if name == "" || version == "" {
+		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "Tag name and version must both be non-empty")
+		return
+	}
 
 	err := s.workflowCAS.Untag(c.Request.Context(), name, version)
 	if err != nil {
