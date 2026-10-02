@@ -1,15 +1,15 @@
 # Dojo Skill Marketplace — Reserved Names
-# Generated: 2026-10-01 (Official section regenerated from plugins/)
+# Generated: 2026-10-02 (Official section regenerated from plugins/)
 # Purpose: Prevent slopsquatting (AI-hallucinated name pre-registration)
 # Review: Quarterly regeneration recommended
 #
 # Categories:
-# [official] - Current Dojo Platform skills (89)
+# [official] - Current Dojo Platform skills (102)
 # [platform] - Dojo Platform infrastructure names
 # [infra] - Third-party platform/service names
 # [slopsquat] - AI-hallucinated names (generated corpus)
 
-# === Official Skills (89) ===
+# === Official Skills (102) ===
 adversarial-reviewer
 agent-dispatch-playbook
 agent-performance-report
@@ -44,6 +44,19 @@ hooks-reference
 implementation-prompt
 ingest-system-prompt
 iterative-scouting
+kata-ai-celebration-pack
+kata-ai-decompose-goal
+kata-ai-draft-goal
+kata-ai-draft-routine
+kata-ai-goal-ladder
+kata-ai-optimize-project
+kata-ai-sprint-intention
+kata-ai-task-chain
+kata-ai-tasks-from-goal
+kata-ai-triage-brain-dump
+kata-ai-unstick-breakdown
+kata-overwhelm
+kata-roll-seed
 maestro-orchestration
 mcp-builder
 mcp-cloudflare-builder
