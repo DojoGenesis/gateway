@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-overwhelm/input.schema.json",
+  "title": "kata-overwhelm input",
+  "description": "Overwhelm intervention: goal (+ what is stuck) -> shame-aware tiny steps. Sends user_id.",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1
+    },
+    "goal": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 1
+    },
+    "stuck_on": {
+      "type": "string",
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "user_id",
+    "goal"
+  ],
+  "additionalProperties": false
+}

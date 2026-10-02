@@ -1,0 +1,294 @@
+{
+  "description": "Three raw thoughts get categories and scores.",
+  "input": {
+    "items": [
+      {
+        "id": "bd-01",
+        "raw_text": "call dentist, tooth thing getting worse"
+      },
+      {
+        "id": "bd-02",
+        "raw_text": "learn to make ceramics someday"
+      },
+      {
+        "id": "bd-03",
+        "raw_text": "do something nice after the tax thing"
+      }
+    ]
+  },
+  "valid_output": {
+    "items": [
+      {
+        "id": "bd-01",
+        "category": "task",
+        "priority_score": 8,
+        "breakdown": [
+          "Find the dentist number",
+          "Call and ask for any open slot this week"
+        ]
+      },
+      {
+        "id": "bd-02",
+        "category": "goal",
+        "priority_score": 4,
+        "breakdown": [
+          "Decide what finished looks like",
+          "List the first three steps"
+        ]
+      },
+      {
+        "id": "bd-03",
+        "category": "celebration",
+        "priority_score": 2,
+        "breakdown": []
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: priority_score above 10",
+      "output": {
+        "items": [
+          {
+            "id": "bd-01",
+            "category": "task",
+            "priority_score": 11,
+            "breakdown": [
+              "Find the dentist number",
+              "Call and ask for any open slot this week"
+            ]
+          },
+          {
+            "id": "bd-02",
+            "category": "goal",
+            "priority_score": 4,
+            "breakdown": [
+              "Decide what finished looks like",
+              "List the first three steps"
+            ]
+          },
+          {
+            "id": "bd-03",
+            "category": "celebration",
+            "priority_score": 2,
+            "breakdown": []
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: priority_score as string",
+      "output": {
+        "items": [
+          {
+            "id": "bd-01",
+            "category": "task",
+            "priority_score": "high",
+            "breakdown": [
+              "Find the dentist number",
+              "Call and ask for any open slot this week"
+            ]
+          },
+          {
+            "id": "bd-02",
+            "category": "goal",
+            "priority_score": 4,
+            "breakdown": [
+              "Decide what finished looks like",
+              "List the first three steps"
+            ]
+          },
+          {
+            "id": "bd-03",
+            "category": "celebration",
+            "priority_score": 2,
+            "breakdown": []
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: category not in enum",
+      "output": {
+        "items": [
+          {
+            "id": "bd-01",
+            "category": "task",
+            "priority_score": 8,
+            "breakdown": [
+              "Find the dentist number",
+              "Call and ask for any open slot this week"
+            ]
+          },
+          {
+            "id": "bd-02",
+            "category": "idea",
+            "priority_score": 4,
+            "breakdown": [
+              "Decide what finished looks like",
+              "List the first three steps"
+            ]
+          },
+          {
+            "id": "bd-03",
+            "category": "celebration",
+            "priority_score": 2,
+            "breakdown": []
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: breakdown missing",
+      "output": {
+        "items": [
+          {
+            "id": "bd-01",
+            "category": "task",
+            "priority_score": 8,
+            "breakdown": [
+              "Find the dentist number",
+              "Call and ask for any open slot this week"
+            ]
+          },
+          {
+            "id": "bd-02",
+            "category": "goal",
+            "priority_score": 4,
+            "breakdown": [
+              "Decide what finished looks like",
+              "List the first three steps"
+            ]
+          },
+          {
+            "id": "bd-03",
+            "category": "celebration",
+            "priority_score": 2
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: bare array root",
+      "output": [
+        {
+          "id": "bd-01",
+          "category": "task",
+          "priority_score": 8,
+          "breakdown": [
+            "Find the dentist number",
+            "Call and ask for any open slot this week"
+          ]
+        },
+        {
+          "id": "bd-02",
+          "category": "goal",
+          "priority_score": 4,
+          "breakdown": [
+            "Decide what finished looks like",
+            "List the first three steps"
+          ]
+        },
+        {
+          "id": "bd-03",
+          "category": "celebration",
+          "priority_score": 2,
+          "breakdown": []
+        }
+      ]
+    },
+    {
+      "why": "schema: negative priority_score",
+      "output": {
+        "items": [
+          {
+            "id": "bd-01",
+            "category": "task",
+            "priority_score": -1,
+            "breakdown": [
+              "Find the dentist number",
+              "Call and ask for any open slot this week"
+            ]
+          },
+          {
+            "id": "bd-02",
+            "category": "goal",
+            "priority_score": 4,
+            "breakdown": [
+              "Decide what finished looks like",
+              "List the first three steps"
+            ]
+          },
+          {
+            "id": "bd-03",
+            "category": "celebration",
+            "priority_score": 2,
+            "breakdown": []
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: \"you should\" in breakdown",
+      "output": {
+        "items": [
+          {
+            "id": "bd-01",
+            "category": "task",
+            "priority_score": 8,
+            "breakdown": [
+              "You should find the number",
+              "Call and ask for any open slot this week"
+            ]
+          },
+          {
+            "id": "bd-02",
+            "category": "goal",
+            "priority_score": 4,
+            "breakdown": [
+              "Decide what finished looks like",
+              "List the first three steps"
+            ]
+          },
+          {
+            "id": "bd-03",
+            "category": "celebration",
+            "priority_score": 2,
+            "breakdown": []
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: exclamation mark in breakdown",
+      "output": {
+        "items": [
+          {
+            "id": "bd-01",
+            "category": "task",
+            "priority_score": 8,
+            "breakdown": [
+              "Find the dentist number",
+              "Call and ask for any open slot this week"
+            ]
+          },
+          {
+            "id": "bd-02",
+            "category": "goal",
+            "priority_score": 4,
+            "breakdown": [
+              "Decide what done looks like!",
+              "List the first three steps"
+            ]
+          },
+          {
+            "id": "bd-03",
+            "category": "celebration",
+            "priority_score": 2,
+            "breakdown": []
+          }
+        ]
+      }
+    }
+  ]
+}

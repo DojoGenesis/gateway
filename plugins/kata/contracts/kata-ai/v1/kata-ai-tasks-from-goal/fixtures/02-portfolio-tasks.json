@@ -1,0 +1,69 @@
+{
+  "description": "Minimal goal context, two drafts.",
+  "input": {
+    "goal": {
+      "title": "Ship the portfolio site"
+    }
+  },
+  "valid_output": {
+    "tasks": [
+      {
+        "title": "Write the three case study outlines",
+        "time_needed": 60,
+        "energy_required": "high",
+        "vibe": "deep_work",
+        "size": "medium"
+      },
+      {
+        "title": "Pick the site template",
+        "time_needed": 15,
+        "vibe": "creative",
+        "size": "tiny"
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: unknown key priority on a task",
+      "output": {
+        "tasks": [
+          {
+            "title": "Write the three case study outlines",
+            "time_needed": 60,
+            "energy_required": "high",
+            "vibe": "deep_work",
+            "size": "medium",
+            "priority": "high"
+          },
+          {
+            "title": "Pick the site template",
+            "time_needed": 15,
+            "vibe": "creative",
+            "size": "tiny"
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: \"just do it\"",
+      "output": {
+        "tasks": [
+          {
+            "title": "Write the three case study outlines",
+            "time_needed": 60,
+            "energy_required": "high",
+            "vibe": "deep_work",
+            "size": "medium"
+          },
+          {
+            "title": "Pick the site template",
+            "time_needed": 15,
+            "vibe": "creative",
+            "size": "tiny",
+            "description": "Just do it and move on."
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "description": "Goal plus stuck_on yields three small steps.",
+  "input": {
+    "user_id": "u-7f3a",
+    "goal": "Finish the thesis chapter",
+    "stuck_on": "Everything feels equally urgent."
+  },
+  "valid_output": {
+    "steps": [
+      "Close every tab except this one.",
+      "Write the single next action on a sticky note.",
+      "Set a five-minute timer and do only that."
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: steps missing",
+      "output": {
+        "step": [
+          "Close every tab except this one.",
+          "Write the single next action on a sticky note.",
+          "Set a five-minute timer and do only that."
+        ]
+      }
+    },
+    {
+      "why": "schema: bare array",
+      "output": [
+        "Close every tab except this one.",
+        "Write the single next action on a sticky note.",
+        "Set a five-minute timer and do only that."
+      ]
+    },
+    {
+      "why": "schema: empty steps",
+      "output": {
+        "steps": []
+      }
+    },
+    {
+      "why": "schema: step is null",
+      "output": {
+        "steps": [
+          null
+        ]
+      }
+    },
+    {
+      "why": "lint: \"don't worry\" in step",
+      "output": {
+        "steps": [
+          "Don't worry about the rest."
+        ]
+      }
+    },
+    {
+      "why": "lint: \"you've got this\"",
+      "output": {
+        "steps": [
+          "Take one breath, you've got this."
+        ]
+      }
+    },
+    {
+      "why": "lint: exclamation mark",
+      "output": {
+        "steps": [
+          "Close every tab!"
+        ]
+      }
+    }
+  ]
+}

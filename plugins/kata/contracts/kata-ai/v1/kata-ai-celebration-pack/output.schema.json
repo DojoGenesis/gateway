@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-celebration-pack/output.schema.json",
+  "title": "kata-ai-celebration-pack output",
+  "type": "object",
+  "properties": {
+    "pack": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 80,
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "emoji": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "contexts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "name",
+        "contexts"
+      ],
+      "additionalProperties": false
+    },
+    "celebrations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "duration": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 60,
+            "description": "Minutes."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "restorative",
+              "energizing",
+              "social",
+              "sensory"
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "duration",
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 10
+    }
+  },
+  "required": [
+    "pack",
+    "celebrations"
+  ],
+  "additionalProperties": false
+}

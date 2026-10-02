@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-goal-ladder/input.schema.json",
+  "title": "kata-ai-goal-ladder input",
+  "description": "Task list -> suggested order of task ids.",
+  "type": "object",
+  "properties": {
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "depends_on_task_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "tasks"
+  ],
+  "additionalProperties": false
+}

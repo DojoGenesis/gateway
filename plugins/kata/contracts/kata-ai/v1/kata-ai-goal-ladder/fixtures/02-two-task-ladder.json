@@ -1,0 +1,42 @@
+{
+  "description": "Minimal ladder without dependency data.",
+  "input": {
+    "tasks": [
+      {
+        "id": "b1",
+        "title": "Water the plants"
+      },
+      {
+        "id": "b2",
+        "title": "Buy a watering can"
+      }
+    ]
+  },
+  "valid_output": {
+    "order": [
+      "b2",
+      "b1"
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: extra key reason",
+      "output": {
+        "order": [
+          "b2",
+          "b1"
+        ],
+        "reason": "Need the can first"
+      }
+    },
+    {
+      "why": "lint: lint trips on any string value",
+      "output": {
+        "order": [
+          "b2",
+          "you should b1"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-decompose-goal/output.schema.json",
+  "title": "kata-ai-decompose-goal output",
+  "type": "object",
+  "properties": {
+    "milestones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "description": "Draft milestone. The app adds completed:false when it persists.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 10
+    }
+  },
+  "required": [
+    "milestones"
+  ],
+  "additionalProperties": false
+}

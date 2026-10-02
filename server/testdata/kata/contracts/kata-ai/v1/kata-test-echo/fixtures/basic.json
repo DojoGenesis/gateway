@@ -1,0 +1,7 @@
+{"input":{"goal":"learn to juggle"},
+ "valid_output":{"steps":[{"title":"Toss one ball hand to hand","minutes":5}]},
+ "invalid_outputs":[
+  {"why":"schema: steps must be non-empty","output":{"steps":[]}},
+  {"why":"schema: minutes must be an integer","output":{"steps":[{"title":"x","minutes":1.5}]}},
+  {"why":"lint: shaming language","output":{"steps":[{"title":"Stop being LAZY and practice"}]}}
+ ]}

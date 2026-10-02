@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/_defs.schema.json",
+  "title": "kata-ai/v1 shared definitions",
+  "description": "Human source of truth for shared fragments. Mirrors src/types/enums.ts and src/types/work.ts. Output schemas inline these (no $ref) so they work as function-tool parameters; input schemas $ref them.",
+  "$defs": {
+    "EnergyLevel": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "Urgency": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "must_do"
+      ]
+    },
+    "Vibe": {
+      "type": "string",
+      "enum": [
+        "calm",
+        "creative",
+        "admin",
+        "deep_work",
+        "maintenance",
+        "social"
+      ]
+    },
+    "TaskSize": {
+      "type": "string",
+      "enum": [
+        "tiny",
+        "small",
+        "medium",
+        "large"
+      ]
+    },
+    "GoalPriority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "RoutineType": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening",
+        "workout",
+        "chores",
+        "custom"
+      ]
+    },
+    "CelebrationType": {
+      "type": "string",
+      "enum": [
+        "restorative",
+        "energizing",
+        "social",
+        "sensory"
+      ]
+    },
+    "BrainDumpCategory": {
+      "type": "string",
+      "enum": [
+        "task",
+        "goal",
+        "routine",
+        "celebration",
+        "milestone",
+        "mixed"
+      ]
+    },
+    "TaskStatus": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed",
+        "archived",
+        "blocked"
+      ]
+    },
+    "TaskDraft": {
+      "type": "object",
+      "description": "A small, editable task suggestion. Only title is required.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "time_needed": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 480,
+          "description": "Minutes."
+        },
+        "energy_required": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "urgency": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "must_do"
+          ]
+        },
+        "vibe": {
+          "type": "string",
+          "enum": [
+            "calm",
+            "creative",
+            "admin",
+            "deep_work",
+            "maintenance",
+            "social"
+          ]
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "tiny",
+            "small",
+            "medium",
+            "large"
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1
+          },
+          "minItems": 0,
+          "maxItems": 5
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "Milestone": {
+      "type": "object",
+      "description": "Draft milestone. The app adds completed:false when it persists.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

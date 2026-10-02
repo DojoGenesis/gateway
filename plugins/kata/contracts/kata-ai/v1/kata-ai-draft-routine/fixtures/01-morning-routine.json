@@ -1,0 +1,198 @@
+{
+  "description": "Routine with ordered tasks.",
+  "input": {
+    "prompt": "A morning routine that does not feel like a boot camp. I leave the house at 8:15."
+  },
+  "valid_output": {
+    "routine": {
+      "title": "Slow morning start",
+      "description": "A short sequence that gets you out the door without rushing.",
+      "type": "morning",
+      "emoji": "☕"
+    },
+    "tasks": [
+      {
+        "title": "Drink a glass of water",
+        "time_needed": 2,
+        "energy_required": "low",
+        "size": "tiny"
+      },
+      {
+        "title": "Set the vitamins out on the counter",
+        "time_needed": 2,
+        "size": "tiny"
+      },
+      {
+        "title": "Wash face and brush teeth",
+        "time_needed": 6,
+        "size": "tiny",
+        "vibe": "maintenance"
+      },
+      {
+        "title": "Pack bag for the day",
+        "time_needed": 8,
+        "vibe": "admin",
+        "size": "small"
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: routine type not in enum",
+      "output": {
+        "routine": {
+          "title": "Slow morning start",
+          "description": "A short sequence that gets you out the door without rushing.",
+          "type": "night",
+          "emoji": "☕"
+        },
+        "tasks": [
+          {
+            "title": "Drink a glass of water",
+            "time_needed": 2,
+            "energy_required": "low",
+            "size": "tiny"
+          },
+          {
+            "title": "Set the vitamins out on the counter",
+            "time_needed": 2,
+            "size": "tiny"
+          },
+          {
+            "title": "Wash face and brush teeth",
+            "time_needed": 6,
+            "size": "tiny",
+            "vibe": "maintenance"
+          },
+          {
+            "title": "Pack bag for the day",
+            "time_needed": 8,
+            "vibe": "admin",
+            "size": "small"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: routine missing",
+      "output": {
+        "tasks": [
+          {
+            "title": "Drink a glass of water",
+            "time_needed": 2,
+            "energy_required": "low",
+            "size": "tiny"
+          },
+          {
+            "title": "Set the vitamins out on the counter",
+            "time_needed": 2,
+            "size": "tiny"
+          },
+          {
+            "title": "Wash face and brush teeth",
+            "time_needed": 6,
+            "size": "tiny",
+            "vibe": "maintenance"
+          },
+          {
+            "title": "Pack bag for the day",
+            "time_needed": 8,
+            "vibe": "admin",
+            "size": "small"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: routine null",
+      "output": {
+        "routine": null,
+        "tasks": []
+      }
+    },
+    {
+      "why": "schema: empty tasks",
+      "output": {
+        "routine": {
+          "title": "Slow morning start",
+          "description": "A short sequence that gets you out the door without rushing.",
+          "type": "morning",
+          "emoji": "☕"
+        },
+        "tasks": []
+      }
+    },
+    {
+      "why": "lint: \"you should\" in a task",
+      "output": {
+        "routine": {
+          "title": "Slow morning start",
+          "description": "A short sequence that gets you out the door without rushing.",
+          "type": "morning",
+          "emoji": "☕"
+        },
+        "tasks": [
+          {
+            "title": "You should drink a glass of water",
+            "time_needed": 2,
+            "energy_required": "low",
+            "size": "tiny"
+          },
+          {
+            "title": "Set the vitamins out on the counter",
+            "time_needed": 2,
+            "size": "tiny"
+          },
+          {
+            "title": "Wash face and brush teeth",
+            "time_needed": 6,
+            "size": "tiny",
+            "vibe": "maintenance"
+          },
+          {
+            "title": "Pack bag for the day",
+            "time_needed": 8,
+            "vibe": "admin",
+            "size": "small"
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: \"symptom\" medical term",
+      "output": {
+        "routine": {
+          "title": "Slow morning start",
+          "description": "Helps with symptoms of a rough start.",
+          "type": "morning",
+          "emoji": "☕"
+        },
+        "tasks": [
+          {
+            "title": "Drink a glass of water",
+            "time_needed": 2,
+            "energy_required": "low",
+            "size": "tiny"
+          },
+          {
+            "title": "Set the vitamins out on the counter",
+            "time_needed": 2,
+            "size": "tiny"
+          },
+          {
+            "title": "Wash face and brush teeth",
+            "time_needed": 6,
+            "size": "tiny",
+            "vibe": "maintenance"
+          },
+          {
+            "title": "Pack bag for the day",
+            "time_needed": 8,
+            "vibe": "admin",
+            "size": "small"
+          }
+        ]
+      }
+    }
+  ]
+}

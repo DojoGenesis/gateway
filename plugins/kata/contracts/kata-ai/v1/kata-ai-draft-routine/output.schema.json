@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-draft-routine/output.schema.json",
+  "title": "kata-ai-draft-routine output",
+  "type": "object",
+  "properties": {
+    "routine": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "morning",
+            "evening",
+            "workout",
+            "chores",
+            "custom"
+          ]
+        },
+        "emoji": {
+          "type": "string",
+          "maxLength": 16
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "description": "A small, editable task suggestion. Only title is required.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "time_needed": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 480,
+            "description": "Minutes."
+          },
+          "energy_required": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "must_do"
+            ]
+          },
+          "vibe": {
+            "type": "string",
+            "enum": [
+              "calm",
+              "creative",
+              "admin",
+              "deep_work",
+              "maintenance",
+              "social"
+            ]
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "tiny",
+              "small",
+              "medium",
+              "large"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40,
+              "minLength": 1
+            },
+            "minItems": 0,
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 12
+    }
+  },
+  "required": [
+    "routine",
+    "tasks"
+  ],
+  "additionalProperties": false
+}

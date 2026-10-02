@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-celebration-pack/input.schema.json",
+  "title": "kata-ai-celebration-pack input",
+  "description": "Free text -> celebration pack.",
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "maxLength": 2000,
+      "minLength": 1
+    }
+  },
+  "required": [
+    "prompt"
+  ],
+  "additionalProperties": false
+}

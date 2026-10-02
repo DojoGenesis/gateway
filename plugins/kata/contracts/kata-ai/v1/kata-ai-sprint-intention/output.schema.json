@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-sprint-intention/output.schema.json",
+  "title": "kata-ai-sprint-intention output",
+  "type": "object",
+  "properties": {
+    "intention": {
+      "type": "string",
+      "maxLength": 160,
+      "minLength": 1
+    }
+  },
+  "required": [
+    "intention"
+  ],
+  "additionalProperties": false
+}

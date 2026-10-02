@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-draft-goal/output.schema.json",
+  "title": "kata-ai-draft-goal output",
+  "type": "object",
+  "properties": {
+    "goal": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "motivation_why": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "desired_outcome": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "potential_roadblocks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1
+          },
+          "minItems": 0,
+          "maxItems": 6
+        },
+        "success_metrics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1
+          },
+          "minItems": 0,
+          "maxItems": 6
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "estimated_time": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 525600,
+          "description": "Minutes."
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "goal"
+  ],
+  "additionalProperties": false
+}

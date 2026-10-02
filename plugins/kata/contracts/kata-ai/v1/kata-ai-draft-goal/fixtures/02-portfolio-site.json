@@ -1,0 +1,55 @@
+{
+  "description": "Short prompt, sparse draft; optional fields omitted.",
+  "input": {
+    "prompt": "finish my portfolio site by end of month, need it for job applications"
+  },
+  "valid_output": {
+    "goal": {
+      "title": "Ship the portfolio site",
+      "description": "Get the portfolio live and linkable before applications go out.",
+      "desired_outcome": "A live site with three case studies.",
+      "priority": "high",
+      "success_metrics": [
+        "Site is live",
+        "Three case studies published"
+      ]
+    }
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: success_metrics exceeds maxItems 6",
+      "output": {
+        "goal": {
+          "title": "Ship the portfolio site",
+          "description": "Get the portfolio live and linkable before applications go out.",
+          "desired_outcome": "A live site with three case studies.",
+          "priority": "high",
+          "success_metrics": [
+            "Metric 0",
+            "Metric 1",
+            "Metric 2",
+            "Metric 3",
+            "Metric 4",
+            "Metric 5",
+            "Metric 6"
+          ]
+        }
+      }
+    },
+    {
+      "why": "lint: exclamation mark in description",
+      "output": {
+        "goal": {
+          "title": "Ship the portfolio site",
+          "description": "Get it live!",
+          "desired_outcome": "A live site with three case studies.",
+          "priority": "high",
+          "success_metrics": [
+            "Site is live",
+            "Three case studies published"
+          ]
+        }
+      }
+    }
+  ]
+}

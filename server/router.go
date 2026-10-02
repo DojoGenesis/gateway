@@ -54,6 +54,12 @@ func (s *Server) setupRoutes() {
 	// probe in deploy/provision.sh hits /health unauthenticated by design.
 	s.router.GET("/events", middleware.AuthMiddleware(), handlers.HandleSSE)
 
+	// ─── Structured skill dispatch (DGS-149) ─────────────────────────
+	// The Kata edge worker calls POST ${GATEWAY_URL}/dispatch (no /v1). Same
+	// AuthMiddleware as /v1/*, attached per-route because this sits outside
+	// the v1 group. /v1/dispatch is registered inside the group.
+	s.router.POST("/dispatch", middleware.AuthMiddleware(), s.handleDispatch)
+
 	// ─── OpenAI-Compatible API (/v1) ─────────────────────────────────
 	v1 := s.router.Group("/v1")
 	// DGS-88: every route under /v1 either spends money (LLM completions,
@@ -77,6 +83,10 @@ func (s *Server) setupRoutes() {
 	{
 		// Chat completions (OpenAI-compatible)
 		v1.POST("/chat/completions", s.handleChatCompletions)
+
+		// Structured skill dispatch (DGS-149). Alias of POST /dispatch below;
+		// inherits the group's AuthMiddleware.
+		v1.POST("/dispatch", s.handleDispatch)
 
 		// Models (OpenAI-compatible)
 		v1.GET("/models", s.handleListModels)

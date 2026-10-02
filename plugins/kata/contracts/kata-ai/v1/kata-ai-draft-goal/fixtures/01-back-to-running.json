@@ -1,0 +1,142 @@
+{
+  "description": "Rambling free text becomes a full goal draft.",
+  "input": {
+    "prompt": "I want to get back into running. It used to help me think clearly. My knee is sensitive and I tend to stop after about a week."
+  },
+  "valid_output": {
+    "goal": {
+      "title": "Run regularly again",
+      "description": "Rebuild a running habit at a gentle pace.",
+      "motivation_why": "Running helps you think clearly.",
+      "desired_outcome": "Three easy runs a week.",
+      "potential_roadblocks": [
+        "A sensitive knee",
+        "Stopping after the first week"
+      ],
+      "success_metrics": [
+        "Three runs a week for four weeks"
+      ],
+      "priority": "medium",
+      "estimated_time": 600
+    }
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: priority is a number (spec doc says number; TS type is string enum)",
+      "output": {
+        "goal": {
+          "title": "Run regularly again",
+          "description": "Rebuild a running habit at a gentle pace.",
+          "motivation_why": "Running helps you think clearly.",
+          "desired_outcome": "Three easy runs a week.",
+          "potential_roadblocks": [
+            "A sensitive knee",
+            "Stopping after the first week"
+          ],
+          "success_metrics": [
+            "Three runs a week for four weeks"
+          ],
+          "priority": 2,
+          "estimated_time": 600
+        }
+      }
+    },
+    {
+      "why": "schema: priority not in enum",
+      "output": {
+        "goal": {
+          "title": "Run regularly again",
+          "description": "Rebuild a running habit at a gentle pace.",
+          "motivation_why": "Running helps you think clearly.",
+          "desired_outcome": "Three easy runs a week.",
+          "potential_roadblocks": [
+            "A sensitive knee",
+            "Stopping after the first week"
+          ],
+          "success_metrics": [
+            "Three runs a week for four weeks"
+          ],
+          "priority": "urgent",
+          "estimated_time": 600
+        }
+      }
+    },
+    {
+      "why": "schema: goal envelope missing (bare fields)",
+      "output": {
+        "title": "Run regularly again",
+        "description": "Rebuild a running habit at a gentle pace.",
+        "motivation_why": "Running helps you think clearly.",
+        "desired_outcome": "Three easy runs a week.",
+        "potential_roadblocks": [
+          "A sensitive knee",
+          "Stopping after the first week"
+        ],
+        "success_metrics": [
+          "Three runs a week for four weeks"
+        ],
+        "priority": "medium",
+        "estimated_time": 600
+      }
+    },
+    {
+      "why": "schema: title missing",
+      "output": {
+        "goal": {
+          "description": "Rebuild a running habit at a gentle pace.",
+          "motivation_why": "Running helps you think clearly.",
+          "desired_outcome": "Three easy runs a week.",
+          "potential_roadblocks": [
+            "A sensitive knee",
+            "Stopping after the first week"
+          ],
+          "success_metrics": [
+            "Three runs a week for four weeks"
+          ],
+          "priority": "medium",
+          "estimated_time": 600
+        }
+      }
+    },
+    {
+      "why": "schema: estimated_time must be positive",
+      "output": {
+        "goal": {
+          "title": "Run regularly again",
+          "description": "Rebuild a running habit at a gentle pace.",
+          "motivation_why": "Running helps you think clearly.",
+          "desired_outcome": "Three easy runs a week.",
+          "potential_roadblocks": [
+            "A sensitive knee",
+            "Stopping after the first week"
+          ],
+          "success_metrics": [
+            "Three runs a week for four weeks"
+          ],
+          "priority": "medium",
+          "estimated_time": 0
+        }
+      }
+    },
+    {
+      "why": "lint: \"don't worry\" in roadblocks",
+      "output": {
+        "goal": {
+          "title": "Run regularly again",
+          "description": "Rebuild a running habit at a gentle pace.",
+          "motivation_why": "Running helps you think clearly.",
+          "desired_outcome": "Three easy runs a week.",
+          "potential_roadblocks": [
+            "Don't worry about your knee",
+            "Stopping after the first week"
+          ],
+          "success_metrics": [
+            "Three runs a week for four weeks"
+          ],
+          "priority": "medium",
+          "estimated_time": 600
+        }
+      }
+    }
+  ]
+}

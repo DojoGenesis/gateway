@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-goal-ladder/output.schema.json",
+  "title": "kata-ai-goal-ladder output",
+  "type": "object",
+  "properties": {
+    "order": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 100,
+        "minLength": 1
+      },
+      "minItems": 1,
+      "maxItems": 100
+    }
+  },
+  "required": [
+    "order"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,275 @@
+{
+  "description": "Goal with milestones produces tagged task drafts.",
+  "input": {
+    "goal": {
+      "title": "Renew my passport before the trip",
+      "description": "Trip is in March.",
+      "motivation_why": "My sister is getting married abroad.",
+      "desired_outcome": "New passport by mid-February.",
+      "milestones": [
+        {
+          "title": "Gather the documents",
+          "completed": false
+        },
+        {
+          "title": "Fill in the application",
+          "completed": false
+        }
+      ]
+    }
+  },
+  "valid_output": {
+    "tasks": [
+      {
+        "title": "List every document the form asks for",
+        "time_needed": 10,
+        "energy_required": "low",
+        "urgency": "medium",
+        "vibe": "admin",
+        "size": "tiny"
+      },
+      {
+        "title": "Find the birth certificate",
+        "description": "Check the folder in the hall closet first.",
+        "time_needed": 20,
+        "energy_required": "medium",
+        "size": "small",
+        "tags": [
+          "documents"
+        ]
+      },
+      {
+        "title": "Take two passport photos",
+        "time_needed": 30,
+        "energy_required": "low",
+        "vibe": "maintenance",
+        "size": "small"
+      },
+      {
+        "title": "Fill in the online form",
+        "time_needed": 45,
+        "energy_required": "medium",
+        "urgency": "high",
+        "vibe": "admin",
+        "size": "medium"
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: energy_required not in enum",
+      "output": {
+        "tasks": [
+          {
+            "title": "List every document the form asks for",
+            "time_needed": 10,
+            "energy_required": "extreme",
+            "urgency": "medium",
+            "vibe": "admin",
+            "size": "tiny"
+          },
+          {
+            "title": "Find the birth certificate",
+            "description": "Check the folder in the hall closet first.",
+            "time_needed": 20,
+            "energy_required": "medium",
+            "size": "small",
+            "tags": [
+              "documents"
+            ]
+          },
+          {
+            "title": "Take two passport photos",
+            "time_needed": 30,
+            "energy_required": "low",
+            "vibe": "maintenance",
+            "size": "small"
+          },
+          {
+            "title": "Fill in the online form",
+            "time_needed": 45,
+            "energy_required": "medium",
+            "urgency": "high",
+            "vibe": "admin",
+            "size": "medium"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: urgency \"must-do\" (hyphen) not in enum",
+      "output": {
+        "tasks": [
+          {
+            "title": "List every document the form asks for",
+            "time_needed": 10,
+            "energy_required": "low",
+            "urgency": "must-do",
+            "vibe": "admin",
+            "size": "tiny"
+          },
+          {
+            "title": "Find the birth certificate",
+            "description": "Check the folder in the hall closet first.",
+            "time_needed": 20,
+            "energy_required": "medium",
+            "size": "small",
+            "tags": [
+              "documents"
+            ]
+          },
+          {
+            "title": "Take two passport photos",
+            "time_needed": 30,
+            "energy_required": "low",
+            "vibe": "maintenance",
+            "size": "small"
+          },
+          {
+            "title": "Fill in the online form",
+            "time_needed": 45,
+            "energy_required": "medium",
+            "urgency": "high",
+            "vibe": "admin",
+            "size": "medium"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: tasks as bare strings",
+      "output": {
+        "tasks": [
+          "List the documents",
+          "Find the certificate"
+        ]
+      }
+    },
+    {
+      "why": "schema: negative time_needed",
+      "output": {
+        "tasks": [
+          {
+            "title": "List every document the form asks for",
+            "time_needed": 10,
+            "energy_required": "low",
+            "urgency": "medium",
+            "vibe": "admin",
+            "size": "tiny"
+          },
+          {
+            "title": "Find the birth certificate",
+            "description": "Check the folder in the hall closet first.",
+            "time_needed": -5,
+            "energy_required": "medium",
+            "size": "small",
+            "tags": [
+              "documents"
+            ]
+          },
+          {
+            "title": "Take two passport photos",
+            "time_needed": 30,
+            "energy_required": "low",
+            "vibe": "maintenance",
+            "size": "small"
+          },
+          {
+            "title": "Fill in the online form",
+            "time_needed": 45,
+            "energy_required": "medium",
+            "urgency": "high",
+            "vibe": "admin",
+            "size": "medium"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: empty tasks array",
+      "output": {
+        "tasks": []
+      }
+    },
+    {
+      "why": "lint: \"you didn't\" shame framing",
+      "output": {
+        "tasks": [
+          {
+            "title": "List every document the form asks for",
+            "time_needed": 10,
+            "energy_required": "low",
+            "urgency": "medium",
+            "vibe": "admin",
+            "size": "tiny"
+          },
+          {
+            "title": "Find the birth certificate",
+            "description": "Check the closet, you didn't look there last time.",
+            "time_needed": 20,
+            "energy_required": "medium",
+            "size": "small",
+            "tags": [
+              "documents"
+            ]
+          },
+          {
+            "title": "Take two passport photos",
+            "time_needed": 30,
+            "energy_required": "low",
+            "vibe": "maintenance",
+            "size": "small"
+          },
+          {
+            "title": "Fill in the online form",
+            "time_needed": 45,
+            "energy_required": "medium",
+            "urgency": "high",
+            "vibe": "admin",
+            "size": "medium"
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: exclamation mark in title",
+      "output": {
+        "tasks": [
+          {
+            "title": "List every document the form asks for",
+            "time_needed": 10,
+            "energy_required": "low",
+            "urgency": "medium",
+            "vibe": "admin",
+            "size": "tiny"
+          },
+          {
+            "title": "Find the birth certificate",
+            "description": "Check the folder in the hall closet first.",
+            "time_needed": 20,
+            "energy_required": "medium",
+            "size": "small",
+            "tags": [
+              "documents"
+            ]
+          },
+          {
+            "title": "Take two passport photos",
+            "time_needed": 30,
+            "energy_required": "low",
+            "vibe": "maintenance",
+            "size": "small"
+          },
+          {
+            "title": "Fill in the form!",
+            "time_needed": 45,
+            "energy_required": "medium",
+            "urgency": "high",
+            "vibe": "admin",
+            "size": "medium"
+          }
+        ]
+      }
+    }
+  ]
+}

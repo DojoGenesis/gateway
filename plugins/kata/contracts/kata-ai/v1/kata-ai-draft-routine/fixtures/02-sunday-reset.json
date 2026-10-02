@@ -1,0 +1,48 @@
+{
+  "description": "Minimal routine.",
+  "input": {
+    "prompt": "sunday reset"
+  },
+  "valid_output": {
+    "routine": {
+      "title": "Sunday reset"
+    },
+    "tasks": [
+      {
+        "title": "Run one load of laundry",
+        "time_needed": 5
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: extra key color on routine",
+      "output": {
+        "routine": {
+          "title": "Sunday reset",
+          "color": "blue"
+        },
+        "tasks": [
+          {
+            "title": "Run one load of laundry",
+            "time_needed": 5
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: exclamation mark",
+      "output": {
+        "routine": {
+          "title": "Sunday reset"
+        },
+        "tasks": [
+          {
+            "title": "Run one load of laundry!",
+            "time_needed": 5
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "description": "No stuck_on supplied.",
+  "input": {
+    "task": {
+      "title": "Fold the laundry"
+    }
+  },
+  "valid_output": {
+    "steps": [
+      "Put the laundry basket next to the bed.",
+      "Fold one shirt."
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: root missing steps",
+      "output": {
+        "step": [
+          "Fold one shirt."
+        ]
+      }
+    },
+    {
+      "why": "lint: \"lazy\"",
+      "output": {
+        "steps": [
+          "Skip the lazy route and use the basket.",
+          "Fold one shirt."
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "description": "Stuck-on text shapes the first steps.",
+  "input": {
+    "task": {
+      "title": "Reply to the landlord",
+      "description": "About the lease renewal."
+    },
+    "stuck_on": "I keep opening it and closing it again."
+  },
+  "valid_output": {
+    "steps": [
+      "Open the email and read only the first line.",
+      "Write down the one question you need to answer.",
+      "Type a two-sentence reply without sending it.",
+      "Read it once, then send."
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: eight steps exceeds maxItems 7",
+      "output": {
+        "steps": [
+          "Step 1",
+          "Step 2",
+          "Step 3",
+          "Step 4",
+          "Step 5",
+          "Step 6",
+          "Step 7",
+          "Step 8"
+        ]
+      }
+    },
+    {
+      "why": "schema: steps are objects, not strings",
+      "output": {
+        "steps": [
+          {
+            "title": "Open the email"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: empty steps",
+      "output": {
+        "steps": []
+      }
+    },
+    {
+      "why": "schema: step over 200 characters",
+      "output": {
+        "steps": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      }
+    },
+    {
+      "why": "lint: \"you should\" in a step",
+      "output": {
+        "steps": [
+          "You should open the email.",
+          "Write down the one question you need to answer.",
+          "Type a two-sentence reply without sending it.",
+          "Read it once, then send."
+        ]
+      }
+    },
+    {
+      "why": "lint: \"you didn't\" in a step",
+      "output": {
+        "steps": [
+          "Open the email and read only the first line.",
+          "Note what you didn't answer last time.",
+          "Type a two-sentence reply without sending it.",
+          "Read it once, then send."
+        ]
+      }
+    }
+  ]
+}

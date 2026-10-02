@@ -1,0 +1,58 @@
+{
+  "description": "Debrief with a stuck point yields a gentle seed.",
+  "input": {
+    "user_id": "u-7f3a",
+    "debrief": {
+      "happened": "Wrote half the proposal.",
+      "stuck_on": "The budget section.",
+      "energy_level": 3
+    }
+  },
+  "valid_output": {
+    "seed": "Start with the one email you already have open."
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: seed is an array",
+      "output": {
+        "seed": [
+          "Start with the email"
+        ]
+      }
+    },
+    {
+      "why": "schema: seed missing",
+      "output": {}
+    },
+    {
+      "why": "schema: seed over 200 characters",
+      "output": {
+        "seed": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    },
+    {
+      "why": "schema: empty seed",
+      "output": {
+        "seed": ""
+      }
+    },
+    {
+      "why": "lint: \"you should\"",
+      "output": {
+        "seed": "You should start with the budget."
+      }
+    },
+    {
+      "why": "lint: \"you didn't\"",
+      "output": {
+        "seed": "Pick up what you didn't finish."
+      }
+    },
+    {
+      "why": "lint: exclamation mark",
+      "output": {
+        "seed": "Start with the budget!"
+      }
+    }
+  ]
+}
