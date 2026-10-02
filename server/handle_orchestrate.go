@@ -15,6 +15,7 @@ import (
 	"github.com/DojoGenesis/gateway/events"
 	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 	serverorchestration "github.com/DojoGenesis/gateway/server/orchestration"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 // ─── Orchestration API Types ─────────────────────────────────────────────────
@@ -118,8 +119,9 @@ func (s *Server) handleOrchestrate(c *gin.Context) {
 	}
 	s.orchestrations.Store(state)
 
-	// Start orchestration in background
-	go s.executeOrchestration(state, task, eventChan, timeout)
+	// Start orchestration in background, on a context that outlives this request
+	// but still carries the caller's tool policy.
+	go s.executeOrchestration(detachedToolContext(c.Request.Context()), state, task, eventChan, timeout)
 
 	c.JSON(http.StatusOK, OrchestrateResponse{
 		OrchestrationID:     orchID,
@@ -132,7 +134,11 @@ func (s *Server) handleOrchestrate(c *gin.Context) {
 // StartOrchestrationForChat creates an orchestration task and kicks off async
 // DAG execution. Returns the orchestration ID immediately (non-blocking).
 // The caller can poll /v1/orchestrate/:id/events for progress.
-func (s *Server) StartOrchestrationForChat(userID, taskDescription string, timeout time.Duration) (string, error) {
+//
+// reqCtx is the caller's request context. The orchestration outlives it and runs
+// on a fresh context, but takes the caller's tool policy from it (see
+// detachedToolContext).
+func (s *Server) StartOrchestrationForChat(reqCtx context.Context, userID, taskDescription string, timeout time.Duration) (string, error) {
 	if s.orchestrationEngine == nil || s.planner == nil {
 		return "", fmt.Errorf("orchestration engine not initialized")
 	}
@@ -154,15 +160,30 @@ func (s *Server) StartOrchestrationForChat(userID, taskDescription string, timeo
 	}
 	s.orchestrations.Store(state)
 
-	go s.executeOrchestration(state, task, eventChan, timeout)
+	go s.executeOrchestration(detachedToolContext(reqCtx), state, task, eventChan, timeout)
 
 	return orchID, nil
 }
 
-func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestrationpkg.Task, eventChan chan events.StreamEvent, timeout time.Duration) {
+// detachedToolContext returns a fresh context, free of reqCtx's cancellation and
+// deadline, that carries the caller's tool policy from reqCtx and nothing else.
+//
+// Orchestrations are deliberately detached from the request that started them
+// (they must survive the HTTP response), so they cannot simply reuse its
+// context. But a bare context.Background() carries no tool policy, and a context
+// with none is unrestricted: every plan node could then run any tool, including
+// run_command, for a user-role caller. Whatever starts detached work on behalf of
+// a caller builds its context here (or with tools.InheritAuthorizer).
+func detachedToolContext(reqCtx context.Context) context.Context {
+	return tools.InheritAuthorizer(context.Background(), reqCtx)
+}
+
+// executeOrchestration plans and runs one orchestration. base is the context
+// from detachedToolContext.
+func (s *Server) executeOrchestration(base context.Context, state *OrchestrationState, task *orchestrationpkg.Task, eventChan chan events.StreamEvent, timeout time.Duration) {
 	defer close(eventChan)
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(base, timeout)
 	defer cancel()
 
 	// Generate plan
@@ -211,7 +232,9 @@ func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestra
 	emitter := serverorchestration.NewEventEmitterAdapter(orchEventChan)
 
 	// Forward orchestration events to the SSE event channel with type conversion
+	forwarderDone := make(chan struct{})
 	go func() {
+		defer close(forwarderDone)
 		for orchEvt := range orchEventChan {
 			// Convert orchestrationpkg.StreamEvent → events.StreamEvent
 			// Type: string → events.EventType, Timestamp: interface{} → time.Time
@@ -242,8 +265,13 @@ func (s *Server) executeOrchestration(state *OrchestrationState, task *orchestra
 	// Execute plan — pass emitter directly to avoid shared-engine race.
 	execErr := s.orchestrationEngine.Execute(ctx, plan, task, task.UserID, emitter)
 
-	// Close emitter channel; the forwarding goroutine drains and exits.
+	// Close emitter channel; the forwarding goroutine drains and exits. Wait for
+	// it: this function's deferred close(eventChan) runs when it returns, and a
+	// forwarder still draining at that point sends on a closed channel, which
+	// panics and takes the whole process down. A plan whose node fails (a tool
+	// the caller may not run, for one) reaches that path with events in flight.
 	close(orchEventChan)
+	<-forwarderDone
 
 	if execErr != nil {
 		state.mu.Lock()

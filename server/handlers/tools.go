@@ -66,6 +66,16 @@ func HandleInvokeTool(c *gin.Context) {
 
 	result, err := tools.InvokeTool(c.Request.Context(), req.ToolName, req.Params)
 	if err != nil {
+		// A policy refusal is not an execution failure: nothing ran, so say why
+		// and stop. No arguments are echoed.
+		if denied, ok := tools.AsToolAccessError(err); ok {
+			c.JSON(http.StatusForbidden, ErrorResponse{
+				Success: boolPtr(false),
+				Error:   denied.Message,
+				Code:    denied.Code,
+			})
+			return
+		}
 		slog.Error("failed to invoke tool", "error", err, "tool", req.ToolName)
 		respondInternalErrorWithSuccess(c, "Failed to invoke tool")
 		return

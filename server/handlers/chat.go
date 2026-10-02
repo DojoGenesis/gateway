@@ -87,7 +87,7 @@ type SpecialistRoutingResult struct {
 // Satisfied by OrchestratorAdapter in adapters.go.
 type Orchestrator interface {
 	GeneratePlanForChat(ctx context.Context, userID, query string) (planSummary string, err error)
-	StartOrchestrationForChat(userID, query string, timeout time.Duration) (orchID string, err error)
+	StartOrchestrationForChat(ctx context.Context, userID, query string, timeout time.Duration) (orchID string, err error)
 }
 
 // SetSemanticRouter injects the semantic router. When set, the chat handler
@@ -259,7 +259,7 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 		// Client polls /v1/orchestrate/:id/events for progress.
 		// Degrades to llm-reasoning if orchestrator not wired or start fails.
 		if h.orchestrator != nil {
-			orchID, err := h.orchestrator.StartOrchestrationForChat(req.UserID, req.Message, 5*time.Minute)
+			orchID, err := h.orchestrator.StartOrchestrationForChat(c.Request.Context(), req.UserID, req.Message, 5*time.Minute)
 			if err != nil {
 				slog.Warn("orchestration start failed, degrading to llm-reasoning", "error", err)
 				c.Header("X-Route-Degraded", "orchestrate->llm-reasoning")

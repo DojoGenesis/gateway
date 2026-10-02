@@ -158,6 +158,13 @@ func (s *Server) handleInvokeTool(c *gin.Context) {
 	durationMs := time.Since(start).Milliseconds()
 
 	if err != nil {
+		// A policy refusal is not an execution failure: nothing ran, so the
+		// response carries the code and nothing else. In particular it does not
+		// echo req.Inputs the way the failure path below does.
+		if denied, ok := tools.AsToolAccessError(err); ok {
+			s.errorResponse(c, http.StatusForbidden, denied.Code, denied.Message)
+			return
+		}
 		s.errorResponseWithDetails(c, http.StatusInternalServerError, "tool_execution_failed",
 			"Tool execution failed: "+err.Error(),
 			gin.H{

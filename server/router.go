@@ -56,9 +56,9 @@ func (s *Server) setupRoutes() {
 
 	// ─── Structured skill dispatch (DGS-149) ─────────────────────────
 	// The Kata edge worker calls POST ${GATEWAY_URL}/dispatch (no /v1). Same
-	// AuthMiddleware as /v1/*, attached per-route because this sits outside
-	// the v1 group. /v1/dispatch is registered inside the group.
-	s.router.POST("/dispatch", middleware.AuthMiddleware(), s.handleDispatch)
+	// AuthMiddleware and toolAccessMiddleware as /v1/*, attached per-route
+	// because this sits outside the v1 group. /v1/dispatch is registered inside the group.
+	s.router.POST("/dispatch", middleware.AuthMiddleware(), toolAccessMiddleware(), s.handleDispatch)
 
 	// ─── OpenAI-Compatible API (/v1) ─────────────────────────────────
 	v1 := s.router.Group("/v1")
@@ -79,7 +79,15 @@ func (s *Server) setupRoutes() {
 	// /health, /metrics, /auth/* and /.well-known/did.json are registered on
 	// s.router outside this group and stay public — the deploy liveness probe
 	// (deploy/provision.sh) hits /health unauthenticated by design.
-	v1.Use(middleware.AuthMiddleware())
+	//
+	// toolAccessMiddleware rides in the SAME Use() call, immediately after
+	// AuthMiddleware: it reads the verified token AuthMiddleware leaves on the
+	// context and binds the caller's tool policy to the request context, which
+	// is what makes the tool registry refuse admin-only tools for a user-role
+	// caller on every route below that reaches it (direct invoke, agent chat,
+	// orchestration). See tool_invoke_gate.go. Keeping the two in one call means
+	// a later edit cannot move one without the other.
+	v1.Use(middleware.AuthMiddleware(), toolAccessMiddleware())
 	{
 		// Chat completions (OpenAI-compatible)
 		v1.POST("/chat/completions", s.handleChatCompletions)
@@ -241,7 +249,14 @@ func (s *Server) setupRoutes() {
 	// POST /execute is the route DGS-108 reached a shell through; it is now
 	// authenticated as well as capability-gated, and those are independent
 	// controls — neither replaces the other.
-	s.router.POST("/api/workflows/:name/execute", middleware.AuthMiddleware(), s.handleWorkflowExecute)
+	//
+	// It is also ADMIN-only. A workflow step runs run_command, which is an
+	// admin-only tool on every other route (see tool_invoke_gate.go); leaving
+	// this one at "any authenticated role" would let a user-role caller store a
+	// workflow and execute it to get the shell the direct invoke routes now
+	// refuse them. The production opt-in (workflowRunCommandEnabled) still
+	// applies on top.
+	s.router.POST("/api/workflows/:name/execute", middleware.AdminAuthMiddleware(), s.handleWorkflowExecute)
 	s.router.GET("/api/workflows/:name/execution", middleware.AuthMiddleware(), s.handleWorkflowExecutionStream)
 
 	// ─── WebSocket: real-time workflow execution events (Era 3) ──────

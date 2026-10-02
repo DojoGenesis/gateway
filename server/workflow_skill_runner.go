@@ -30,11 +30,12 @@ func NewCommandSkillRunner() *CommandSkillRunner {
 // The gate below is the boundary where a workflow definition that arrived over
 // the network becomes a process on this host. It is checked here, before
 // dispatch, rather than inside runCommand or tools.RunCommand, because this is
-// the narrowest point that covers the DGS-108 chain without touching the
-// authenticated agent tool-calling path, which also reaches tools.RunCommand
-// through the tool registry and has a different threat model. See
-// workflow_run_command_gate.go for why this is a capability gate and not an
-// authentication fix.
+// the narrowest point that covers the workflow-to-shell chain. The tool
+// registry, which also reaches tools.RunCommand (direct invoke routes, agent
+// tool-calling, orchestration), is gated separately by tool_invoke_gate.go,
+// and that gate reuses workflowRunCommandEnabled so the opt-in has one source
+// of truth. See workflow_run_command_gate.go for why this is a capability gate
+// and not an authentication fix.
 func (r *CommandSkillRunner) RunSkill(ctx context.Context, skillName string, input map[string]string) (string, error) {
 	switch skillName {
 	case "run_command":

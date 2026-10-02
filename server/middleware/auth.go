@@ -173,6 +173,27 @@ func AdminAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
+// IsAdminRequest reports whether the caller of an already-authenticated request
+// holds admin privileges.
+//
+// It exists for handlers that sit behind AuthMiddleware (any role) but must
+// make a per-resource decision, where AdminAuthMiddleware (a whole-route gate)
+// is too coarse. It applies exactly the role test AdminAuthMiddleware applies —
+// the same validateAdminRole — to the token AuthMiddleware already verified, so
+// the two cannot drift. A service credential is never an admin.
+//
+// It fails closed: a request that has not passed AuthMiddleware has no verified
+// token or user on the context and is reported as not admin.
+func IsAdminRequest(c *gin.Context) bool {
+	token := c.GetString("token")
+	userID := c.GetString("user_id")
+	if token == "" || userID == "" {
+		return false
+	}
+	isAdmin, err := validateAdminRole(token, userID)
+	return err == nil && isAdmin
+}
+
 // OptionalAuthMiddleware validates JWT if present, otherwise assigns a guest ID.
 func OptionalAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

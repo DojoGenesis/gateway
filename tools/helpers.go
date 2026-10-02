@@ -1,6 +1,20 @@
 package tools
 
-import "time"
+import (
+	"strings"
+	"time"
+)
+
+// isPlainFileID reports whether id is safe to use as a single file-name segment
+// beneath a fixed directory: non-empty, no path separator or NUL, and not "."
+// or "..". Tools that build "<dir>/<id>.json" from a caller-supplied id must
+// check it first, or "../../x" walks out of <dir>.
+func isPlainFileID(id string) bool {
+	if id == "" || id == "." || id == ".." {
+		return false
+	}
+	return !strings.ContainsAny(id, "/\\\x00")
+}
 
 func GetStringParam(params map[string]interface{}, key string, defaultValue string) string {
 	if val, ok := params[key]; ok {

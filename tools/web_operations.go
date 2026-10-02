@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -87,30 +90,48 @@ func isRetriableError(err error) bool {
 		strings.Contains(errStr, "connection reset")
 }
 
+// requestErrorDetail returns an error's text with any request URL removed.
+// net/http wraps transport errors in *url.Error, whose text includes the full
+// URL, and the SerpAPI URL carries the operator's key as a query parameter.
+// Log this, never the raw error, and never return either to a caller.
+func requestErrorDetail(err error) string {
+	var ue *neturl.Error
+	if errors.As(err, &ue) {
+		return ue.Op + ": " + ue.Err.Error()
+	}
+	return err.Error()
+}
+
 // webSearchDuckDuckGo calls the DuckDuckGo Instant Answer API (no key required).
 // Results are derived from RelatedTopics rather than traditional organic results,
 // so they are useful for factual lookups but less comprehensive than SerpAPI.
 func webSearchDuckDuckGo(ctx context.Context, query string, maxResults int, params map[string]interface{}) (map[string]interface{}, error) {
-	ddgURL := fmt.Sprintf("https://api.duckduckgo.com/?q=%s&format=json&no_html=1&skip_disambig=1",
-		strings.ReplaceAll(query, " ", "+"))
+	ddgQuery := neturl.Values{}
+	ddgQuery.Set("q", query)
+	ddgQuery.Set("format", "json")
+	ddgQuery.Set("no_html", "1")
+	ddgQuery.Set("skip_disambig", "1")
+	ddgURL := "https://api.duckduckgo.com/?" + ddgQuery.Encode()
 
 	timeout := GetDurationParam(params, "timeout", defaultTimeout)
 	client := newHTTPClient(timeout)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", ddgURL, nil)
 	if err != nil {
+		slog.Warn("web_search: could not build request", "engine", "duckduckgo", "error", requestErrorDetail(err))
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to create DDG request: %v", err),
+			"error":   "search request failed",
 		}, nil
 	}
 	req.Header.Set("User-Agent", defaultUserAgent)
 
 	resp, err := client.doRequestWithRetry(ctx, req, maxRetries)
 	if err != nil {
+		slog.Warn("web_search: request failed", "engine", "duckduckgo", "error", requestErrorDetail(err))
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("DDG request failed: %v", err),
+			"error":   "search request failed",
 		}, nil
 	}
 	defer resp.Body.Close()
@@ -124,9 +145,9 @@ func webSearchDuckDuckGo(ctx context.Context, query string, maxResults int, para
 	}
 
 	var ddgResp struct {
-		AbstractText   string `json:"AbstractText"`
-		AbstractURL    string `json:"AbstractURL"`
-		RelatedTopics  []struct {
+		AbstractText  string `json:"AbstractText"`
+		AbstractURL   string `json:"AbstractURL"`
+		RelatedTopics []struct {
 			Text     string `json:"Text"`
 			FirstURL string `json:"FirstURL"`
 			Topics   []struct {
@@ -205,19 +226,24 @@ func WebSearch(ctx context.Context, params map[string]interface{}) (map[string]i
 		return webSearchDuckDuckGo(ctx, query, maxResults, params)
 	}
 
-	url := fmt.Sprintf("https://serpapi.com/search?q=%s&num=%d&api_key=%s",
-		strings.ReplaceAll(query, " ", "+"),
-		maxResults,
-		apiKey)
+	// Build the query with url.Values so caller text is escaped, never spliced
+	// into the URL. The key rides in this URL, so no error that can carry the
+	// URL may be returned to the caller (see requestErrorDetail).
+	serpQuery := neturl.Values{}
+	serpQuery.Set("q", query)
+	serpQuery.Set("num", strconv.Itoa(maxResults))
+	serpQuery.Set("api_key", apiKey)
+	serpURL := "https://serpapi.com/search?" + serpQuery.Encode()
 
 	timeout := GetDurationParam(params, "timeout", defaultTimeout)
 	client := newHTTPClient(timeout)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", serpURL, nil)
 	if err != nil {
+		slog.Warn("web_search: could not build request", "engine", "serpapi", "error", requestErrorDetail(err))
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("failed to create request: %v", err),
+			"error":   "search request failed",
 		}, nil
 	}
 
@@ -225,18 +251,21 @@ func WebSearch(ctx context.Context, params map[string]interface{}) (map[string]i
 
 	resp, err := client.doRequestWithRetry(ctx, req, maxRetries)
 	if err != nil {
+		slog.Warn("web_search: request failed", "engine", "serpapi", "error", requestErrorDetail(err))
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("request failed: %v", err),
+			"error":   "search request failed",
 		}, nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		// The provider's error body is not returned: it is third-party text and
+		// can quote the request, key included.
+		slog.Warn("web_search: provider returned an error", "engine", "serpapi", "status", resp.StatusCode)
 		return map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("API error: %d - %s", resp.StatusCode, string(body)),
+			"error":   fmt.Sprintf("search provider returned status %d", resp.StatusCode),
 		}, nil
 	}
 

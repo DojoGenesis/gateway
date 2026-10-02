@@ -32,6 +32,12 @@ func getDocument(_ context.Context, params map[string]interface{}) (map[string]i
 		return nil, fmt.Errorf("document_id is required")
 	}
 
+	// document_id is joined into a file path below; reject anything that could
+	// leave the documents directory.
+	if !isPlainFileID(docID) {
+		return nil, fmt.Errorf("invalid document_id")
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine home directory: %w", err)
