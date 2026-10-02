@@ -175,6 +175,10 @@ type Server struct {
 
 	// Federated agent mesh (Era 4 Phase 0). Nil when mesh is not configured.
 	mesh *mesh.Mesh
+
+	// dispatch is the POST /dispatch skill registry (DGS-149), built once at
+	// startup from KATA_PLUGIN_DIR. Nil is treated as an empty registry.
+	dispatch *dispatchRegistry
 }
 
 // New creates a new Server with all dependencies injected.
@@ -235,6 +239,7 @@ func New(deps ServerDeps) *Server {
 		execBus:               newExecutionBus(),
 		latencyTracker:        services.NewProviderLatencyTracker(60),
 		wsHub:                 NewWorkflowWSHub(),
+		dispatch:              loadDispatchRegistryFromEnv(),
 	}
 
 	// Start WebSocket broadcast loop in background.

@@ -1,0 +1,1 @@
+{"rules":[{"id":"no-shame","pattern":"\\blazy\\b","flags":"i"},{"id":"no-should","pattern":"you should have"}]}
