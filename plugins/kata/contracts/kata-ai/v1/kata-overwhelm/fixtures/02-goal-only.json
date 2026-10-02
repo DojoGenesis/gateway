@@ -1,0 +1,38 @@
+{
+  "description": "No stuck_on supplied.",
+  "input": {
+    "user_id": "u-7f3a",
+    "goal": "Clean the apartment before guests arrive"
+  },
+  "valid_output": {
+    "steps": [
+      "Name the project out loud in one sentence.",
+      "Pick the part that feels smallest."
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: eight steps exceeds maxItems 7",
+      "output": {
+        "steps": [
+          "Step 1",
+          "Step 2",
+          "Step 3",
+          "Step 4",
+          "Step 5",
+          "Step 6",
+          "Step 7",
+          "Step 8"
+        ]
+      }
+    },
+    {
+      "why": "lint: \"you failed\"",
+      "output": {
+        "steps": [
+          "Look at what you failed to finish."
+        ]
+      }
+    }
+  ]
+}

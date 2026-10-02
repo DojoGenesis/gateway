@@ -1,0 +1,30 @@
+{
+  "description": "Empty stuck_on, optional next_seed provided.",
+  "input": {
+    "user_id": "u-7f3a",
+    "debrief": {
+      "happened": "Went for a walk and cleared the desk.",
+      "stuck_on": "",
+      "energy_level": 4,
+      "next_seed": "Open the budget file."
+    }
+  },
+  "valid_output": {
+    "seed": "What would 10 minutes of this look like?"
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: extra key",
+      "output": {
+        "seed": "Open the file.",
+        "mood": "calm"
+      }
+    },
+    {
+      "why": "lint: \"just do it\"",
+      "output": {
+        "seed": "Just do it, ten minutes."
+      }
+    }
+  ]
+}

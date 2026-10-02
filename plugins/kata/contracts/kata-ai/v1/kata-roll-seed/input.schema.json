@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-roll-seed/input.schema.json",
+  "title": "kata-roll-seed input",
+  "description": "Roll debrief -> a next-roll seed. Sends user_id.",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1
+    },
+    "debrief": {
+      "type": "object",
+      "properties": {
+        "happened": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "stuck_on": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "energy_level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "next_seed": {
+          "type": "string",
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "happened",
+        "stuck_on",
+        "energy_level"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "user_id",
+    "debrief"
+  ],
+  "additionalProperties": false
+}

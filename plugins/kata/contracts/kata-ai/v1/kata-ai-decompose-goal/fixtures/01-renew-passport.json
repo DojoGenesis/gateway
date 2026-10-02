@@ -1,0 +1,158 @@
+{
+  "description": "Goal with context produces five ordered milestones.",
+  "input": {
+    "goal": {
+      "title": "Renew my passport before the trip",
+      "description": "The trip is in March and the process has several offices and forms.",
+      "motivation_why": "My sister is getting married abroad.",
+      "desired_outcome": "New passport in hand by mid-February."
+    }
+  },
+  "valid_output": {
+    "milestones": [
+      {
+        "title": "Gather the documents",
+        "description": "Old passport, birth certificate, and two photos in one folder."
+      },
+      {
+        "title": "Fill in the application",
+        "description": "Use the online form and save a copy."
+      },
+      {
+        "title": "Book the appointment"
+      },
+      {
+        "title": "Submit and pay"
+      },
+      {
+        "title": "Track the delivery"
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: empty milestones array violates minItems",
+      "output": {
+        "milestones": []
+      }
+    },
+    {
+      "why": "schema: milestone missing title",
+      "output": {
+        "milestones": [
+          {
+            "description": "Old passport, birth certificate, and two photos in one folder."
+          },
+          {
+            "title": "Fill in the application",
+            "description": "Use the online form and save a copy."
+          },
+          {
+            "title": "Book the appointment"
+          },
+          {
+            "title": "Submit and pay"
+          },
+          {
+            "title": "Track the delivery"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: extra key completed (additionalProperties false)",
+      "output": {
+        "milestones": [
+          {
+            "title": "Gather the documents",
+            "description": "Old passport, birth certificate, and two photos in one folder.",
+            "completed": false
+          },
+          {
+            "title": "Fill in the application",
+            "description": "Use the online form and save a copy."
+          },
+          {
+            "title": "Book the appointment"
+          },
+          {
+            "title": "Submit and pay"
+          },
+          {
+            "title": "Track the delivery"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: root is an array, not an object",
+      "output": [
+        {
+          "title": "Gather the documents",
+          "description": "Old passport, birth certificate, and two photos in one folder."
+        },
+        {
+          "title": "Fill in the application",
+          "description": "Use the online form and save a copy."
+        },
+        {
+          "title": "Book the appointment"
+        },
+        {
+          "title": "Submit and pay"
+        },
+        {
+          "title": "Track the delivery"
+        }
+      ]
+    },
+    {
+      "why": "lint: exclamation mark in description",
+      "output": {
+        "milestones": [
+          {
+            "title": "Gather the documents",
+            "description": "Old passport, birth certificate, and two photos in one folder."
+          },
+          {
+            "title": "Fill in the application",
+            "description": "Save a copy of the form!"
+          },
+          {
+            "title": "Book the appointment"
+          },
+          {
+            "title": "Submit and pay"
+          },
+          {
+            "title": "Track the delivery"
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: \"you should\" in title",
+      "output": {
+        "milestones": [
+          {
+            "title": "Gather the documents",
+            "description": "Old passport, birth certificate, and two photos in one folder."
+          },
+          {
+            "title": "Fill in the application",
+            "description": "Use the online form and save a copy."
+          },
+          {
+            "title": "You should book the appointment"
+          },
+          {
+            "title": "Submit and pay"
+          },
+          {
+            "title": "Track the delivery"
+          }
+        ]
+      }
+    }
+  ]
+}

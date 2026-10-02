@@ -1,0 +1,51 @@
+{
+  "description": "A 25-minute sprint gets a modest intention.",
+  "input": {
+    "task": {
+      "title": "Write the quarterly report",
+      "description": "Needs three sections."
+    },
+    "sprint_duration": 25
+  },
+  "valid_output": {
+    "intention": "Get the first section of the report onto the page, rough is fine."
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: intention is a list",
+      "output": {
+        "intention": [
+          "Write the report"
+        ]
+      }
+    },
+    {
+      "why": "schema: intention over 160 characters",
+      "output": {
+        "intention": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    },
+    {
+      "why": "schema: empty intention",
+      "output": {
+        "intention": ""
+      }
+    },
+    {
+      "why": "schema: bare string root",
+      "output": "Write the report"
+    },
+    {
+      "why": "lint: exclamation mark",
+      "output": {
+        "intention": "Write the first section!"
+      }
+    },
+    {
+      "why": "lint: \"you've got this\"",
+      "output": {
+        "intention": "Write the first section, you've got this."
+      }
+    }
+  ]
+}

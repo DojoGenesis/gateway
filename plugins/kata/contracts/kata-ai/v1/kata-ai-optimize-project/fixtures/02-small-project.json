@@ -1,0 +1,44 @@
+{
+  "description": "All-small project.",
+  "input": {
+    "goal": {
+      "title": "Tidy the desk"
+    },
+    "tasks": [
+      {
+        "title": "Clear the drawer",
+        "status": "active",
+        "time_needed": 10
+      },
+      {
+        "title": "Wipe the surface",
+        "status": "active"
+      }
+    ]
+  },
+  "valid_output": {
+    "suggestions": [
+      "Everything here is small. A single focused sprint could clear several at once."
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: object suggestions",
+      "output": {
+        "suggestions": [
+          {
+            "text": "Do a sprint"
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: exclamation mark",
+      "output": {
+        "suggestions": [
+          "One sprint could clear all of it!"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-unstick-breakdown/output.schema.json",
+  "title": "kata-ai-unstick-breakdown output",
+  "type": "object",
+  "properties": {
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+      },
+      "minItems": 1,
+      "maxItems": 7
+    }
+  },
+  "required": [
+    "steps"
+  ],
+  "additionalProperties": false
+}

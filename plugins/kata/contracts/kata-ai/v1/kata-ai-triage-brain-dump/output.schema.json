@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-triage-brain-dump/output.schema.json",
+  "title": "kata-ai-triage-brain-dump output",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "task",
+              "goal",
+              "routine",
+              "celebration",
+              "milestone",
+              "mixed"
+            ]
+          },
+          "priority_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "breakdown": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "minItems": 0,
+            "maxItems": 7
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "priority_score",
+          "breakdown"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 50
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "additionalProperties": false
+}

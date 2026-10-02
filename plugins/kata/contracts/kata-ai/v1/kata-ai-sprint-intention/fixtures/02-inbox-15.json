@@ -1,0 +1,26 @@
+{
+  "description": "Short sprint.",
+  "input": {
+    "task": {
+      "title": "Clear the inbox"
+    },
+    "sprint_duration": 15
+  },
+  "valid_output": {
+    "intention": "Reply to the two emails that need a yes or no."
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: wrong key (suggestion)",
+      "output": {
+        "suggestion": "Reply to two emails."
+      }
+    },
+    {
+      "why": "lint: \"simply\"",
+      "output": {
+        "intention": "Simply answer the two emails."
+      }
+    }
+  ]
+}

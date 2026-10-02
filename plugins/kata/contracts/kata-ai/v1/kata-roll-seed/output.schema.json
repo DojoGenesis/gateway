@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-roll-seed/output.schema.json",
+  "title": "kata-roll-seed output",
+  "type": "object",
+  "properties": {
+    "seed": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1
+    }
+  },
+  "required": [
+    "seed"
+  ],
+  "additionalProperties": false
+}

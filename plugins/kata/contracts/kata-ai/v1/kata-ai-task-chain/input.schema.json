@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-task-chain/input.schema.json",
+  "title": "kata-ai-task-chain input",
+  "description": "One task -> an ordered chain of smaller tasks.",
+  "type": "object",
+  "properties": {
+    "task": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "time_needed": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 480
+        },
+        "energy_required": {
+          "$ref": "../_defs.schema.json#/$defs/EnergyLevel"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "task"
+  ],
+  "additionalProperties": false
+}

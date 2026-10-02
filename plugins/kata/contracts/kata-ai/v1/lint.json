@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "description": "Shame-aware voice lint for kata-ai/v1 outputs. RE2-compatible (Go regexp): no lookarounds or backreferences. A rule matches when the pattern is found in any string value.",
+  "applies_to": "all string values in output, recursively",
+  "rules": [
+    {
+      "id": "no-exclamation",
+      "pattern": "!",
+      "flags": "",
+      "why": "No exclamation points; Kata is calm."
+    },
+    {
+      "id": "no-dont-worry",
+      "pattern": "\\bdon['’]?t worry\\b",
+      "flags": "i",
+      "why": "Dismisses the feeling instead of making room for it."
+    },
+    {
+      "id": "no-youve-got-this",
+      "pattern": "\\byou['’]?ve got this\\b",
+      "flags": "i",
+      "why": "Cheerleading cliche."
+    },
+    {
+      "id": "no-you-should",
+      "pattern": "\\byou should\\b",
+      "flags": "i",
+      "why": "Instruction, not scaffolding."
+    },
+    {
+      "id": "no-you-didnt",
+      "pattern": "\\byou didn['’]?t\\b",
+      "flags": "i",
+      "why": "Shame framing."
+    },
+    {
+      "id": "no-you-failed",
+      "pattern": "\\byou failed\\b",
+      "flags": "i",
+      "why": "Shame framing."
+    },
+    {
+      "id": "no-lazy",
+      "pattern": "\\blazy\\b",
+      "flags": "i",
+      "why": "Shame framing."
+    },
+    {
+      "id": "no-just-do-it",
+      "pattern": "\\bjust do it\\b",
+      "flags": "i",
+      "why": "Talks down to the user."
+    },
+    {
+      "id": "no-simply",
+      "pattern": "\\bsimply\\b",
+      "flags": "i",
+      "why": "Minimizes difficulty."
+    },
+    {
+      "id": "no-medical-diagnos",
+      "pattern": "\\bdiagnos",
+      "flags": "i",
+      "why": "No medical claims."
+    },
+    {
+      "id": "no-medical-treat",
+      "pattern": "\\btreat(s|ed|ing|ment|ments)?\\b",
+      "flags": "i",
+      "why": "No medical claims."
+    },
+    {
+      "id": "no-medical-cure",
+      "pattern": "\\bcure[sd]?\\b",
+      "flags": "i",
+      "why": "No medical claims."
+    },
+    {
+      "id": "no-medical-symptom",
+      "pattern": "\\bsymptoms?\\b",
+      "flags": "i",
+      "why": "No medical claims."
+    }
+  ]
+}

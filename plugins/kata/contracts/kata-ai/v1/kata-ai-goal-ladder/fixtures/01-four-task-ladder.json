@@ -1,0 +1,79 @@
+{
+  "description": "Tasks with dependencies come back in a workable order.",
+  "input": {
+    "tasks": [
+      {
+        "id": "t-edit",
+        "title": "Edit the draft",
+        "depends_on_task_ids": [
+          "t-draft"
+        ]
+      },
+      {
+        "id": "t-draft",
+        "title": "Write the draft",
+        "depends_on_task_ids": [
+          "t-outline"
+        ]
+      },
+      {
+        "id": "t-outline",
+        "title": "Outline the piece",
+        "depends_on_task_ids": [
+          "t-research"
+        ]
+      },
+      {
+        "id": "t-research",
+        "title": "Collect sources"
+      }
+    ]
+  },
+  "valid_output": {
+    "order": [
+      "t-research",
+      "t-outline",
+      "t-draft",
+      "t-edit"
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: order contains a number",
+      "output": {
+        "order": [
+          "t-research",
+          3
+        ]
+      }
+    },
+    {
+      "why": "schema: empty order",
+      "output": {
+        "order": []
+      }
+    },
+    {
+      "why": "schema: bare array root",
+      "output": [
+        "t-research",
+        "t-outline"
+      ]
+    },
+    {
+      "why": "schema: order is a string",
+      "output": {
+        "order": "t-research,t-outline"
+      }
+    },
+    {
+      "why": "lint: id containing an exclamation mark (lint covers every string value)",
+      "output": {
+        "order": [
+          "t-research!",
+          "t-outline"
+        ]
+      }
+    }
+  ]
+}

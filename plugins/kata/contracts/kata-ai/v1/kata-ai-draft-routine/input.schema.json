@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-draft-routine/input.schema.json",
+  "title": "kata-ai-draft-routine input",
+  "description": "Free text -> routine + tasks.",
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "maxLength": 2000,
+      "minLength": 1
+    }
+  },
+  "required": [
+    "prompt"
+  ],
+  "additionalProperties": false
+}

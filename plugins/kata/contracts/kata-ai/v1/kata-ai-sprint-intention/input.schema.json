@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-sprint-intention/input.schema.json",
+  "title": "kata-ai-sprint-intention input",
+  "description": "Task + sprint length -> a suggested intention.",
+  "type": "object",
+  "properties": {
+    "task": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "sprint_duration": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 240,
+      "description": "Minutes."
+    }
+  },
+  "required": [
+    "task",
+    "sprint_duration"
+  ],
+  "additionalProperties": false
+}

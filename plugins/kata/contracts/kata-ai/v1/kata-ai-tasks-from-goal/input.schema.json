@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-tasks-from-goal/input.schema.json",
+  "title": "kata-ai-tasks-from-goal input",
+  "description": "Goal (with milestones) -> task drafts.",
+  "type": "object",
+  "properties": {
+    "goal": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "motivation_why": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "desired_outcome": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "milestones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "due_date": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "completed": {
+                "type": "boolean"
+              },
+              "completed_at": {
+                "type": "string",
+                "maxLength": 40
+              }
+            },
+            "required": [
+              "title"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 20
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "goal"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,61 @@
+{
+  "description": "Minimal pack.",
+  "input": {
+    "prompt": "Something high energy for after a big task"
+  },
+  "valid_output": {
+    "pack": {
+      "name": "Loud Finish",
+      "contexts": [
+        "any_time"
+      ]
+    },
+    "celebrations": [
+      {
+        "title": "Dance to the first chorus of a loud song",
+        "duration": 3,
+        "type": "energizing"
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: extra key on pack",
+      "output": {
+        "pack": {
+          "name": "Loud Finish",
+          "contexts": [
+            "any_time"
+          ],
+          "color": "orange"
+        },
+        "celebrations": [
+          {
+            "title": "Dance to the first chorus of a loud song",
+            "duration": 3,
+            "type": "energizing"
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: \"don't worry\"",
+      "output": {
+        "pack": {
+          "name": "Loud Finish",
+          "contexts": [
+            "any_time"
+          ],
+          "description": "Don't worry about doing it right."
+        },
+        "celebrations": [
+          {
+            "title": "Dance to the first chorus of a loud song",
+            "duration": 3,
+            "type": "energizing"
+          }
+        ]
+      }
+    }
+  ]
+}

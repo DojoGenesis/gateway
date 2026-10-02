@@ -1,0 +1,5 @@
+source: DojoGenesis/kata contracts/kata-ai/v1
+commit: bde2add7be8d4adbb309db1f25cf87dd8f60c445
+branch: feat/dgs-149-kata-ai-v1-contracts
+vendored: 2026-10-02
+rule: do not edit here; change in Kata, re-vendor, regenerate MANIFEST.sha256 (shasum -a 256 over every file except MANIFEST.sha256 and SOURCE)

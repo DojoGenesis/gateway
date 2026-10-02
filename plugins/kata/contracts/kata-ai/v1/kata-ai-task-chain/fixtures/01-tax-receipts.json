@@ -1,0 +1,173 @@
+{
+  "description": "A heavy admin task becomes an ordered chain.",
+  "input": {
+    "task": {
+      "title": "Do the quarterly receipts",
+      "description": "A shoebox of receipts since July.",
+      "time_needed": 120,
+      "energy_required": "high"
+    }
+  },
+  "valid_output": {
+    "tasks": [
+      {
+        "title": "Open the tax folder and set the receipts on the desk",
+        "time_needed": 5,
+        "energy_required": "low",
+        "size": "tiny"
+      },
+      {
+        "title": "Sort receipts into three piles by month",
+        "time_needed": 20,
+        "energy_required": "low",
+        "size": "small"
+      },
+      {
+        "title": "Enter each pile into the spreadsheet",
+        "time_needed": 40,
+        "energy_required": "medium",
+        "vibe": "admin",
+        "size": "medium"
+      },
+      {
+        "title": "Check the totals against the bank statement",
+        "time_needed": 15,
+        "energy_required": "medium",
+        "size": "small"
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: size not in enum",
+      "output": {
+        "tasks": [
+          {
+            "title": "Open the tax folder and set the receipts on the desk",
+            "time_needed": 5,
+            "energy_required": "low",
+            "size": "huge"
+          },
+          {
+            "title": "Sort receipts into three piles by month",
+            "time_needed": 20,
+            "energy_required": "low",
+            "size": "small"
+          },
+          {
+            "title": "Enter each pile into the spreadsheet",
+            "time_needed": 40,
+            "energy_required": "medium",
+            "vibe": "admin",
+            "size": "medium"
+          },
+          {
+            "title": "Check the totals against the bank statement",
+            "time_needed": 15,
+            "energy_required": "medium",
+            "size": "small"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: tasks missing",
+      "output": {
+        "chain": [
+          {
+            "title": "Open the tax folder and set the receipts on the desk",
+            "time_needed": 5,
+            "energy_required": "low",
+            "size": "tiny"
+          },
+          {
+            "title": "Sort receipts into three piles by month",
+            "time_needed": 20,
+            "energy_required": "low",
+            "size": "small"
+          },
+          {
+            "title": "Enter each pile into the spreadsheet",
+            "time_needed": 40,
+            "energy_required": "medium",
+            "vibe": "admin",
+            "size": "medium"
+          },
+          {
+            "title": "Check the totals against the bank statement",
+            "time_needed": 15,
+            "energy_required": "medium",
+            "size": "small"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: tag longer than 40 characters",
+      "output": {
+        "tasks": [
+          {
+            "title": "Open the tax folder and set the receipts on the desk",
+            "time_needed": 5,
+            "energy_required": "low",
+            "size": "tiny",
+            "tags": [
+              "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            ]
+          },
+          {
+            "title": "Sort receipts into three piles by month",
+            "time_needed": 20,
+            "energy_required": "low",
+            "size": "small"
+          },
+          {
+            "title": "Enter each pile into the spreadsheet",
+            "time_needed": 40,
+            "energy_required": "medium",
+            "vibe": "admin",
+            "size": "medium"
+          },
+          {
+            "title": "Check the totals against the bank statement",
+            "time_needed": 15,
+            "energy_required": "medium",
+            "size": "small"
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: \"you should\" in task title",
+      "output": {
+        "tasks": [
+          {
+            "title": "Open the tax folder and set the receipts on the desk",
+            "time_needed": 5,
+            "energy_required": "low",
+            "size": "tiny"
+          },
+          {
+            "title": "You should sort the receipts",
+            "time_needed": 20,
+            "energy_required": "low",
+            "size": "small"
+          },
+          {
+            "title": "Enter each pile into the spreadsheet",
+            "time_needed": 40,
+            "energy_required": "medium",
+            "vibe": "admin",
+            "size": "medium"
+          },
+          {
+            "title": "Check the totals against the bank statement",
+            "time_needed": 15,
+            "energy_required": "medium",
+            "size": "small"
+          }
+        ]
+      }
+    }
+  ]
+}

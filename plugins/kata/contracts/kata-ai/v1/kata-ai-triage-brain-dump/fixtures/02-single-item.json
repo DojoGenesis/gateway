@@ -1,0 +1,46 @@
+{
+  "description": "One mixed item with a fractional score.",
+  "input": {
+    "items": [
+      {
+        "id": "x1",
+        "raw_text": "get groceries and plan the whole garden"
+      }
+    ]
+  },
+  "valid_output": {
+    "items": [
+      {
+        "id": "x1",
+        "category": "mixed",
+        "priority_score": 5.5,
+        "breakdown": [
+          "Separate the errand from the project"
+        ]
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: empty items",
+      "output": {
+        "items": []
+      }
+    },
+    {
+      "why": "lint: \"lazy\"",
+      "output": {
+        "items": [
+          {
+            "id": "x1",
+            "category": "mixed",
+            "priority_score": 5.5,
+            "breakdown": [
+              "Skip the lazy shortcut"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

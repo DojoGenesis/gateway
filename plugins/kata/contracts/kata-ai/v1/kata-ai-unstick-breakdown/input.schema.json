@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.dojogenesis.com/kata-ai/v1/kata-ai-unstick-breakdown/input.schema.json",
+  "title": "kata-ai-unstick-breakdown input",
+  "description": "Stuck task -> tiny steps.",
+  "type": "object",
+  "properties": {
+    "task": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "stuck_on": {
+      "type": "string",
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "task"
+  ],
+  "additionalProperties": false
+}

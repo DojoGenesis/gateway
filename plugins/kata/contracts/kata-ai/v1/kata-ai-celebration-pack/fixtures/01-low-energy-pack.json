@@ -1,0 +1,209 @@
+{
+  "description": "A calm pack with three celebrations.",
+  "input": {
+    "prompt": "Small ways to mark finishing something when I am drained. Nothing loud."
+  },
+  "valid_output": {
+    "pack": {
+      "name": "Quiet Wins",
+      "description": "Low-key ways to mark a finished task when energy is low.",
+      "emoji": "🌿",
+      "contexts": [
+        "after_work",
+        "low_energy"
+      ]
+    },
+    "celebrations": [
+      {
+        "title": "Step outside for two minutes",
+        "duration": 2,
+        "type": "restorative"
+      },
+      {
+        "title": "Put on one favorite song",
+        "duration": 4,
+        "type": "sensory"
+      },
+      {
+        "title": "Send a friend a photo of the finished thing",
+        "duration": 3,
+        "type": "social"
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: celebration type not in enum",
+      "output": {
+        "pack": {
+          "name": "Quiet Wins",
+          "description": "Low-key ways to mark a finished task when energy is low.",
+          "emoji": "🌿",
+          "contexts": [
+            "after_work",
+            "low_energy"
+          ]
+        },
+        "celebrations": [
+          {
+            "title": "Step outside for two minutes",
+            "duration": 2,
+            "type": "calming"
+          },
+          {
+            "title": "Put on one favorite song",
+            "duration": 4,
+            "type": "sensory"
+          },
+          {
+            "title": "Send a friend a photo of the finished thing",
+            "duration": 3,
+            "type": "social"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: pack missing contexts",
+      "output": {
+        "pack": {
+          "name": "Quiet Wins",
+          "description": "Low-key ways to mark a finished task when energy is low.",
+          "emoji": "🌿"
+        },
+        "celebrations": [
+          {
+            "title": "Step outside for two minutes",
+            "duration": 2,
+            "type": "restorative"
+          },
+          {
+            "title": "Put on one favorite song",
+            "duration": 4,
+            "type": "sensory"
+          },
+          {
+            "title": "Send a friend a photo of the finished thing",
+            "duration": 3,
+            "type": "social"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: no celebrations",
+      "output": {
+        "pack": {
+          "name": "Quiet Wins",
+          "description": "Low-key ways to mark a finished task when energy is low.",
+          "emoji": "🌿",
+          "contexts": [
+            "after_work",
+            "low_energy"
+          ]
+        },
+        "celebrations": []
+      }
+    },
+    {
+      "why": "schema: duration as string",
+      "output": {
+        "pack": {
+          "name": "Quiet Wins",
+          "description": "Low-key ways to mark a finished task when energy is low.",
+          "emoji": "🌿",
+          "contexts": [
+            "after_work",
+            "low_energy"
+          ]
+        },
+        "celebrations": [
+          {
+            "title": "Step outside for two minutes",
+            "duration": "2",
+            "type": "restorative"
+          },
+          {
+            "title": "Put on one favorite song",
+            "duration": 4,
+            "type": "sensory"
+          },
+          {
+            "title": "Send a friend a photo of the finished thing",
+            "duration": 3,
+            "type": "social"
+          }
+        ]
+      }
+    },
+    {
+      "why": "schema: pack null (fallback shape is not valid model output)",
+      "output": {
+        "pack": null,
+        "celebrations": []
+      }
+    },
+    {
+      "why": "lint: exclamation mark in celebration title",
+      "output": {
+        "pack": {
+          "name": "Quiet Wins",
+          "description": "Low-key ways to mark a finished task when energy is low.",
+          "emoji": "🌿",
+          "contexts": [
+            "after_work",
+            "low_energy"
+          ]
+        },
+        "celebrations": [
+          {
+            "title": "Step outside for two minutes",
+            "duration": 2,
+            "type": "restorative"
+          },
+          {
+            "title": "Put on a favorite song!",
+            "duration": 4,
+            "type": "sensory"
+          },
+          {
+            "title": "Send a friend a photo of the finished thing",
+            "duration": 3,
+            "type": "social"
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: \"treat\" is a medical term in lint",
+      "output": {
+        "pack": {
+          "name": "Quiet Wins",
+          "description": "A gentle way to treat low mood.",
+          "emoji": "🌿",
+          "contexts": [
+            "after_work",
+            "low_energy"
+          ]
+        },
+        "celebrations": [
+          {
+            "title": "Step outside for two minutes",
+            "duration": 2,
+            "type": "restorative"
+          },
+          {
+            "title": "Put on one favorite song",
+            "duration": 4,
+            "type": "sensory"
+          },
+          {
+            "title": "Send a friend a photo of the finished thing",
+            "duration": 3,
+            "type": "social"
+          }
+        ]
+      }
+    }
+  ]
+}

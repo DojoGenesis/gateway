@@ -1,0 +1,104 @@
+{
+  "description": "Mixed statuses lead to concrete, calm observations.",
+  "input": {
+    "goal": {
+      "title": "Redesign the family recipe site",
+      "milestones": [
+        {
+          "title": "Pick a layout",
+          "completed": true
+        },
+        {
+          "title": "Move the recipes",
+          "completed": false
+        }
+      ]
+    },
+    "tasks": [
+      {
+        "title": "Choose a template",
+        "status": "completed",
+        "time_needed": 30
+      },
+      {
+        "title": "Export old recipes",
+        "status": "blocked",
+        "time_needed": 90
+      },
+      {
+        "title": "Import recipes",
+        "status": "blocked",
+        "time_needed": 120
+      },
+      {
+        "title": "Write the about page",
+        "status": "active",
+        "time_needed": 60
+      }
+    ]
+  },
+  "valid_output": {
+    "suggestions": [
+      "Three tasks need an hour or more. Splitting them would make the first step easier to start.",
+      "Two tasks are blocked; pick the one that unblocks the other and look at it first.",
+      "Most of the high-energy work sits at the end. Moving one earlier would even out the load."
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: suggestions is a string",
+      "output": {
+        "suggestions": "Split the long tasks."
+      }
+    },
+    {
+      "why": "schema: empty suggestions",
+      "output": {
+        "suggestions": []
+      }
+    },
+    {
+      "why": "schema: eight suggestions exceeds maxItems 7",
+      "output": {
+        "suggestions": [
+          "Idea 0",
+          "Idea 1",
+          "Idea 2",
+          "Idea 3",
+          "Idea 4",
+          "Idea 5",
+          "Idea 6",
+          "Idea 7"
+        ]
+      }
+    },
+    {
+      "why": "schema: bare array root",
+      "output": [
+        "Three tasks need an hour or more. Splitting them would make the first step easier to start.",
+        "Two tasks are blocked; pick the one that unblocks the other and look at it first.",
+        "Most of the high-energy work sits at the end. Moving one earlier would even out the load."
+      ]
+    },
+    {
+      "why": "lint: \"you should\" in a suggestion",
+      "output": {
+        "suggestions": [
+          "You should split the long tasks.",
+          "Two tasks are blocked; pick the one that unblocks the other and look at it first.",
+          "Most of the high-energy work sits at the end. Moving one earlier would even out the load."
+        ]
+      }
+    },
+    {
+      "why": "lint: \"you failed\"",
+      "output": {
+        "suggestions": [
+          "Three tasks need an hour or more. Splitting them would make the first step easier to start.",
+          "You failed to unblock the export.",
+          "Most of the high-energy work sits at the end. Moving one earlier would even out the load."
+        ]
+      }
+    }
+  ]
+}

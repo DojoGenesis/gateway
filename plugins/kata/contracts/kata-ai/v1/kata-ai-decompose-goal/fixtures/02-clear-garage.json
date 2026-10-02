@@ -1,0 +1,86 @@
+{
+  "description": "Title-only goal still yields a small milestone list.",
+  "input": {
+    "goal": {
+      "title": "Clear out the garage"
+    }
+  },
+  "valid_output": {
+    "milestones": [
+      {
+        "title": "Clear the floor"
+      },
+      {
+        "title": "Sort what stays"
+      },
+      {
+        "title": "Haul out what goes"
+      },
+      {
+        "title": "Put shelves up"
+      }
+    ]
+  },
+  "invalid_outputs": [
+    {
+      "why": "schema: eleven milestones exceeds maxItems 10",
+      "output": {
+        "milestones": [
+          {
+            "title": "Step 1"
+          },
+          {
+            "title": "Step 2"
+          },
+          {
+            "title": "Step 3"
+          },
+          {
+            "title": "Step 4"
+          },
+          {
+            "title": "Step 5"
+          },
+          {
+            "title": "Step 6"
+          },
+          {
+            "title": "Step 7"
+          },
+          {
+            "title": "Step 8"
+          },
+          {
+            "title": "Step 9"
+          },
+          {
+            "title": "Step 10"
+          },
+          {
+            "title": "Step 11"
+          }
+        ]
+      }
+    },
+    {
+      "why": "lint: \"simply\" minimizes difficulty",
+      "output": {
+        "milestones": [
+          {
+            "title": "Clear the floor",
+            "description": "Simply push everything to one wall."
+          },
+          {
+            "title": "Sort what stays"
+          },
+          {
+            "title": "Haul out what goes"
+          },
+          {
+            "title": "Put shelves up"
+          }
+        ]
+      }
+    }
+  ]
+}

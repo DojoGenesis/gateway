@@ -331,23 +331,85 @@ func compileSchemaFile(pluginDir, rel string) (*jsonschema.Schema, map[string]in
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return nil, nil, fmt.Errorf("%s: not a JSON object: %w", rel, err)
 	}
-	sch, err := compileSchemaDoc(full, raw)
+	siblings, err := contractSiblingSchemas(pluginDir, full)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", rel, err)
+	}
+	sch, err := compileSchemaDoc(full, raw, siblings)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", rel, err)
 	}
 	return sch, doc, nil
 }
 
+// contractSiblingSchemas collects the shared schemas a contract's files may
+// $ref by absolute $id (e.g. kata-ai/v1/_defs.schema.json, which input
+// schemas reference as https://contracts.dojogenesis.com/kata-ai/v1/_defs.schema.json).
+// It walks from the schema's directory up to (not above) the plugin root and
+// returns every *.schema.json found directly in those directories, keyed by
+// its $id. Nothing is fetched: an $id that is not on disk under the plugin
+// root still fails to resolve.
+func contractSiblingSchemas(pluginDir, schemaPath string) (map[string]any, error) {
+	absRoot, err := filepath.Abs(pluginDir)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{}
+	for dir := filepath.Dir(schemaPath); ; dir = filepath.Dir(dir) {
+		if dir != absRoot && !strings.HasPrefix(dir, absRoot+string(filepath.Separator)) {
+			break
+		}
+		matches, err := filepath.Glob(filepath.Join(dir, "*.schema.json"))
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range matches {
+			if m == schemaPath {
+				continue
+			}
+			b, err := os.ReadFile(m)
+			if err != nil {
+				return nil, err
+			}
+			d, err := jsonschema.UnmarshalJSON(bytes.NewReader(b))
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", m, err)
+			}
+			obj, ok := d.(map[string]any)
+			if !ok {
+				continue
+			}
+			id, _ := obj["$id"].(string)
+			if id == "" {
+				continue
+			}
+			if _, dup := out[id]; !dup {
+				out[id] = d
+			}
+		}
+		if dir == absRoot {
+			break
+		}
+	}
+	return out, nil
+}
+
 // compileSchemaDoc compiles raw schema bytes registered at the file's path,
-// defaulting to draft 2020-12. Only the file loader is reachable (the library
-// default) — no network fetches.
-func compileSchemaDoc(location string, raw []byte) (*jsonschema.Schema, error) {
+// defaulting to draft 2020-12, with resources (shared schemas keyed by $id)
+// pre-registered so local $refs resolve. Only the file loader is reachable
+// (the library default) — no network fetches.
+func compileSchemaDoc(location string, raw []byte, resources map[string]any) (*jsonschema.Schema, error) {
 	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}
 	c := jsonschema.NewCompiler()
 	c.DefaultDraft(jsonschema.Draft2020)
+	for id, r := range resources {
+		if err := c.AddResource(id, r); err != nil {
+			return nil, fmt.Errorf("registering %s: %w", id, err)
+		}
+	}
 	if err := c.AddResource(location, doc); err != nil {
 		return nil, err
 	}
