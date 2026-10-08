@@ -1,6 +1,6 @@
 # Deployment Guide
 
-**Release line:** `v3.x` — latest tag `v3.2.2`. Production (`gateway.trespies.dev`, Hetzner) runs `v3.2.2+dynmodels`.
+**Release line:** `v3.x`. Production (`gateway.trespies.dev`, Hetzner) runs whatever [`deploy/provision.sh`](./deploy/provision.sh) pins as `GATEWAY_VERSION` — that variable is the single source of truth for the deployed version (see the **Version pin** note under [VPS Production Deployment](#vps-production-deployment)); this doc does not restate the number so it cannot drift out of sync with it again.
 **Runtime:** a single Go binary (`agentic-gateway`) listening on **port 7340** by default.
 
 See [`README.md`](./README.md) for the architecture overview and [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system design.
@@ -226,7 +226,7 @@ curl http://localhost:7340/admin/metrics/prometheus # admin surface (requires ad
 
 ### Version scheme
 
-Releases are cut as git tags `vMAJOR.MINOR.PATCH` (latest: `v3.2.2`). A running build may carry semver build metadata after a `+` — e.g. production runs `v3.2.2+dynmodels`.
+Releases are cut as git tags `vMAJOR.MINOR.PATCH`. A running build may carry semver build metadata after a `+` (e.g. a custom build tag). Don't trust a version number written in this doc for "what's latest" or "what's deployed" — both go stale the moment a release ships. [`deploy/provision.sh`](./deploy/provision.sh)'s `GATEWAY_VERSION` is the single source of truth for the deployed version, and it is bumped only together with a published release (see the **Version pin** note under [VPS Production Deployment](#vps-production-deployment)).
 
 ---
 
@@ -262,7 +262,7 @@ journalctl -u caddy -f              # TLS / proxy logs
 curl https://gateway.trespies.dev/health
 ```
 
-> **Version pin:** `deploy/provision.sh` sets `GATEWAY_VERSION` and only re-downloads when the installed binary's version differs. Bump that variable and re-run to upgrade.
+> **Version pin (single source of truth):** `deploy/provision.sh` sets `GATEWAY_VERSION` — read that variable directly for the exact version pinned to production; nothing else in this repo's docs should restate the number. The script only re-downloads when the installed binary's version differs from the pin. Bump the variable and re-run to upgrade.
 
 ---
 

@@ -2,7 +2,7 @@ name: Deploy
 
 # Runs on every push to main:
 #   1. Build and test (gate)
-#   2. Build + push ghcr.io/trespies-source/dojo-bridge:latest (multi-arch)
+#   2. Build + push ghcr.io/dojogenesis/dojo-bridge:latest (multi-arch)
 #   3. SSH to Hetzner VPS and run docker compose pull + up -d
 #
 # Required GitHub secrets:
