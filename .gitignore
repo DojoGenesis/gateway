@@ -80,3 +80,4 @@ chat-ui/build/
 # Root package-lock (npm init artifact)
 dojo-gateway-linux
 system-prompt.txt
+.wrangler/
