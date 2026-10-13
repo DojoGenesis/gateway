@@ -23,11 +23,16 @@ DOMAIN="gateway.trespies.dev"
 #   v3.3.3 still serves anonymous CAS reads and writes, anonymous workflow
 #   storage and execution, and the SSE broadcaster. This is the version that
 #   must be on gateway.trespies.dev.
+#   v3.3.9 -> v3.3.10: a default-deny per-tool policy on every tool-call
+#   path (DGS-172, GHSA-wcwx-v458-q427). v3.3.9 lets any authenticated
+#   caller invoke run_command, execute_python, read_file and write_file
+#   through /v1/tools/:name/invoke and /v1/tools/invoke, so re-provisioning
+#   on it re-opens host execution and arbitrary file reads.
 #
 #   NOTE for whoever runs this next: /api/* now needs a credential. The `dojo`
 #   CLI sends one only when configured — export DOJO_GATEWAY_TOKEN (see
 #   docs/api-route-disposition.md) or its skill and CAS commands will 401.
-GATEWAY_VERSION="v3.3.9"
+GATEWAY_VERSION="v3.3.10"
 GATEWAY_PORT=7340
 GATEWAY_USER="dojo"
 GATEWAY_HOME="/opt/dojo"
