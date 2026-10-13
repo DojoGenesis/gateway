@@ -46,6 +46,12 @@ func InvokeToolWithTimeout(ctx context.Context, name string, params map[string]i
 		return nil, err
 	}
 
+	// Caller policy runs after the lookup (an unknown name stays "not found")
+	// and before anything else touches the parameters or the tool function.
+	if err := AuthorizeCall(ctx, name); err != nil {
+		return nil, err
+	}
+
 	// Inject project_id from context into params if not already present
 	params = injectProjectIDIntoParams(ctx, params)
 

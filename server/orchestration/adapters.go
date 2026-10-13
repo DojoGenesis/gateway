@@ -28,6 +28,14 @@ func (t *ToolInvokerAdapter) InvokeTool(ctx context.Context, toolName string, pa
 		return nil, fmt.Errorf("ToolInvokerAdapter: tool not found '%s': %w", toolName, err)
 	}
 
+	// toolDef.Function is called directly below, so it bypasses the caller-policy
+	// check in tools.InvokeTool; ask here. A plan node is caller-influenced (a
+	// submitted plan, or one an LLM wrote from the caller's prompt), so this is
+	// where a plan that names run_command meets the caller's authority.
+	if err := tools.AuthorizeCall(ctx, toolName); err != nil {
+		return nil, fmt.Errorf("ToolInvokerAdapter: tool '%s' refused: %w", toolName, err)
+	}
+
 	// Execute the tool using its function
 	if toolDef.Function == nil {
 		return nil, fmt.Errorf("ToolInvokerAdapter: tool '%s' has no function", toolName)

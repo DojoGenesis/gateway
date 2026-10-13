@@ -28,6 +28,7 @@ import (
 	"github.com/DojoGenesis/gateway/provider"
 	"github.com/DojoGenesis/gateway/server/services/providers"
 	"github.com/DojoGenesis/gateway/server/streaming"
+	toolspkg "github.com/DojoGenesis/gateway/tools"
 )
 
 // ─── Agent chat types ────────────────────────────────────────────────────────
@@ -249,6 +250,13 @@ func (s *Server) executeToolCall(ctx context.Context, tc provider.ToolCall) stri
 		return fmt.Sprintf(`{"error":"tool not found: %s"}`, tc.Name)
 	}
 
+	// toolDef.Function is called directly below, so it does not pass through
+	// tools.InvokeTool and its caller-policy check; ask here instead.
+	if err := toolspkg.AuthorizeCall(ctx, tc.Name); err != nil {
+		msg, _ := json.Marshal(err.Error())
+		return fmt.Sprintf(`{"error":%s}`, msg)
+	}
+
 	toolCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -274,6 +282,8 @@ func (s *Server) buildToolList(ctx context.Context) []provider.Tool {
 	if err != nil || len(defs) == 0 {
 		return nil
 	}
+	// Offer the model only what this caller may run.
+	defs = toolspkg.FilterAuthorized(ctx, defs)
 	tools := make([]provider.Tool, 0, len(defs))
 	for _, d := range defs {
 		tools = append(tools, provider.Tool{
@@ -383,7 +393,10 @@ func (s *Server) handleGatewayAgentChatStream(c *gin.Context, agentID string, re
 	}
 	toolList := s.buildToolList(c.Request.Context())
 
-	llmCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	// Detached from the request so the stream outlives it, but the caller's tool
+	// policy must travel with the work: a fresh Background context would run the
+	// agent's tool calls with no restriction at all.
+	llmCtx, cancel := context.WithTimeout(detachedToolContext(c.Request.Context()), 5*time.Minute)
 
 	// Launch the streaming agent loop in a goroutine
 	go func() {
@@ -699,8 +712,10 @@ func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 
 	systemPrompt := s.buildAgentSystemPrompt(agentConfig, req.DocumentID, req.DocumentContent)
 
-	// Use a generous context for LLM calls (5 minutes) — Ollama can be slow on first load
-	llmCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	// Use a generous context for LLM calls (5 minutes) — Ollama can be slow on first load.
+	// The caller's tool policy is carried over from the request: this context is
+	// detached from it, and a bare Background context would be unrestricted.
+	llmCtx, cancel := context.WithTimeout(detachedToolContext(c.Request.Context()), 5*time.Minute)
 	defer cancel()
 
 	// Build tool list from registry (nil-safe; returns nil when no registry)
@@ -801,6 +816,12 @@ func (s *Server) handleGatewayOrchestrate(c *gin.Context) {
 	}
 	s.orchestrations.Store(orchState)
 
+	// The plan above is caller-supplied, so every node's tool_name is too. The
+	// goroutine below runs on a detached context; capture the caller's tool
+	// policy here, while the request context is still the request's, and
+	// re-bind it there (tools the caller may not run fail their node).
+	reqCtx := c.Request.Context()
+
 	// Execute orchestration (async)
 	go func() {
 		userID := req.UserID
@@ -814,7 +835,7 @@ func (s *Server) handleGatewayOrchestrate(c *gin.Context) {
 		// Use context.Background() so the long-running orchestration is not
 		// cancelled when Gin flushes the HTTP 202 response and tears down the
 		// request context. Matches the pattern in handle_orchestrate.go:165.
-		bgCtx, bgCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		bgCtx, bgCancel := context.WithTimeout(detachedToolContext(reqCtx), 10*time.Minute)
 		defer bgCancel()
 		execErr := s.orchestrationEngine.Execute(bgCtx, orchPlan, task, userID, nil)
 

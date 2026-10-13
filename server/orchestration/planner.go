@@ -48,7 +48,7 @@ func (p *Planner) GeneratePlan(ctx context.Context, task *orchestrationpkg.Task)
 		}
 	}
 
-	availableTools := tools.GetAllTools()
+	availableTools := tools.FilterAuthorized(ctx, tools.GetAllTools())
 	prompt := p.buildPlanningPrompt(task, availableTools)
 
 	response, err := p.callLLM(ctx, prompt)
@@ -87,7 +87,7 @@ func (p *Planner) RegeneratePlan(ctx context.Context, task *orchestrationpkg.Tas
 		}
 	}
 
-	availableTools := tools.GetAllTools()
+	availableTools := tools.FilterAuthorized(ctx, tools.GetAllTools())
 	prompt := p.buildReplanningPrompt(task, failedPlan, errorContext, availableTools)
 
 	response, err := p.callLLM(ctx, prompt)

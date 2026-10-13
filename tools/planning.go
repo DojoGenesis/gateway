@@ -76,6 +76,9 @@ func getPlanFilePath(planID string) string {
 }
 
 func savePlan(plan Plan) error {
+	if !isPlainFileID(plan.ID) {
+		return fmt.Errorf("invalid plan id")
+	}
 	if err := ensurePlansDirectory(); err != nil {
 		return fmt.Errorf("failed to create plans directory: %w", err)
 	}
@@ -94,6 +97,10 @@ func savePlan(plan Plan) error {
 }
 
 func loadPlan(planID string) (*Plan, error) {
+	// plan_id arrives from the caller and is joined into a file path below.
+	if !isPlainFileID(planID) {
+		return nil, fmt.Errorf("invalid plan id")
+	}
 	planPath := getPlanFilePath(planID)
 	data, err := os.ReadFile(planPath)
 	if err != nil {

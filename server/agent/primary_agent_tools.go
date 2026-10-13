@@ -324,7 +324,9 @@ func (pa *PrimaryAgent) HandleQueryWithTools(ctx context.Context, req QueryReque
 	// Sending only relevant tools reduces input token count per call, which is
 	// critical for staying under provider TPM rate limits. The full tool set (~33)
 	// is only sent when intent is unrecognised.
-	availableTools := tools.GetToolsForIntent(string(intent))
+	// Offer the model only tools this caller may run (see tools.WithAuthorizer);
+	// the refusal in tools.InvokeTool is the control, this saves wasted turns.
+	availableTools := tools.FilterAuthorized(ctxWithTimeout, tools.GetToolsForIntent(string(intent)))
 	pluginTools := convertToolsToPluginFormat(availableTools)
 
 	// Set defaults for temperature and max tokens

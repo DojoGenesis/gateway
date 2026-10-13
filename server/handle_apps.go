@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/DojoGenesis/gateway/apps"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 // handleGetResource serves a UI resource by URI with security headers.
@@ -156,6 +157,19 @@ func (s *Server) handleProxyToolCall(c *gin.Context) {
 	}
 	if req.AppID == "" || req.ToolName == "" {
 		s.errorResponse(c, http.StatusBadRequest, "missing_fields", "app_id and tool_name are required")
+		return
+	}
+
+	// ProxyToolCall invokes the tool function itself (apps cannot import the tool
+	// registry), and a launched app holds a wildcard grant, so the app-level
+	// authorization policy says nothing about the CALLER. Apply the caller's tool
+	// policy here, before the call is handed over.
+	if err := tools.AuthorizeCall(c.Request.Context(), req.ToolName); err != nil {
+		if denied, ok := tools.AsToolAccessError(err); ok {
+			s.errorResponse(c, http.StatusForbidden, denied.Code, denied.Message)
+			return
+		}
+		s.errorResponse(c, http.StatusForbidden, "tool_not_permitted", "tool call not permitted")
 		return
 	}
 

@@ -346,6 +346,10 @@ curl -X POST http://localhost:8080/v1/tools/composio:github:list_repos/invoke \
   }'
 ```
 
+MCP-hosted tools such as `composio:*` are admin-only on this route: the request
+needs an `Authorization: Bearer <admin token>` header, and a user-role token is
+refused with 403 (`tool_requires_admin`).
+
 ### 4. Check OTEL Traces
 
 Visit Langfuse UI (http://localhost:3000) and look for spans with:

@@ -38,7 +38,7 @@ func (a *SpecialistRouterAdapter) Route(decision agent.RoutingDecision) Speciali
 // the ChatHandler's Orchestrator interface.
 type OrchestratorAdapter struct {
 	Planner     orchestrationpkg.PlannerInterface
-	StartOrchFn func(userID, query string, timeout time.Duration) (string, error)
+	StartOrchFn func(ctx context.Context, userID, query string, timeout time.Duration) (string, error)
 }
 
 // GeneratePlanForChat creates a Task from the user's query, generates a plan,
@@ -70,9 +70,9 @@ func (a *OrchestratorAdapter) GeneratePlanForChat(ctx context.Context, userID, q
 
 // StartOrchestrationForChat delegates async orchestration start to the server via StartOrchFn.
 // Returns the orchestration ID on success, or an error if the function is not configured.
-func (a *OrchestratorAdapter) StartOrchestrationForChat(userID, query string, timeout time.Duration) (string, error) {
+func (a *OrchestratorAdapter) StartOrchestrationForChat(ctx context.Context, userID, query string, timeout time.Duration) (string, error) {
 	if a.StartOrchFn == nil {
 		return "", fmt.Errorf("orchestration start function not configured")
 	}
-	return a.StartOrchFn(userID, query, timeout)
+	return a.StartOrchFn(ctx, userID, query, timeout)
 }

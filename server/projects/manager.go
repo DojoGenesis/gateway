@@ -319,6 +319,14 @@ func validateProjectName(name string) error {
 	if strings.Contains(name, "..") {
 		return fmt.Errorf("project name cannot contain '..'")
 	}
+	if strings.ContainsRune(name, 0) {
+		return fmt.Errorf("project name contains invalid characters")
+	}
+	// A name made only of dots ("." here, since ".." is rejected above) joins to
+	// the projects base directory itself, which delete would then remove whole.
+	if strings.Trim(name, ".") == "" {
+		return fmt.Errorf("project name must contain a letter or digit")
+	}
 	return nil
 }
 

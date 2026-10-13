@@ -155,9 +155,17 @@ PUT  /api/cas/batch                Batch sync
 
 ```
 GET  /v1/tools                     List registered tools
-POST /v1/tools/:name/invoke        Invoke a tool by name
+POST /v1/tools/:name/invoke        Invoke a tool by name (admin role for tools that reach the host)
 GET  /v1/gateway/tools             Gateway tool discovery (MCP namespace support)
 ```
+
+Tools that execute code or reach the host's files or network (`run_command`,
+`execute_python`, `read_file`, `write_file`, `fetch_url`, `api_call`, ...) and
+every tool not explicitly classified, including MCP-hosted tools, require the
+admin role on every route that can invoke them. `run_command` and
+`execute_python` additionally require `WORKFLOW_RUN_COMMAND_ENABLED`, which is
+off by default in production. The classification lives in
+`server/tool_invoke_gate.go`.
 
 ### Memory
 
