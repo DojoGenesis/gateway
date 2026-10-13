@@ -5,6 +5,9 @@ name: Deploy
 #   2. Build + push ghcr.io/dojogenesis/dojo-bridge:latest (multi-arch)
 #   3. SSH to Hetzner VPS and run docker compose pull + up -d
 #
+# Steps 2 and 3 run only on DojoGenesis/gateway. Mirrors and forks inherit
+# this file and run their own Actions; on those, only the test job runs.
+#
 # Required GitHub secrets:
 #   GHCR_TOKEN          — PAT from DojoGenesis with read:packages scope (for VPS pulls)
 #   HETZNER_HOST        — VPS IP address
@@ -47,6 +50,7 @@ jobs:
   # ─── Build + Push Bridge Image ───────────────────────────────────────────────
   build-bridge:
     needs: test
+    if: github.repository == 'DojoGenesis/gateway'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,6 +84,7 @@ jobs:
   # ─── Deploy to Hetzner VPS ───────────────────────────────────────────────────
   deploy:
     needs: build-bridge
+    if: github.repository == 'DojoGenesis/gateway'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to Hetzner VPS
