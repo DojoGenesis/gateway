@@ -91,7 +91,30 @@ func convertInputSchema(schema interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Otherwise, wrap it in a generic object schema
+	// The mcp-go SDK exposes the schema as a typed struct (ToolInputSchema) or
+	// as raw JSON. Round-trip through JSON to get a faithful generic map.
+	var data []byte
+	switch v := schema.(type) {
+	case json.RawMessage:
+		data = v
+	case []byte:
+		data = v
+	default:
+		b, err := json.Marshal(v)
+		if err != nil {
+			data = nil
+		} else {
+			data = b
+		}
+	}
+	if len(data) > 0 {
+		var m map[string]interface{}
+		if err := json.Unmarshal(data, &m); err == nil && hasSchemaContent(m) {
+			return m
+		}
+	}
+
+	// Genuinely empty or unknown schema: wrap it in a generic object schema
 	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
@@ -101,6 +124,19 @@ func convertInputSchema(schema interface{}) map[string]interface{} {
 			},
 		},
 	}
+}
+
+// hasSchemaContent reports whether a decoded schema declares anything, i.e. a
+// non-empty "type" or at least one property. A zero-value SDK schema marshals
+// to {"type":"","properties":{}} and is treated as unknown.
+func hasSchemaContent(m map[string]interface{}) bool {
+	if t, ok := m["type"].(string); ok && t != "" {
+		return true
+	}
+	if p, ok := m["properties"].(map[string]interface{}); ok && len(p) > 0 {
+		return true
+	}
+	return false
 }
 
 // calculateMapSize estimates the size of a map in bytes by marshaling to JSON.
