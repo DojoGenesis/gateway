@@ -66,7 +66,15 @@ api.policydatainfrastructure.com {
 
     header /static/* Cache-Control "no-cache, must-revalidate"
 
-    reverse_proxy localhost:8340
+    reverse_proxy localhost:8340 {
+        # Bridge the listener gap while pdi.service restarts (deploys) or
+        # drains. Retries apply to DIAL failures only — a request already
+        # streaming cannot be replayed — so this is the complement to the
+        # server-side graceful drain, not a substitute for it. Added
+        # 2026-08-08 after a deploy 502'd a live chat request.
+        lb_try_duration 10s
+        lb_try_interval 500ms
+    }
 
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -87,7 +95,15 @@ policydatainfrastructure.com {
 
     header /static/* Cache-Control "no-cache, must-revalidate"
 
-    reverse_proxy localhost:8340
+    reverse_proxy localhost:8340 {
+        # Bridge the listener gap while pdi.service restarts (deploys) or
+        # drains. Retries apply to DIAL failures only — a request already
+        # streaming cannot be replayed — so this is the complement to the
+        # server-side graceful drain, not a substitute for it. Added
+        # 2026-08-08 after a deploy 502'd a live chat request.
+        lb_try_duration 10s
+        lb_try_interval 500ms
+    }
 
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
