@@ -19,7 +19,7 @@ func runTunnelCommand(args []string) error {
 		return stopTunnel()
 	}
 
-	port := 8080
+	port := 8090
 	if len(args) > 0 {
 		p, err := strconv.Atoi(args[0])
 		if err != nil {

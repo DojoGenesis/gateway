@@ -7,7 +7,7 @@ How to integrate the Agentic Gateway into a real-world frontend application. Bas
 ```
 ┌─────────────────────┐     HTTP/SSE      ┌──────────────────────┐
 │   Frontend App      │ ◄──────────────► │   Agentic Gateway    │
-│   (any framework)   │                   │   (Go, port 8080)    │
+│   (any framework)   │                   │   (Go, port 7340)    │
 │                     │                   │                      │
 │  - Agent creation   │   POST /agents    │  - LLM routing       │
 │  - SSE streaming    │   POST /chat      │  - Tool execution    │
@@ -31,7 +31,7 @@ let cors_origins = "http://localhost:5173,https://tauri.localhost";
 
 Command::new(&gateway_binary)
     .env("PATH", &enriched_path)
-    .env("PORT", "8080")
+    .env("PORT", "7340")
     .env("ALLOWED_ORIGINS", &cors_origins)
     .env("MCP_CONFIG_PATH", &config_path)
     .env("MEMORY_DB_PATH", &db_path)
@@ -41,7 +41,7 @@ Command::new(&gateway_binary)
 ### As a standalone service
 
 ```bash
-PORT=8080 \
+PORT=7340 \
 ALLOWED_ORIGINS="http://localhost:3000,https://your-app.com" \
 MCP_CONFIG_PATH=./gateway-config.yaml \
 ./agentic-gateway
@@ -51,7 +51,7 @@ MCP_CONFIG_PATH=./gateway-config.yaml \
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `PORT` | No (default 8080) | HTTP listen port |
+| `PORT` | No (default 7340) | HTTP listen port |
 | `ALLOWED_ORIGINS` | Yes (for browser clients) | Comma-separated CORS origins |
 | `MCP_CONFIG_PATH` | No | Path to MCP server config YAML |
 | `MEMORY_DB_PATH` | No | SQLite path for persistent memory |
@@ -78,7 +78,7 @@ ALLOWED_ORIGINS="http://localhost:5173,https://tauri.localhost,https://your-app.
 ```typescript
 async function checkGateway(): Promise<boolean> {
   try {
-    const resp = await fetch('http://127.0.0.1:8080/health', {
+    const resp = await fetch('http://127.0.0.1:7340/health', {
       signal: AbortSignal.timeout(3000)
     });
     if (resp.ok) {
@@ -119,7 +119,7 @@ Returns a map of connected MCP servers with tool counts.
 ### Create an agent
 
 ```typescript
-const resp = await fetch('http://127.0.0.1:8080/v1/gateway/agents', {
+const resp = await fetch('http://127.0.0.1:7340/v1/gateway/agents', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -134,7 +134,7 @@ The gateway initializes the agent with a disposition (personality) from the work
 ### Verify an agent is alive
 
 ```typescript
-const resp = await fetch(`http://127.0.0.1:8080/v1/gateway/agents/${agentId}`);
+const resp = await fetch(`http://127.0.0.1:7340/v1/gateway/agents/${agentId}`);
 const alive = resp.ok; // 200 = alive, 404 = dead
 ```
 
@@ -146,7 +146,7 @@ Agents are in-memory — they don't survive gateway restarts. Your app should:
 ## 5. Chat — Non-Streaming
 
 ```typescript
-const resp = await fetch(`http://127.0.0.1:8080/v1/gateway/agents/${agentId}/chat`, {
+const resp = await fetch(`http://127.0.0.1:7340/v1/gateway/agents/${agentId}/chat`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -350,7 +350,7 @@ Available providers are detected at startup. Ollama is always available when run
 ANTHROPIC_API_KEY=sk-... ./agentic-gateway
 
 # Or via the settings API
-curl -X POST http://localhost:8080/v1/settings/providers \
+curl -X POST http://localhost:7340/v1/settings/providers \
   -H "Content-Type: application/json" \
   -d '{"provider": "anthropic", "api_key": "sk-..."}'
 ```

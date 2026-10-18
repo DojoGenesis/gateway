@@ -1,8 +1,10 @@
 # Project Status: AgenticGatewayByDojoGenesis
 
-**Last Updated:** 2026-04-09
-**Version:** v3.2.0
+**Last Updated:** 2026-10-18 (header only; see note below)
+**Version:** v3.3.10, the latest release, pinned in `deploy/provision.sh` (October 12, 2026)
 **Status:** PRODUCTION-READY
+
+> **Snapshot note (2026-10-18).** Everything below this header was last verified on 2026-04-09 at v3.2.0. Releases v3.3.0 through v3.3.10 shipped since then and are not reflected in the counts and tables that follow. Treat those figures as an April snapshot until they are re-measured.
 
 ---
 
@@ -498,16 +500,16 @@ go test ./... -race
 docker compose up -d
 
 # Check health
-curl http://localhost:8080/health
+curl http://localhost:7340/health
 
 # Check MCP status
-curl http://localhost:8080/admin/mcp/status
+curl http://localhost:7340/admin/mcp/status
 
 # Check provider status
-curl http://localhost:8080/admin/providers
+curl http://localhost:7340/admin/providers
 
 # View metrics
-curl http://localhost:8080/admin/metrics/prometheus
+curl http://localhost:7340/admin/metrics/prometheus
 ```
 
 ---
@@ -523,6 +525,6 @@ curl http://localhost:8080/admin/metrics/prometheus
 
 ---
 
-**Status:** PRODUCTION-READY (v3.2.0)
-**Date:** 2026-04-09
+**Status:** PRODUCTION-READY (body last verified at v3.2.0)
+**Date:** 2026-04-09 (body), 2026-10-18 (header)
 **Next Review:** Era 4 scoping — edge deployment, D1 CAS sync, federated mesh

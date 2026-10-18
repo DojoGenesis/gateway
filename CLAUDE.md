@@ -2,7 +2,7 @@
 
 ## Orientation
 
-**DojoGenesis** · **AgenticGatewayByDojoGenesis** · production-ready · v3.2.0 / server v1.1.0 · Era 3 complete, Era 4 Phase 0 spec written.
+**DojoGenesis** · **AgenticGatewayByDojoGenesis** · production-ready · v3.3.10 (latest release, pinned in `deploy/provision.sh`) · Era 3 complete, Era 4 Phase 0 spec written.
 
 Self-hosted agentic AI runtime: multi-provider LLM routing, DAG orchestration, content-addressable skill storage (CAS), MCP host, real-time SSE, portal auth — one Go binary. Hard dependency for the whole DojoGenesis platform. Primary client is the `dojo` CLI at `C:\Users\cruzr\cli\`.
 
