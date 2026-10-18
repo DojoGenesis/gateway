@@ -18,6 +18,7 @@ import (
 
 	"github.com/DojoGenesis/gateway/disposition"
 	"github.com/DojoGenesis/gateway/events"
+	"github.com/DojoGenesis/gateway/observation/audit"
 	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 	"github.com/DojoGenesis/gateway/pkg/collaboration"
 	pkgerrors "github.com/DojoGenesis/gateway/pkg/errors"
@@ -251,8 +252,11 @@ func (s *Server) executeToolCall(ctx context.Context, tc provider.ToolCall) stri
 	}
 
 	// toolDef.Function is called directly below, so it does not pass through
-	// tools.InvokeTool and its caller-policy check; ask here instead.
+	// tools.InvokeTool and its caller-policy check or its audit report; do
+	// both here instead.
+	start := time.Now()
 	if err := toolspkg.AuthorizeCall(ctx, tc.Name); err != nil {
+		toolspkg.ObserveCall(ctx, tc.Name, tc.Arguments, nil, err, time.Since(start))
 		msg, _ := json.Marshal(err.Error())
 		return fmt.Sprintf(`{"error":%s}`, msg)
 	}
@@ -261,6 +265,7 @@ func (s *Server) executeToolCall(ctx context.Context, tc provider.ToolCall) stri
 	defer cancel()
 
 	result, err := toolDef.Function(toolCtx, tc.Arguments)
+	toolspkg.ObserveCall(ctx, tc.Name, tc.Arguments, result, err, time.Since(start))
 	if err != nil {
 		return fmt.Sprintf(`{"error":"%s"}`, err.Error())
 	}
@@ -609,6 +614,11 @@ func (s *Server) handleGatewayCreateAgent(c *gin.Context) {
 	s.agents[agentID] = runtime
 	s.agentMu.Unlock()
 
+	s.auditRecorder.AgentSpawn(c.Request.Context(), agentID, map[string]interface{}{
+		"active_mode":        req.ActiveMode,
+		"disposition_source": disp.SourceFile,
+	})
+
 	c.JSON(http.StatusCreated, gin.H{
 		"agent_id": agentID,
 		"config":   agentConfig,
@@ -678,6 +688,9 @@ func (s *Server) handleGatewayAgentChat(c *gin.Context) {
 		s.errorResponse(c, http.StatusNotFound, "not_found", fmt.Sprintf("Agent not found: %s", agentID))
 		return
 	}
+
+	// Tool calls and memory access beneath this request are this agent's.
+	c.Request = c.Request.WithContext(audit.WithAgentID(c.Request.Context(), agentID))
 
 	agentConfig := runtime.Config
 

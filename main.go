@@ -19,6 +19,7 @@ import (
 	"github.com/DojoGenesis/gateway/disposition"
 	"github.com/DojoGenesis/gateway/mcp"
 	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/observation/audit"
 	"github.com/DojoGenesis/gateway/runtime/mesh"
 	"github.com/DojoGenesis/gateway/specialist"
 	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
@@ -437,6 +438,17 @@ func main() {
 		}
 	}
 
+	// ─── Initialize Audit Log ────────────────────────────────────────
+	// Every tool call (including refusals), agent spawn and memory operation is
+	// appended to a hash-chained log; GET /admin/audit/verify checks the chain.
+	auditRecorder := initAuditRecorder()
+	if auditRecorder != nil {
+		tools.SetCallObserver(auditRecorder.ToolExecution)
+		if memoryManager != nil {
+			memoryManager.SetAccessObserver(auditRecorder.MemoryAccess)
+		}
+	}
+
 	// ─── Initialize Services ─────────────────────────────────────────
 	costTracker := services.NewCostTracker()
 	budgetTracker := services.NewBudgetTracker(
@@ -758,6 +770,7 @@ func main() {
 		WorkflowCAS:         workflowCAS,
 		D1Syncer:            d1Syncer,
 		Mesh:                gatewayMesh,
+		AuditRecorder:       auditRecorder,
 	})
 
 	// Load provider keys that were persisted by a previous run (or by the CLI).
@@ -799,6 +812,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Close audit log after the server has stopped writing to it
+	tools.SetCallObserver(nil)
+	if err := auditRecorder.Close(); err != nil {
+		slog.Warn("audit log close error", "error", err)
+	}
+
 	// Close auth database
 	if authDB != nil {
 		if err := authDB.Close(); err != nil {
@@ -815,6 +834,36 @@ func main() {
 	}
 
 	slog.Info("Agentic Gateway shut down cleanly")
+}
+
+// initAuditRecorder opens the audit log unless AUDIT_ENABLED=false. A failure
+// to open it is logged and leaves audit off rather than stopping the gateway.
+// The default path is absolute for the same reason as memory.db.
+func initAuditRecorder() *audit.Recorder {
+	if strings.EqualFold(os.Getenv("AUDIT_ENABLED"), "false") {
+		slog.Info("audit log disabled (AUDIT_ENABLED=false)")
+		return nil
+	}
+	path := getEnv("AUDIT_DB_PATH", filepath.Join(userHomeDir(), ".dojo", "audit.db"))
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		slog.Warn("audit log disabled: cannot create directory", "path", path, "error", err)
+		return nil
+	}
+	auditLog, err := audit.NewSQLiteAuditLog(path)
+	if err != nil {
+		slog.Warn("audit log disabled: cannot open database", "path", path, "error", err)
+		return nil
+	}
+	recordArgs := strings.EqualFold(os.Getenv("AUDIT_RECORD_TOOL_ARGS"), "true")
+	rec, err := audit.NewRecorder(context.Background(), auditLog, audit.WithToolArgs(recordArgs))
+	if err != nil {
+		_ = auditLog.Close()
+		slog.Warn("audit log disabled: cannot resume hash chain", "path", path, "error", err)
+		return nil
+	}
+	seq, _ := rec.Head()
+	slog.Info("audit log initialized", "db", path, "entries", seq, "raw_tool_args", recordArgs)
+	return rec
 }
 
 func getEnv(key, defaultValue string) string {

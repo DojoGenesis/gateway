@@ -59,6 +59,18 @@ type AuditEntry struct {
 
 	// Metadata holds additional context.
 	Metadata map[string]interface{}
+
+	// Seq is the entry's position in the hash chain, starting at 1. Zero means
+	// the entry was written without a Recorder and is not chained.
+	Seq int64
+
+	// PrevHash is the EntryHash of the entry at Seq-1 (empty for Seq 1).
+	PrevHash string
+
+	// EntryHash is the SHA-256 over this entry's fields and PrevHash. Changing,
+	// removing or reordering any chained entry breaks every hash after it; see
+	// Verify.
+	EntryHash string
 }
 
 // AuditFilter specifies criteria for querying audit entries.

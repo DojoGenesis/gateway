@@ -5,6 +5,7 @@ import (
 
 	"github.com/DojoGenesis/gateway/apps"
 	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/observation/audit"
 	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 	"github.com/DojoGenesis/gateway/pkg/gateway"
 	"github.com/DojoGenesis/gateway/provider"
@@ -59,4 +60,7 @@ type ServerDeps struct {
 
 	// Mesh is the federated agent mesh. Nil means mesh is disabled.
 	Mesh *mesh.Mesh
+
+	// AuditRecorder writes the hash-chained audit log. Nil disables audit.
+	AuditRecorder *audit.Recorder
 }

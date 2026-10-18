@@ -361,6 +361,10 @@ func (s *Server) setupRoutes() {
 		// Cost aggregation
 		admin.GET("/costs", s.handleAdminCosts)
 
+		// Audit log (hash-chained record of tool runs, agent spawns, memory access)
+		admin.GET("/audit/verify", s.handleAdminAuditVerify)
+		admin.GET("/audit/entries", s.handleAdminAuditEntries)
+
 		// Routing mode control (semantic router hot-switching)
 		admin.GET("/routing/mode", s.handleAdminRoutingMode)
 		admin.POST("/routing/mode", s.handleAdminSetRoutingMode)

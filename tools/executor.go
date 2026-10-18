@@ -40,11 +40,16 @@ func InvokeTool(ctx context.Context, name string, params map[string]interface{})
 // InvokeToolWithTimeout executes a tool with an explicit timeout.
 // Validates parameters, injects project_id from context, and runs the tool
 // function in a goroutine with timeout enforcement.
-func InvokeToolWithTimeout(ctx context.Context, name string, params map[string]interface{}, timeout time.Duration) (map[string]interface{}, error) {
+func InvokeToolWithTimeout(ctx context.Context, name string, params map[string]interface{}, timeout time.Duration) (result map[string]interface{}, err error) {
 	tool, err := GetTool(name)
 	if err != nil {
 		return nil, err
 	}
+
+	// Observe with the caller's context, not the timeout context made below,
+	// which is already cancelled by the time this runs.
+	callerCtx, start := ctx, time.Now()
+	defer func() { ObserveCall(callerCtx, name, params, result, err, time.Since(start)) }()
 
 	// Caller policy runs after the lookup (an unknown name stays "not found")
 	// and before anything else touches the parameters or the tool function.

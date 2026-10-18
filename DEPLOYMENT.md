@@ -133,11 +133,14 @@ The full set of variables is documented in [`.env.example`](./.env.example).
 | `MEMORY_DB_PATH` | `~/.dojo/memory.db` | Conversation-memory SQLite path — **use an absolute path** |
 | `DOJO_CAS_PATH` | `~/.dojo/skills.db` | Content-addressable skill/workflow store |
 | `AUTH_DB_DIR` | `.dojo/` (CWD-relative) | Auth DB directory — set absolute for deploys |
+| `AUDIT_DB_PATH` | `~/.dojo/audit.db` | Hash-chained audit log of tool calls, agent spawns and memory access — **use an absolute path**. Check it with `GET /admin/audit/verify` |
+| `AUDIT_ENABLED` | `true` | Set `false` to turn the audit log off |
+| `AUDIT_RECORD_TOOL_ARGS` | `false` | Store raw tool arguments in the audit log. Off by default: only their SHA-256 and key names are kept |
 | `MCP_CONFIG_PATH` | `gateway-config.yaml` | MCP host configuration file |
 | `MCP_APPS_ENABLED` | `false` | Enable the MCP Apps bridge |
 | `REGISTRATION_ENABLED` | `true` | Public sign-up on `POST /auth/register`. **The only way to close it** — see below |
 
-> **Relative DB paths bite.** A relative `MEMORY_DB_PATH` or `DOJO_CAS_PATH` silently creates a new empty database whenever the working directory changes (e.g. across restarts). Always use absolute paths in any non-local deployment.
+> **Relative DB paths bite.** A relative `MEMORY_DB_PATH`, `DOJO_CAS_PATH` or `AUDIT_DB_PATH` silently creates a new empty database whenever the working directory changes (e.g. across restarts). Always use absolute paths in any non-local deployment.
 
 ### JWT signing secret
 

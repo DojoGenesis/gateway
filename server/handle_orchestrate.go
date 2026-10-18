@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/DojoGenesis/gateway/events"
+	"github.com/DojoGenesis/gateway/observation/audit"
 	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 	serverorchestration "github.com/DojoGenesis/gateway/server/orchestration"
 	"github.com/DojoGenesis/gateway/tools"
@@ -175,7 +176,7 @@ func (s *Server) StartOrchestrationForChat(reqCtx context.Context, userID, taskD
 // run_command, for a user-role caller. Whatever starts detached work on behalf of
 // a caller builds its context here (or with tools.InheritAuthorizer).
 func detachedToolContext(reqCtx context.Context) context.Context {
-	return tools.InheritAuthorizer(context.Background(), reqCtx)
+	return audit.InheritAgentID(tools.InheritAuthorizer(context.Background(), reqCtx), reqCtx)
 }
 
 // executeOrchestration plans and runs one orchestration. base is the context

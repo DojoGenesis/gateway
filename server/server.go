@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DojoGenesis/gateway/observation/audit"
 	"github.com/DojoGenesis/gateway/pkg/netbind"
 
 	"github.com/gin-contrib/cors"
@@ -176,6 +177,9 @@ type Server struct {
 	// Federated agent mesh (Era 4 Phase 0). Nil when mesh is not configured.
 	mesh *mesh.Mesh
 
+	// Hash-chained audit log. Nil (a no-op recorder) when audit is disabled.
+	auditRecorder *audit.Recorder
+
 	// dispatch is the POST /dispatch skill registry (DGS-149), built once at
 	// startup from KATA_PLUGIN_DIR. Nil is treated as an empty registry.
 	dispatch *dispatchRegistry
@@ -236,6 +240,7 @@ func New(deps ServerDeps) *Server {
 		semanticRouter:        deps.SemanticRouter,
 		specialistRouter:      deps.SpecialistRouter,
 		mesh:                  deps.Mesh,
+		auditRecorder:         deps.AuditRecorder,
 		execBus:               newExecutionBus(),
 		latencyTracker:        services.NewProviderLatencyTracker(60),
 		wsHub:                 NewWorkflowWSHub(),

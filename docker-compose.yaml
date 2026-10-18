@@ -34,6 +34,7 @@ services:
 
       # Memory configuration
       MEMORY_DB_PATH: "/app/data/dojo_memory.db"
+      AUDIT_DB_PATH: "/app/data/audit.db"
 
     volumes:
       # Mount gateway MCP configuration

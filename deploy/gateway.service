@@ -37,6 +37,7 @@ Environment="GATEWAY_BIND_HOST=127.0.0.1"
 Environment="SYSTEM_PROMPT_FILE=/etc/dojo/system-prompt.md"
 Environment="MEMORY_DB_PATH=/var/lib/dojo/memory.db"
 Environment="DOJO_CAS_PATH=/var/lib/dojo/skills.db"
+Environment="AUDIT_DB_PATH=/var/lib/dojo/audit.db"
 
 # Security hardening
 NoNewPrivileges=true
