@@ -62,7 +62,8 @@ type lintRule struct {
 
 // goHandlerOp names an op implemented in Go rather than by a model.
 type goHandlerOp struct {
-	ID string
+	ID      string
+	Version string
 	// Implemented is false while the op is registered but blocked; the
 	// handler answers 501 instead of 404 so the caller can tell "not built
 	// yet" from "no such skill".
@@ -79,14 +80,11 @@ type dispatchRegistry struct {
 	goOps        map[string]*goHandlerOp
 }
 
-// kataGoOps are the Go-handler ops (DGS-150). They are registered but NOT
-// implemented: the memory store has no per-user scoping (the memories table
-// has no owner column and /v1/memory list/get/delete are global), so a
-// subject-scoped write or "delete all for this user" cannot be built safely
-// without an operator ruling. See the DGS-150 report.
+// kataGoOps are the Go-handler ops (DGS-150), built on the per-owner memory
+// scoping from DGS-163. See dispatch_kata_memory.go.
 var kataGoOps = []goHandlerOp{
-	{ID: "kata-memory-write", Reason: "memory storage is not scoped per user; blocked pending operator ruling (DGS-150)"},
-	{ID: "kata-account-delete", Reason: "memory storage is not scoped per user; blocked pending operator ruling (DGS-150)"},
+	{ID: "kata-memory-write", Version: "1.0.0", Implemented: true},
+	{ID: "kata-account-delete", Version: "1.0.0", Implemented: true},
 }
 
 // kataPluginDirFromEnv resolves the kata plugin root: KATA_PLUGIN_DIR, else

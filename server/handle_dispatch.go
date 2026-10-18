@@ -167,6 +167,19 @@ func (s *Server) handleDispatch(c *gin.Context) {
 			dispatchError(c, http.StatusNotImplemented, "not_implemented", gop.Reason)
 			return
 		}
+		if s.memoryManager == nil {
+			dispatchError(c, http.StatusServiceUnavailable, "memory_unavailable", "memory store is not configured")
+			return
+		}
+		switch gop.ID {
+		case "kata-memory-write":
+			s.runKataMemoryWrite(c, gop, subject, req.Input)
+		case "kata-account-delete":
+			s.runKataAccountDelete(c, gop, subject)
+		default:
+			dispatchError(c, http.StatusNotImplemented, "not_implemented", "no handler for "+gop.ID)
+		}
+		return
 	}
 
 	op, ok := reg.structured[req.Skill]
