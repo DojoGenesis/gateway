@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -59,6 +60,12 @@ func (h *MemoryHandler) StoreMemory(c *gin.Context) {
 		return
 	}
 
+	_, status, msg := MemoryScope(c)
+	if status != 0 {
+		respondErrorWithSuccess(c, status, msg)
+		return
+	}
+
 	var req StoreMemoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondBadRequestWithSuccess(c, "Invalid request body")
@@ -87,6 +94,9 @@ func (h *MemoryHandler) StoreMemory(c *gin.Context) {
 		ContextType: req.ContextType,
 		CreatedAt:   now,
 		UpdatedAt:   now,
+		// Always the caller, even under all_owners: a store never writes
+		// into someone else's memory.
+		OwnerID: c.GetString("user_id"),
 	}
 
 	if err := h.memory.Store(c.Request.Context(), mem); err != nil {
@@ -107,13 +117,19 @@ func (h *MemoryHandler) RetrieveMemory(c *gin.Context) {
 		return
 	}
 
+	scope, status, msg := MemoryScope(c)
+	if status != 0 {
+		respondErrorWithSuccess(c, status, msg)
+		return
+	}
+
 	memoryID := c.Param("id")
 	if memoryID == "" {
 		respondBadRequestWithSuccess(c, "Memory ID is required")
 		return
 	}
 
-	mem, err := h.memory.Retrieve(c.Request.Context(), memoryID)
+	mem, err := h.memory.GetMemoryScoped(c.Request.Context(), scope, memoryID)
 	if err != nil {
 		slog.Warn("memory not found", "id", memoryID, "error", err)
 		respondNotFoundWithSuccess(c, "Memory not found")
@@ -132,6 +148,12 @@ func (h *MemoryHandler) SearchMemory(c *gin.Context) {
 		return
 	}
 
+	scope, status, msg := MemoryScope(c)
+	if status != 0 {
+		respondErrorWithSuccess(c, status, msg)
+		return
+	}
+
 	var req SearchMemoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondBadRequestWithSuccess(c, "Invalid request body")
@@ -146,7 +168,7 @@ func (h *MemoryHandler) SearchMemory(c *gin.Context) {
 		maxResults = 100
 	}
 
-	memories, err := h.memory.Search(c.Request.Context(), req.Query, maxResults)
+	memories, _, err := h.memory.SearchMemoriesPageScoped(c.Request.Context(), scope, req.Query, maxResults, 0)
 	if err != nil {
 		slog.Error("failed to search memories", "error", err)
 		respondInternalErrorWithSuccess(c, "Failed to search memories")
@@ -166,13 +188,19 @@ func (h *MemoryHandler) DeleteMemory(c *gin.Context) {
 		return
 	}
 
+	scope, status, msg := MemoryScope(c)
+	if status != 0 {
+		respondErrorWithSuccess(c, status, msg)
+		return
+	}
+
 	memoryID := c.Param("id")
 	if memoryID == "" {
 		respondBadRequestWithSuccess(c, "Memory ID is required")
 		return
 	}
 
-	if err := h.memory.Delete(c.Request.Context(), memoryID); err != nil {
+	if err := h.memory.DeleteMemoryScoped(c.Request.Context(), scope, memoryID); err != nil {
 		slog.Warn("failed to delete memory", "id", memoryID, "error", err)
 		respondNotFoundWithSuccess(c, "Failed to delete memory")
 		return
@@ -195,6 +223,12 @@ func (h *MemoryHandler) UpdateMemory(c *gin.Context) {
 		return
 	}
 
+	scope, status, msg := MemoryScope(c)
+	if status != 0 {
+		respondErrorWithSuccess(c, status, msg)
+		return
+	}
+
 	memoryID := c.Param("id")
 	if memoryID == "" {
 		respondBadRequestWithSuccess(c, "Memory ID is required")
@@ -212,7 +246,11 @@ func (h *MemoryHandler) UpdateMemory(c *gin.Context) {
 		return
 	}
 
-	updatedMemory, err := h.memory.Update(c.Request.Context(), memoryID, req.Content, req.Metadata)
+	updatedMemory, err := h.memory.UpdateScoped(c.Request.Context(), scope, memoryID, req.Content, req.Metadata)
+	if errors.Is(err, memory.ErrMemoryNotFound) {
+		respondNotFoundWithSuccess(c, "Memory not found")
+		return
+	}
 	if err != nil {
 		slog.Error("failed to update memory", "id", memoryID, "error", err)
 		respondInternalErrorWithSuccess(c, "Failed to update memory")
@@ -236,6 +274,12 @@ func (h *MemoryHandler) ListMemories(c *gin.Context) {
 		return
 	}
 
+	scope, status, msg := MemoryScope(c)
+	if status != 0 {
+		respondErrorWithSuccess(c, status, msg)
+		return
+	}
+
 	var req ListMemoriesRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		respondBadRequestWithSuccess(c, "Invalid query parameters")
@@ -250,11 +294,18 @@ func (h *MemoryHandler) ListMemories(c *gin.Context) {
 		maxResults = 100
 	}
 
-	memories, err := h.memory.List(c.Request.Context(), req.SessionID, maxResults)
+	listed, err := h.memory.ListMemoriesScoped(c.Request.Context(), scope, memory.MemoryFilter{
+		ContextType: req.SessionID,
+		Limit:       maxResults,
+	})
 	if err != nil {
 		slog.Error("failed to list memories", "error", err)
 		respondInternalErrorWithSuccess(c, "Failed to list memories")
 		return
+	}
+	memories := make([]memory.Memory, 0, len(listed))
+	for _, m := range listed {
+		memories = append(memories, *m)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

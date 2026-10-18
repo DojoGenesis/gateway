@@ -28,6 +28,12 @@ func setupMemoryTestRouter(t *testing.T) (*gin.Engine, *memory.MemoryManager, fu
 	h := NewMemoryHandler(mm, nil, nil)
 
 	router := gin.New()
+	// Stand-in for AuthMiddleware: the memory handlers scope every call to
+	// the authenticated subject (DGS-163).
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", "test-user")
+		c.Next()
+	})
 
 	router.POST("/api/v1/memory", h.StoreMemory)
 	router.GET("/api/v1/memory/:id", h.RetrieveMemory)
@@ -151,6 +157,7 @@ func TestHandleRetrieveMemory(t *testing.T) {
 		Type:      "conversation",
 		Content:   "Test content for retrieval",
 		Metadata:  map[string]interface{}{"key": "value"},
+		OwnerID:   "test-user",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -216,6 +223,7 @@ func TestHandleSearchMemory(t *testing.T) {
 			Type:      "conversation",
 			Content:   "This is about golang programming",
 			Metadata:  map[string]interface{}{},
+			OwnerID:   "test-user",
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -224,6 +232,7 @@ func TestHandleSearchMemory(t *testing.T) {
 			Type:      "plan",
 			Content:   "Planning to learn Python",
 			Metadata:  map[string]interface{}{},
+			OwnerID:   "test-user",
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -232,6 +241,7 @@ func TestHandleSearchMemory(t *testing.T) {
 			Type:      "conversation",
 			Content:   "Advanced golang techniques",
 			Metadata:  map[string]interface{}{},
+			OwnerID:   "test-user",
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -365,6 +375,7 @@ func TestHandleDeleteMemory(t *testing.T) {
 		Type:      "conversation",
 		Content:   "Content to be deleted",
 		Metadata:  map[string]interface{}{},
+		OwnerID:   "test-user",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -565,6 +576,7 @@ func TestHandleUpdateMemory(t *testing.T) {
 		Type:      "conversation",
 		Content:   "Original content",
 		Metadata:  map[string]interface{}{"key": "value"},
+		OwnerID:   "test-user",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -620,7 +632,7 @@ func TestHandleUpdateMemory(t *testing.T) {
 			name:           "Update non-existent memory",
 			memoryID:       "non-existent-id",
 			requestBody:    UpdateMemoryRequest{Content: "Test"},
-			expectedStatus: http.StatusInternalServerError,
+			expectedStatus: http.StatusNotFound, // was 500 before DGS-163 mapped not-found
 			checkResponse: func(t *testing.T, resp map[string]interface{}) {
 				assert.False(t, resp["success"].(bool))
 			},
@@ -670,6 +682,7 @@ func TestHandleListMemories(t *testing.T) {
 			Content:     fmt.Sprintf("Content %d", i),
 			Metadata:    map[string]interface{}{"session_id": "test-session"},
 			ContextType: "test-session",
+			OwnerID:     "test-user",
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
 		}

@@ -117,6 +117,7 @@ func (pa *PrimaryAgent) storeConversation(ctx context.Context, userID string, qu
 		},
 		CreatedAt: response.Timestamp,
 		UpdatedAt: response.Timestamp,
+		OwnerID:   userID,
 	}
 
 	return pa.memoryManager.Store(ctx, mem)

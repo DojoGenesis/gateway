@@ -49,7 +49,7 @@ func (m *MemoryManager) StoreMemory(ctx context.Context, memory *Memory) error {
 // GetMemory retrieves a memory by ID.
 func (m *MemoryManager) GetMemory(ctx context.Context, id string) (*Memory, error) {
 	start := time.Now()
-	mem, err := m.getMemory(ctx, id)
+	mem, err := m.getMemory(ctx, id, nil)
 	m.observe(ctx, "get", map[string]interface{}{"memory_id": id}, err, start)
 	return mem, err
 }
@@ -57,7 +57,7 @@ func (m *MemoryManager) GetMemory(ctx context.Context, id string) (*Memory, erro
 // UpdateMemory updates an existing memory.
 func (m *MemoryManager) UpdateMemory(ctx context.Context, memory *Memory) error {
 	start := time.Now()
-	err := m.updateMemory(ctx, memory)
+	err := m.updateMemory(ctx, memory, nil)
 	meta := map[string]interface{}{}
 	if memory != nil {
 		meta["memory_id"] = memory.ID
@@ -70,7 +70,7 @@ func (m *MemoryManager) UpdateMemory(ctx context.Context, memory *Memory) error 
 // DeleteMemory deletes a memory by ID.
 func (m *MemoryManager) DeleteMemory(ctx context.Context, id string) error {
 	start := time.Now()
-	err := m.deleteMemory(ctx, id)
+	err := m.deleteMemory(ctx, id, nil)
 	m.observe(ctx, "delete", map[string]interface{}{"memory_id": id}, err, start)
 	return err
 }
@@ -79,7 +79,7 @@ func (m *MemoryManager) DeleteMemory(ctx context.Context, id string) error {
 // searchMemoriesPage.
 func (m *MemoryManager) SearchMemoriesPage(ctx context.Context, query string, limit, offset int) ([]SearchResult, int, error) {
 	start := time.Now()
-	results, total, err := m.searchMemoriesPage(ctx, query, limit, offset)
+	results, total, err := m.searchMemoriesPage(ctx, query, limit, offset, nil)
 	m.observe(ctx, "search", map[string]interface{}{
 		"query_sha256": hashText(query),
 		"returned":     len(results),

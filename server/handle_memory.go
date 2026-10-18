@@ -1,11 +1,13 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/DojoGenesis/gateway/memory"
+	"github.com/DojoGenesis/gateway/server/handlers"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -18,7 +20,9 @@ type MemoryStoreRequest struct {
 	Content     string                 `json:"content" binding:"required"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 	ContextType string                 `json:"context_type,omitempty"`
-	UserID      string                 `json:"user_id,omitempty"`
+	// UserID is accepted for backward compatibility and ignored: the owner
+	// of a stored memory is always the authenticated subject (DGS-163).
+	UserID string `json:"user_id,omitempty"`
 }
 
 // MemoryResponse is the API response for a single memory.
@@ -89,6 +93,12 @@ func (s *Server) handleStoreMemory(c *gin.Context) {
 		return
 	}
 
+	_, status, msg := handlers.MemoryScope(c)
+	if status != 0 {
+		s.errorResponse(c, status, memoryScopeErrorCode(status), msg)
+		return
+	}
+
 	var req MemoryStoreRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid request: "+err.Error())
@@ -117,6 +127,9 @@ func (s *Server) handleStoreMemory(c *gin.Context) {
 		ContextType: contextType,
 		CreatedAt:   now,
 		UpdatedAt:   now,
+		// Always the caller, even under all_owners: a store never writes
+		// into someone else's memory.
+		OwnerID: c.GetString("user_id"),
 	}
 
 	if err := s.memoryManager.Store(c.Request.Context(), mem); err != nil {
@@ -131,6 +144,12 @@ func (s *Server) handleStoreMemory(c *gin.Context) {
 func (s *Server) handleListMemories(c *gin.Context) {
 	if s.memoryManager == nil {
 		s.errorResponse(c, http.StatusServiceUnavailable, "server_error", "Memory manager not initialized")
+		return
+	}
+
+	scope, status, msg := handlers.MemoryScope(c)
+	if status != 0 {
+		s.errorResponse(c, status, memoryScopeErrorCode(status), msg)
 		return
 	}
 
@@ -158,7 +177,7 @@ func (s *Server) handleListMemories(c *gin.Context) {
 	var total int
 
 	if query != "" {
-		results, searchTotal, searchErr := s.memoryManager.SearchMemoriesPage(c.Request.Context(), query, limit, offset)
+		results, searchTotal, searchErr := s.memoryManager.SearchMemoriesPageScoped(c.Request.Context(), scope, query, limit, offset)
 		if searchErr != nil {
 			s.errorResponse(c, http.StatusInternalServerError, "server_error", "Search failed: "+searchErr.Error())
 			return
@@ -170,7 +189,7 @@ func (s *Server) handleListMemories(c *gin.Context) {
 	} else {
 		filter := memory.MemoryFilter{ContextType: sessionID, Limit: limit, Offset: offset}
 
-		listed, err := s.memoryManager.ListMemories(c.Request.Context(), filter)
+		listed, err := s.memoryManager.ListMemoriesScoped(c.Request.Context(), scope, filter)
 		if err != nil {
 			s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to list memories: "+err.Error())
 			return
@@ -184,7 +203,7 @@ func (s *Server) handleListMemories(c *gin.Context) {
 		// way to tell "the store has exactly 20 entries" apart from "the store
 		// has 34 entries and I silently got the first 20 of them".
 		countFilter := memory.MemoryFilter{ContextType: sessionID}
-		total, err = s.memoryManager.CountMemories(c.Request.Context(), countFilter)
+		total, err = s.memoryManager.CountMemoriesScoped(c.Request.Context(), scope, countFilter)
 		if err != nil {
 			s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to count memories: "+err.Error())
 			return
@@ -211,13 +230,19 @@ func (s *Server) handleGetMemory(c *gin.Context) {
 		return
 	}
 
+	scope, status, msg := handlers.MemoryScope(c)
+	if status != 0 {
+		s.errorResponse(c, status, memoryScopeErrorCode(status), msg)
+		return
+	}
+
 	memoryID := c.Param("id")
 	if memoryID == "" {
 		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "Memory ID is required")
 		return
 	}
 
-	mem, err := s.memoryManager.Retrieve(c.Request.Context(), memoryID)
+	mem, err := s.memoryManager.GetMemoryScoped(c.Request.Context(), scope, memoryID)
 	if err != nil {
 		s.errorResponse(c, http.StatusNotFound, "not_found", "Memory not found")
 		return
@@ -230,6 +255,12 @@ func (s *Server) handleGetMemory(c *gin.Context) {
 func (s *Server) handleUpdateMemory(c *gin.Context) {
 	if s.memoryManager == nil {
 		s.errorResponse(c, http.StatusServiceUnavailable, "server_error", "Memory manager not initialized")
+		return
+	}
+
+	scope, status, msg := handlers.MemoryScope(c)
+	if status != 0 {
+		s.errorResponse(c, status, memoryScopeErrorCode(status), msg)
 		return
 	}
 
@@ -250,7 +281,11 @@ func (s *Server) handleUpdateMemory(c *gin.Context) {
 		return
 	}
 
-	updatedMem, err := s.memoryManager.Update(c.Request.Context(), memoryID, req.Content, req.Metadata)
+	updatedMem, err := s.memoryManager.UpdateScoped(c.Request.Context(), scope, memoryID, req.Content, req.Metadata)
+	if errors.Is(err, memory.ErrMemoryNotFound) {
+		s.errorResponse(c, http.StatusNotFound, "not_found", "Memory not found")
+		return
+	}
 	if err != nil {
 		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Failed to update memory: "+err.Error())
 		return
@@ -266,13 +301,19 @@ func (s *Server) handleDeleteMemory(c *gin.Context) {
 		return
 	}
 
+	scope, status, msg := handlers.MemoryScope(c)
+	if status != 0 {
+		s.errorResponse(c, status, memoryScopeErrorCode(status), msg)
+		return
+	}
+
 	memoryID := c.Param("id")
 	if memoryID == "" {
 		s.errorResponse(c, http.StatusBadRequest, "invalid_request", "Memory ID is required")
 		return
 	}
 
-	if err := s.memoryManager.Delete(c.Request.Context(), memoryID); err != nil {
+	if err := s.memoryManager.DeleteMemoryScoped(c.Request.Context(), scope, memoryID); err != nil {
 		s.errorResponse(c, http.StatusNotFound, "not_found", "Memory not found")
 		return
 	}
@@ -284,6 +325,12 @@ func (s *Server) handleDeleteMemory(c *gin.Context) {
 func (s *Server) handleSearchMemory(c *gin.Context) {
 	if s.memoryManager == nil {
 		s.errorResponse(c, http.StatusServiceUnavailable, "server_error", "Memory manager not initialized")
+		return
+	}
+
+	scope, status, msg := handlers.MemoryScope(c)
+	if status != 0 {
+		s.errorResponse(c, status, memoryScopeErrorCode(status), msg)
 		return
 	}
 
@@ -305,7 +352,7 @@ func (s *Server) handleSearchMemory(c *gin.Context) {
 		offset = 0
 	}
 
-	results, total, err := s.memoryManager.SearchMemoriesPage(c.Request.Context(), req.Query, limit, offset)
+	results, total, err := s.memoryManager.SearchMemoriesPageScoped(c.Request.Context(), scope, req.Query, limit, offset)
 	if err != nil {
 		s.errorResponse(c, http.StatusInternalServerError, "server_error", "Search failed: "+err.Error())
 		return
@@ -326,4 +373,13 @@ func (s *Server) handleSearchMemory(c *gin.Context) {
 		Results:    searchResults,
 		TotalCount: total,
 	})
+}
+
+// memoryScopeErrorCode maps a handlers.MemoryScope refusal to this API's
+// error code.
+func memoryScopeErrorCode(status int) string {
+	if status == http.StatusForbidden {
+		return "forbidden"
+	}
+	return "unauthorized"
 }

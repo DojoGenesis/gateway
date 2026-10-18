@@ -80,7 +80,8 @@ func (m *MemoryManager) initSchema() error {
 		embedding BLOB,
 		context_type TEXT DEFAULT 'conversation',
 		created_at DATETIME NOT NULL,
-		updated_at DATETIME NOT NULL
+		updated_at DATETIME NOT NULL,
+		owner_id TEXT NOT NULL DEFAULT ''
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
@@ -89,8 +90,66 @@ func (m *MemoryManager) initSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_memories_context_type ON memories(context_type);
 	`
 
-	_, err := m.db.Exec(schema)
-	return err
+	if _, err := m.db.Exec(schema); err != nil {
+		return err
+	}
+	return m.migrateOwnerColumn()
+}
+
+// migrateOwnerColumn adds memories.owner_id to a database created before
+// DGS-163, then indexes it. The index is created here rather than in the
+// schema above because on an old database the column does not exist until
+// the ALTER runs.
+//
+// Rows that predate the column get owner_id = ” (LegacyOwnerID). No
+// authenticated subject is ever empty, so owner-scoped reads never return
+// them; only an explicit all-owners scope (admin) can see or reassign them.
+func (m *MemoryManager) migrateOwnerColumn() error {
+	rows, err := m.db.Query(`PRAGMA table_info(memories)`)
+	if err != nil {
+		return fmt.Errorf("failed to read memories columns: %w", err)
+	}
+	hasOwner := false
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, colType string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dflt, &pk); err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to scan memories columns: %w", err)
+		}
+		if name == "owner_id" {
+			hasOwner = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("failed to read memories columns: %w", err)
+	}
+	rows.Close()
+
+	if !hasOwner {
+		if _, err := m.db.Exec(`ALTER TABLE memories ADD COLUMN owner_id TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add memories.owner_id: %w", err)
+		}
+	}
+	if _, err := m.db.Exec(`CREATE INDEX IF NOT EXISTS idx_memories_owner_updated ON memories(owner_id, updated_at)`); err != nil {
+		return fmt.Errorf("failed to index memories.owner_id: %w", err)
+	}
+	return nil
+}
+
+// memoryColumns is the column list every SELECT that feeds scanMemory uses.
+const memoryColumns = `id, type, content, metadata, embedding, context_type, created_at, updated_at, owner_id`
+
+// ownerClause returns an " AND owner_id = ?" fragment and its arg when owner is
+// non-nil, and nothing when owner is nil (unscoped: internal callers and the
+// explicit all-owners scope).
+func ownerClause(owner *string) (string, []interface{}) {
+	if owner == nil {
+		return "", nil
+	}
+	return " AND owner_id = ?", []interface{}{*owner}
 }
 
 // storeMemory stores a new memory or updates an existing one (upsert).
@@ -120,8 +179,8 @@ func (m *MemoryManager) storeMemory(ctx context.Context, memory *Memory) error {
 	}
 
 	query := `
-		INSERT INTO memories (id, type, content, metadata, embedding, context_type, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO memories (id, type, content, metadata, embedding, context_type, created_at, updated_at, owner_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			type = excluded.type,
 			content = excluded.content,
@@ -129,9 +188,12 @@ func (m *MemoryManager) storeMemory(ctx context.Context, memory *Memory) error {
 			embedding = excluded.embedding,
 			context_type = excluded.context_type,
 			updated_at = excluded.updated_at
+		WHERE memories.owner_id = excluded.owner_id
 	`
 
-	_, err = m.db.ExecContext(ctx, query,
+	// The WHERE on the upsert means a store whose ID collides with another
+	// owner's memory changes nothing: ownership never moves through a store.
+	result, err := m.db.ExecContext(ctx, query,
 		memory.ID,
 		memory.Type,
 		memory.Content,
@@ -140,28 +202,34 @@ func (m *MemoryManager) storeMemory(ctx context.Context, memory *Memory) error {
 		memory.ContextType,
 		memory.CreatedAt,
 		memory.UpdatedAt,
+		memory.OwnerID,
 	)
 
 	if err != nil {
 		return fmt.Errorf("failed to store memory: %w", err)
 	}
+	if n, err := result.RowsAffected(); err == nil && n == 0 {
+		return ErrMemoryOwnerConflict
+	}
 
 	return nil
 }
 
-// getMemory retrieves a memory by ID.
-func (m *MemoryManager) getMemory(ctx context.Context, id string) (*Memory, error) {
+// getMemory retrieves a memory by ID. A non-nil owner restricts the lookup to
+// that owner's rows; another owner's memory reads as ErrMemoryNotFound.
+func (m *MemoryManager) getMemory(ctx context.Context, id string, owner *string) (*Memory, error) {
 	if id == "" {
 		return nil, fmt.Errorf("id cannot be empty")
 	}
 
-	query := `SELECT id, type, content, metadata, embedding, context_type, created_at, updated_at FROM memories WHERE id = ?`
+	ownerSQL, ownerArgs := ownerClause(owner)
+	query := `SELECT ` + memoryColumns + ` FROM memories WHERE id = ?` + ownerSQL
 
 	var memory Memory
 	var metadataJSON string
 	var embeddingBytes []byte
 
-	err := m.db.QueryRowContext(ctx, query, id).Scan(
+	err := m.db.QueryRowContext(ctx, query, append([]interface{}{id}, ownerArgs...)...).Scan(
 		&memory.ID,
 		&memory.Type,
 		&memory.Content,
@@ -170,6 +238,7 @@ func (m *MemoryManager) getMemory(ctx context.Context, id string) (*Memory, erro
 		&memory.ContextType,
 		&memory.CreatedAt,
 		&memory.UpdatedAt,
+		&memory.OwnerID,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -195,8 +264,9 @@ func (m *MemoryManager) getMemory(ctx context.Context, id string) (*Memory, erro
 	return &memory, nil
 }
 
-// updateMemory updates an existing memory's content and metadata.
-func (m *MemoryManager) updateMemory(ctx context.Context, memory *Memory) error {
+// updateMemory updates an existing memory's content and metadata. It never
+// changes owner_id. A non-nil owner restricts the update to that owner's rows.
+func (m *MemoryManager) updateMemory(ctx context.Context, memory *Memory, owner *string) error {
 	if memory == nil {
 		return fmt.Errorf("memory cannot be nil")
 	}
@@ -216,8 +286,9 @@ func (m *MemoryManager) updateMemory(ctx context.Context, memory *Memory) error 
 		embeddingBytes, _ = serializeEmbedding(memory.Embedding)
 	}
 
-	query := `UPDATE memories SET type = ?, content = ?, metadata = ?, embedding = ?, context_type = ?, updated_at = ? WHERE id = ?`
-	result, err := m.db.ExecContext(ctx, query,
+	ownerSQL, ownerArgs := ownerClause(owner)
+	query := `UPDATE memories SET type = ?, content = ?, metadata = ?, embedding = ?, context_type = ?, updated_at = ? WHERE id = ?` + ownerSQL
+	args := []interface{}{
 		memory.Type,
 		memory.Content,
 		string(metadataJSON),
@@ -225,7 +296,8 @@ func (m *MemoryManager) updateMemory(ctx context.Context, memory *Memory) error 
 		memory.ContextType,
 		memory.UpdatedAt,
 		memory.ID,
-	)
+	}
+	result, err := m.db.ExecContext(ctx, query, append(args, ownerArgs...)...)
 	if err != nil {
 		return fmt.Errorf("failed to update memory: %w", err)
 	}
@@ -241,14 +313,16 @@ func (m *MemoryManager) updateMemory(ctx context.Context, memory *Memory) error 
 	return nil
 }
 
-// deleteMemory deletes a memory by ID.
-func (m *MemoryManager) deleteMemory(ctx context.Context, id string) error {
+// deleteMemory deletes a memory by ID. A non-nil owner restricts the delete to
+// that owner's rows; another owner's memory reads as ErrMemoryNotFound.
+func (m *MemoryManager) deleteMemory(ctx context.Context, id string, owner *string) error {
 	if id == "" {
 		return fmt.Errorf("id cannot be empty")
 	}
 
-	query := `DELETE FROM memories WHERE id = ?`
-	result, err := m.db.ExecContext(ctx, query, id)
+	ownerSQL, ownerArgs := ownerClause(owner)
+	query := `DELETE FROM memories WHERE id = ?` + ownerSQL
+	result, err := m.db.ExecContext(ctx, query, append([]interface{}{id}, ownerArgs...)...)
 	if err != nil {
 		return fmt.Errorf("failed to delete memory: %w", err)
 	}
@@ -288,7 +362,11 @@ func (m *MemoryManager) SearchMemories(ctx context.Context, query string, limit 
 // total is what lets an HTTP caller tell "you got everything" apart from "you got
 // a page of a larger result set" -- the same class of gap fixed for plain listing
 // by CountMemories.
-func (m *MemoryManager) searchMemoriesPage(ctx context.Context, query string, limit, offset int) ([]SearchResult, int, error) {
+//
+// A non-nil owner restricts the search to that owner's rows. The ranking's
+// document frequencies are then computed over that owner's memories only, so
+// scores reveal nothing about anyone else's.
+func (m *MemoryManager) searchMemoriesPage(ctx context.Context, query string, limit, offset int, owner *string) ([]SearchResult, int, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -301,9 +379,9 @@ func (m *MemoryManager) searchMemoriesPage(ctx context.Context, query string, li
 	var all []SearchResult
 	var err error
 	if trimmed == "" {
-		all, err = m.listAllAsResults(ctx, 0) // 0 => no limit; we page below.
+		all, err = m.listAllAsResults(ctx, 0, owner) // 0 => no limit; we page below.
 	} else {
-		all, err = m.rankedSearch(ctx, trimmed)
+		all, err = m.rankedSearch(ctx, trimmed, owner)
 	}
 	if err != nil {
 		return nil, 0, err
@@ -342,16 +420,17 @@ const tokenExactPhraseBonus = 1000.0
 //     matching more of the distinct query tokens, so "matches all 6 tokens"
 //     outranks "matches 1 of 6" even when the matched token itself is common.
 //  3. Ties fall back to updated_at DESC, matching the original ORDER BY.
-func (m *MemoryManager) rankedSearch(ctx context.Context, trimmedQuery string) ([]SearchResult, error) {
+func (m *MemoryManager) rankedSearch(ctx context.Context, trimmedQuery string, owner *string) ([]SearchResult, error) {
 	tokens := tokenizeQuery(trimmedQuery)
 	if len(tokens) == 0 {
 		return []SearchResult{}, nil
 	}
 
+	ownerSQL, ownerArgs := ownerClause(owner)
 	rows, err := m.db.QueryContext(ctx, `
-		SELECT id, type, content, metadata, embedding, context_type, created_at, updated_at
+		SELECT `+memoryColumns+`
 		FROM memories
-	`)
+		WHERE 1=1`+ownerSQL, ownerArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search memories: %w", err)
 	}
@@ -511,13 +590,17 @@ func buildMemoryFilterWhere(filter MemoryFilter) (string, []interface{}) {
 		args = append(args, *filter.CreatedAfter)
 	}
 
+	ownerSQL, ownerArgs := ownerClause(filter.OwnerID)
+	clause += ownerSQL
+	args = append(args, ownerArgs...)
+
 	return clause, args
 }
 
 // listMemories lists memories matching the given filter.
 func (m *MemoryManager) listMemories(ctx context.Context, filter MemoryFilter) ([]*Memory, error) {
 	where, args := buildMemoryFilterWhere(filter)
-	query := `SELECT id, type, content, metadata, embedding, context_type, created_at, updated_at FROM memories` + where + ` ORDER BY updated_at DESC`
+	query := `SELECT ` + memoryColumns + ` FROM memories` + where + ` ORDER BY updated_at DESC`
 
 	limit := filter.Limit
 	if limit <= 0 {
@@ -576,7 +659,7 @@ func (m *MemoryManager) searchMemoriesSemantic(ctx context.Context, queryEmbeddi
 	}
 
 	sqlQuery := `
-		SELECT id, type, content, metadata, embedding, context_type, created_at, updated_at
+		SELECT ` + memoryColumns + `
 		FROM memories
 		WHERE embedding IS NOT NULL
 	`
@@ -626,13 +709,15 @@ func (m *MemoryManager) searchMemoriesSemantic(ctx context.Context, queryEmbeddi
 // updated_at DESC. limit <= 0 means "no limit" (return everything) -- callers that
 // want a bounded page (e.g. SearchMemories's empty-query case) must pass a
 // positive limit explicitly.
-func (m *MemoryManager) listAllAsResults(ctx context.Context, limit int) ([]SearchResult, error) {
+// A non-nil owner restricts the listing to that owner's rows.
+func (m *MemoryManager) listAllAsResults(ctx context.Context, limit int, owner *string) ([]SearchResult, error) {
+	ownerSQL, args := ownerClause(owner)
 	sqlQuery := `
-		SELECT id, type, content, metadata, embedding, context_type, created_at, updated_at
+		SELECT ` + memoryColumns + `
 		FROM memories
+		WHERE 1=1` + ownerSQL + `
 		ORDER BY updated_at DESC
 	`
-	var args []interface{}
 	if limit > 0 {
 		sqlQuery += " LIMIT ?"
 		args = append(args, limit)
@@ -685,6 +770,7 @@ func (m *MemoryManager) scanMemory(row scannable) (*Memory, error) {
 		&memory.ContextType,
 		&memory.CreatedAt,
 		&memory.UpdatedAt,
+		&memory.OwnerID,
 	)
 	if err != nil {
 		return nil, err

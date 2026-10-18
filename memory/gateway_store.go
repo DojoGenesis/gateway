@@ -12,6 +12,10 @@ import (
 // GatewayMemoryStore adapts the existing memory.MemoryManager
 // to implement the gateway.MemoryStore interface.
 // This allows the memory manager to be used through the gateway's standard interface.
+//
+// gateway.MemoryStore has no owner parameter, so every method takes the owner
+// from ctx (memory.WithOwner) and fails closed with ErrInvalidScope when ctx
+// carries none (DGS-163).
 type GatewayMemoryStore struct {
 	manager *MemoryManager
 }
@@ -32,8 +36,14 @@ func (s *GatewayMemoryStore) Store(ctx context.Context, entry *gateway.MemoryEnt
 		return fmt.Errorf("memory entry cannot be nil")
 	}
 
+	scope := ScopeFromContext(ctx)
+	if _, err := scope.predicate(); err != nil {
+		return err
+	}
+
 	// Convert gateway.MemoryEntry to memory.Memory
 	memory := Memory{
+		OwnerID:     scope.OwnerID(),
 		ID:          entry.ID,
 		Type:        entry.EntryType,
 		Content:     entry.Content,
@@ -71,7 +81,7 @@ func (s *GatewayMemoryStore) Search(ctx context.Context, query *gateway.SearchQu
 	}
 
 	// Search using memory manager
-	searchResults, err := s.manager.Search(ctx, query.Text, limit)
+	searchResults, _, err := s.manager.SearchMemoriesPageScoped(ctx, ScopeFromContext(ctx), query.Text, limit, 0)
 	if err != nil {
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
@@ -116,7 +126,7 @@ func (s *GatewayMemoryStore) Get(ctx context.Context, id string) (*gateway.Memor
 	}
 
 	// Get from memory manager
-	memory, err := s.manager.Get(ctx, id)
+	memory, err := s.manager.GetMemoryScoped(ctx, ScopeFromContext(ctx), id)
 	if err != nil {
 		return nil, fmt.Errorf("get failed: %w", err)
 	}
@@ -142,5 +152,5 @@ func (s *GatewayMemoryStore) Delete(ctx context.Context, id string) error {
 	}
 
 	// Delete using memory manager
-	return s.manager.Delete(ctx, id)
+	return s.manager.DeleteMemoryScoped(ctx, ScopeFromContext(ctx), id)
 }
