@@ -324,7 +324,7 @@ func buildAndRegisterAdapters(gw *channel.WebhookGateway, creds channel.Credenti
 }
 
 // bridgePort returns the HTTP port for the bridge server.
-// Defaults to 8090 to avoid collision with the main Gateway (typically 8080).
+// Defaults to 8090 to avoid collision with the main Gateway (default 7340).
 func bridgePort() string {
 	if p := os.Getenv("DOJO_BRIDGE_PORT"); p != "" {
 		return p

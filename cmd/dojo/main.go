@@ -27,6 +27,10 @@ import (
 
 const defaultCASPath = "dojo-skills.db"
 
+// version marks an unreleased local build. Release builds override it via
+// -ldflags "-X main.version=<tag>".
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
@@ -55,7 +59,7 @@ func main() {
 			os.Exit(1)
 		}
 	case "version":
-		fmt.Println("dojo v3.2.0-era3")
+		fmt.Println("dojo " + version)
 	case "help", "-h", "--help":
 		printUsage()
 	default:

@@ -141,10 +141,10 @@ docker-compose restart gateway
 
 ```bash
 # Check MCP status
-curl http://localhost:8080/admin/mcp/status
+curl http://localhost:7340/admin/mcp/status
 
 # List all tools (should include custom:* tools)
-curl http://localhost:8080/v1/gateway/tools
+curl http://localhost:7340/v1/gateway/tools
 ```
 
 ---
@@ -311,7 +311,7 @@ health_check:
 
 ```bash
 # Check overall MCP health
-curl http://localhost:8080/admin/mcp/status
+curl http://localhost:7340/admin/mcp/status
 
 # Response includes per-server health:
 # {

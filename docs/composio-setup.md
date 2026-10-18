@@ -298,7 +298,7 @@ tools:
 ### 1. Verify Server Registration
 
 ```bash
-curl http://localhost:8080/admin/mcp/status
+curl http://localhost:7340/admin/mcp/status
 ```
 
 Expected response:
@@ -323,7 +323,7 @@ Expected response:
 ### 2. List Composio Tools
 
 ```bash
-curl http://localhost:8080/v1/gateway/tools | jq '.tools[] | select(.name | startswith("composio:"))'
+curl http://localhost:7340/v1/gateway/tools | jq '.tools[] | select(.name | startswith("composio:"))'
 ```
 
 Expected output:
@@ -339,7 +339,7 @@ Expected output:
 ### 3. Invoke a Tool
 
 ```bash
-curl -X POST http://localhost:8080/v1/tools/composio:github:list_repos/invoke \
+curl -X POST http://localhost:7340/v1/tools/composio:github:list_repos/invoke \
   -H "Content-Type: application/json" \
   -d '{
     "owner": "your-github-username"

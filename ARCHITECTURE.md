@@ -574,7 +574,7 @@ docker-compose ps
 docker-compose logs -f gateway
 
 # Check MCP status
-curl http://localhost:8080/admin/mcp/status
+curl http://localhost:7340/admin/mcp/status
 ```
 
 ### Environment Variables
