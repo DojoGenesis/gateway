@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DojoGenesis/gateway/pkg/gateway"
+	"github.com/DojoGenesis/gateway/tools"
 )
 
 // ToolCallRequest represents a tool call from an app.
@@ -55,6 +56,7 @@ func (p *ToolCallProxy) ProxyCall(ctx context.Context, req *ToolCallRequest) (*T
 
 	// Check authorization
 	if !p.policy.CanCallTool(req.AppID, req.ToolName) {
+		tools.ObserveCall(ctx, req.ToolName, req.Arguments, nil, fmt.Errorf("app %s is not authorized to call tool %s", req.AppID, req.ToolName), 0)
 		return &ToolCallResponse{
 			IsError: true,
 			Error:   fmt.Sprintf("app %s is not authorized to call tool %s", req.AppID, req.ToolName),
@@ -91,7 +93,10 @@ func (p *ToolCallProxy) ProxyCall(ctx context.Context, req *ToolCallRequest) (*T
 		args = make(map[string]interface{})
 	}
 
+	start := time.Now()
 	result, err := tool.Function(callCtx, args)
+	// tool.Function is called directly, so report the call for audit here.
+	tools.ObserveCall(ctx, req.ToolName, args, result, err, time.Since(start))
 	if err != nil {
 		return &ToolCallResponse{
 			IsError: true,

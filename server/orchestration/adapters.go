@@ -3,6 +3,7 @@ package orchestration
 import (
 	"context"
 	"fmt"
+	"time"
 
 	orchestrationpkg "github.com/DojoGenesis/gateway/orchestration"
 	"github.com/DojoGenesis/gateway/server/services"
@@ -21,12 +22,16 @@ func NewToolInvokerAdapter() *ToolInvokerAdapter {
 }
 
 // InvokeTool executes a tool by name with the given parameters.
-func (t *ToolInvokerAdapter) InvokeTool(ctx context.Context, toolName string, parameters map[string]interface{}) (map[string]interface{}, error) {
+func (t *ToolInvokerAdapter) InvokeTool(ctx context.Context, toolName string, parameters map[string]interface{}) (result map[string]interface{}, err error) {
 	// Get the tool definition from the registry
 	toolDef, err := tools.GetTool(toolName)
 	if err != nil {
 		return nil, fmt.Errorf("ToolInvokerAdapter: tool not found '%s': %w", toolName, err)
 	}
+
+	// Same bypass as below: report the call for audit the way tools.InvokeTool would.
+	start := time.Now()
+	defer func() { tools.ObserveCall(ctx, toolName, parameters, result, err, time.Since(start)) }()
 
 	// toolDef.Function is called directly below, so it bypasses the caller-policy
 	// check in tools.InvokeTool; ask here. A plan node is caller-influenced (a
@@ -41,7 +46,7 @@ func (t *ToolInvokerAdapter) InvokeTool(ctx context.Context, toolName string, pa
 		return nil, fmt.Errorf("ToolInvokerAdapter: tool '%s' has no function", toolName)
 	}
 
-	result, err := toolDef.Function(ctx, parameters)
+	result, err = toolDef.Function(ctx, parameters)
 	if err != nil {
 		return nil, fmt.Errorf("ToolInvokerAdapter: execution failed for tool '%s': %w", toolName, err)
 	}

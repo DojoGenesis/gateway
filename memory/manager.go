@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -20,7 +21,8 @@ import (
 
 // MemoryManager provides CRUD operations for conversational memories.
 type MemoryManager struct {
-	db *sql.DB
+	db       *sql.DB
+	observer atomic.Pointer[AccessObserver]
 }
 
 // NewMemoryManager creates a new MemoryManager backed by SQLite at the given path.
@@ -91,8 +93,8 @@ func (m *MemoryManager) initSchema() error {
 	return err
 }
 
-// StoreMemory stores a new memory or updates an existing one (upsert).
-func (m *MemoryManager) StoreMemory(ctx context.Context, memory *Memory) error {
+// storeMemory stores a new memory or updates an existing one (upsert).
+func (m *MemoryManager) storeMemory(ctx context.Context, memory *Memory) error {
 	if memory == nil {
 		return fmt.Errorf("memory cannot be nil")
 	}
@@ -147,8 +149,8 @@ func (m *MemoryManager) StoreMemory(ctx context.Context, memory *Memory) error {
 	return nil
 }
 
-// GetMemory retrieves a memory by ID.
-func (m *MemoryManager) GetMemory(ctx context.Context, id string) (*Memory, error) {
+// getMemory retrieves a memory by ID.
+func (m *MemoryManager) getMemory(ctx context.Context, id string) (*Memory, error) {
 	if id == "" {
 		return nil, fmt.Errorf("id cannot be empty")
 	}
@@ -193,8 +195,8 @@ func (m *MemoryManager) GetMemory(ctx context.Context, id string) (*Memory, erro
 	return &memory, nil
 }
 
-// UpdateMemory updates an existing memory's content and metadata.
-func (m *MemoryManager) UpdateMemory(ctx context.Context, memory *Memory) error {
+// updateMemory updates an existing memory's content and metadata.
+func (m *MemoryManager) updateMemory(ctx context.Context, memory *Memory) error {
 	if memory == nil {
 		return fmt.Errorf("memory cannot be nil")
 	}
@@ -239,8 +241,8 @@ func (m *MemoryManager) UpdateMemory(ctx context.Context, memory *Memory) error 
 	return nil
 }
 
-// DeleteMemory deletes a memory by ID.
-func (m *MemoryManager) DeleteMemory(ctx context.Context, id string) error {
+// deleteMemory deletes a memory by ID.
+func (m *MemoryManager) deleteMemory(ctx context.Context, id string) error {
 	if id == "" {
 		return fmt.Errorf("id cannot be empty")
 	}
@@ -281,12 +283,12 @@ func (m *MemoryManager) SearchMemories(ctx context.Context, query string, limit 
 	return results, err
 }
 
-// SearchMemoriesPage is SearchMemories with limit/offset paging, additionally
+// searchMemoriesPage is SearchMemories with limit/offset paging, additionally
 // returning the true number of matches *before* paging was applied. Exposing that
 // total is what lets an HTTP caller tell "you got everything" apart from "you got
 // a page of a larger result set" -- the same class of gap fixed for plain listing
 // by CountMemories.
-func (m *MemoryManager) SearchMemoriesPage(ctx context.Context, query string, limit, offset int) ([]SearchResult, int, error) {
+func (m *MemoryManager) searchMemoriesPage(ctx context.Context, query string, limit, offset int) ([]SearchResult, int, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -512,8 +514,8 @@ func buildMemoryFilterWhere(filter MemoryFilter) (string, []interface{}) {
 	return clause, args
 }
 
-// ListMemories lists memories matching the given filter.
-func (m *MemoryManager) ListMemories(ctx context.Context, filter MemoryFilter) ([]*Memory, error) {
+// listMemories lists memories matching the given filter.
+func (m *MemoryManager) listMemories(ctx context.Context, filter MemoryFilter) ([]*Memory, error) {
 	where, args := buildMemoryFilterWhere(filter)
 	query := `SELECT id, type, content, metadata, embedding, context_type, created_at, updated_at FROM memories` + where + ` ORDER BY updated_at DESC`
 
@@ -564,8 +566,8 @@ func (m *MemoryManager) CountMemories(ctx context.Context, filter MemoryFilter) 
 	return count, nil
 }
 
-// SearchMemoriesSemantic searches memories using embedding cosine similarity.
-func (m *MemoryManager) SearchMemoriesSemantic(ctx context.Context, queryEmbedding []float32, limit int) ([]SearchResult, error) {
+// searchMemoriesSemantic searches memories using embedding cosine similarity.
+func (m *MemoryManager) searchMemoriesSemantic(ctx context.Context, queryEmbedding []float32, limit int) ([]SearchResult, error) {
 	if len(queryEmbedding) == 0 {
 		return nil, fmt.Errorf("query embedding cannot be empty")
 	}

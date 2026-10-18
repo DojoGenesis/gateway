@@ -34,7 +34,8 @@ type d1AuditLog struct {
 }
 
 // NewD1AuditLog creates a D1-backed AuditLog. The remote `audit_log` table must
-// already exist (matching the schema in observation/audit/log.go createAuditTables).
+// already exist (matching the schema in observation/audit/log.go createAuditTables),
+// including the hash-chain columns seq, prev_hash and entry_hash.
 func NewD1AuditLog(cfg D1Config) (AuditLog, error) {
 	if cfg.AccountID == "" || cfg.DatabaseID == "" || cfg.APIToken == "" {
 		return nil, errors.New("audit/d1: AccountID, DatabaseID, and APIToken are required")
@@ -73,8 +74,8 @@ func (l *d1AuditLog) Record(ctx context.Context, entry AuditEntry) error {
 
 	_, err = l.client.Exec(ctx,
 		`INSERT INTO audit_log
-		 (id, timestamp, agent_id, action, tool, tool_args, capabilities_granted, result_hash, duration_ns, metadata)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 (id, timestamp, agent_id, action, tool, tool_args, capabilities_granted, result_hash, duration_ns, metadata, seq, prev_hash, entry_hash)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		entry.ID,
 		entry.Timestamp.UTC().Format(time.RFC3339Nano),
 		entry.AgentID,
@@ -85,6 +86,9 @@ func (l *d1AuditLog) Record(ctx context.Context, entry AuditEntry) error {
 		entry.ResultHash,
 		entry.Duration.Nanoseconds(),
 		string(metaJSON),
+		entry.Seq,
+		entry.PrevHash,
+		entry.EntryHash,
 	)
 	if err != nil {
 		return fmt.Errorf("audit/d1: record: %w", err)
@@ -93,7 +97,7 @@ func (l *d1AuditLog) Record(ctx context.Context, entry AuditEntry) error {
 }
 
 func (l *d1AuditLog) Query(ctx context.Context, filter AuditFilter) ([]AuditEntry, error) {
-	sql := `SELECT id, timestamp, agent_id, action, tool, tool_args, capabilities_granted, result_hash, duration_ns, metadata
+	sql := `SELECT id, timestamp, agent_id, action, tool, tool_args, capabilities_granted, result_hash, duration_ns, metadata, seq, prev_hash, entry_hash
 	        FROM audit_log`
 
 	var conditions []string
@@ -126,7 +130,7 @@ func (l *d1AuditLog) Query(ctx context.Context, filter AuditFilter) ([]AuditEntr
 	if len(conditions) > 0 {
 		sql += " WHERE " + strings.Join(conditions, " AND ")
 	}
-	sql += " ORDER BY timestamp DESC"
+	sql += " ORDER BY timestamp DESC, seq DESC"
 	if filter.Limit > 0 {
 		sql += fmt.Sprintf(" LIMIT %d", filter.Limit)
 	}
@@ -186,6 +190,18 @@ func (l *d1AuditLog) Export(ctx context.Context, filter AuditFilter, format Expo
 	}
 }
 
+func (l *d1AuditLog) chainHead(ctx context.Context) (int64, string, error) {
+	rows, err := l.client.Query(ctx,
+		`SELECT seq, entry_hash FROM audit_log WHERE seq IS NOT NULL AND seq > 0 ORDER BY seq DESC LIMIT 1`)
+	if err != nil {
+		return 0, "", fmt.Errorf("audit/d1: chain head: %w", err)
+	}
+	if len(rows) == 0 {
+		return 0, "", nil
+	}
+	return d1client.Int64(rows[0]["seq"]), d1client.String(rows[0]["entry_hash"]), nil
+}
+
 // Close is a no-op; D1 uses stateless HTTP with no persistent connection.
 func (l *d1AuditLog) Close() error { return nil }
 
@@ -201,6 +217,9 @@ func rowToEntry(row map[string]any) (AuditEntry, error) {
 	e.Tool = d1client.String(row["tool"])
 	e.ResultHash = d1client.String(row["result_hash"])
 	e.Duration = time.Duration(d1client.Int64(row["duration_ns"]))
+	e.Seq = d1client.Int64(row["seq"])
+	e.PrevHash = d1client.String(row["prev_hash"])
+	e.EntryHash = d1client.String(row["entry_hash"])
 
 	tsStr := d1client.String(row["timestamp"])
 	if tsStr != "" {

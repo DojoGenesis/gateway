@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -76,10 +77,18 @@ func createAuditTables(db *sql.DB) error {
 		capabilities_granted TEXT,
 		result_hash TEXT,
 		duration_ns INTEGER,
-		metadata TEXT
+		metadata TEXT,
+		seq INTEGER,
+		prev_hash TEXT,
+		entry_hash TEXT
 	)`)
 	if err != nil {
 		return fmt.Errorf("audit: create table: %w", err)
+	}
+
+	// Tables created before the hash chain existed lack its columns.
+	if err := addMissingChainColumns(db); err != nil {
+		return err
 	}
 
 	indexes := []string{
@@ -87,10 +96,47 @@ func createAuditTables(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action)`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp)`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_tool ON audit_log(tool)`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_seq ON audit_log(seq)`,
 	}
 	for _, idx := range indexes {
 		if _, err := db.Exec(idx); err != nil {
 			return fmt.Errorf("audit: create index: %w", err)
+		}
+	}
+	return nil
+}
+
+func addMissingChainColumns(db *sql.DB) error {
+	rows, err := db.Query(`PRAGMA table_info(audit_log)`)
+	if err != nil {
+		return fmt.Errorf("audit: table info: %w", err)
+	}
+	have := map[string]bool{}
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("audit: table info scan: %w", err)
+		}
+		have[name] = true
+	}
+	_ = rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("audit: table info: %w", err)
+	}
+
+	for _, col := range []struct{ name, ctype string }{
+		{"seq", "INTEGER"},
+		{"prev_hash", "TEXT"},
+		{"entry_hash", "TEXT"},
+	} {
+		if have[col.name] {
+			continue
+		}
+		if _, err := db.Exec(`ALTER TABLE audit_log ADD COLUMN ` + col.name + ` ` + col.ctype); err != nil { //nolint:gosec // G202: column names are the constants above
+			return fmt.Errorf("audit: add column %s: %w", col.name, err)
 		}
 	}
 	return nil
@@ -116,8 +162,8 @@ func (l *sqliteAuditLog) Record(ctx context.Context, entry AuditEntry) error {
 	}
 
 	_, err = l.db.ExecContext(ctx,
-		`INSERT INTO audit_log (id, timestamp, agent_id, action, tool, tool_args, capabilities_granted, result_hash, duration_ns, metadata)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO audit_log (id, timestamp, agent_id, action, tool, tool_args, capabilities_granted, result_hash, duration_ns, metadata, seq, prev_hash, entry_hash)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		entry.ID,
 		entry.Timestamp,
 		entry.AgentID,
@@ -128,6 +174,9 @@ func (l *sqliteAuditLog) Record(ctx context.Context, entry AuditEntry) error {
 		entry.ResultHash,
 		entry.Duration.Nanoseconds(),
 		string(metaJSON),
+		entry.Seq,
+		entry.PrevHash,
+		entry.EntryHash,
 	)
 	if err != nil {
 		return fmt.Errorf("audit: record: %w", err)
@@ -136,7 +185,7 @@ func (l *sqliteAuditLog) Record(ctx context.Context, entry AuditEntry) error {
 }
 
 func (l *sqliteAuditLog) Query(ctx context.Context, filter AuditFilter) ([]AuditEntry, error) {
-	query := `SELECT id, timestamp, agent_id, action, tool, tool_args, capabilities_granted, result_hash, duration_ns, metadata FROM audit_log`
+	query := `SELECT id, timestamp, agent_id, action, tool, tool_args, capabilities_granted, result_hash, duration_ns, metadata, seq, prev_hash, entry_hash FROM audit_log`
 	var conditions []string
 	var args []interface{}
 
@@ -168,7 +217,8 @@ func (l *sqliteAuditLog) Query(ctx context.Context, filter AuditFilter) ([]Audit
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
-	query += " ORDER BY timestamp DESC"
+	// Newest first. seq breaks ties between entries recorded in the same instant.
+	query += " ORDER BY timestamp DESC, seq DESC"
 
 	if filter.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", filter.Limit)
@@ -190,13 +240,19 @@ func (l *sqliteAuditLog) Query(ctx context.Context, filter AuditFilter) ([]Audit
 		var action string
 		var toolArgsJSON, capsJSON, metaJSON sql.NullString
 		var durationNs int64
+		var seq sql.NullInt64
+		var prevHash, entryHash sql.NullString
 
 		if err := rows.Scan(&e.ID, &e.Timestamp, &e.AgentID, &action, &e.Tool,
-			&toolArgsJSON, &capsJSON, &e.ResultHash, &durationNs, &metaJSON); err != nil {
+			&toolArgsJSON, &capsJSON, &e.ResultHash, &durationNs, &metaJSON,
+			&seq, &prevHash, &entryHash); err != nil {
 			return nil, fmt.Errorf("audit: query scan: %w", err)
 		}
 		e.Action = Action(action)
 		e.Duration = time.Duration(durationNs)
+		e.Seq = seq.Int64
+		e.PrevHash = prevHash.String
+		e.EntryHash = entryHash.String
 
 		if toolArgsJSON.Valid && toolArgsJSON.String != "" {
 			_ = json.Unmarshal([]byte(toolArgsJSON.String), &e.ToolArgs)
@@ -252,4 +308,19 @@ func (l *sqliteAuditLog) Export(ctx context.Context, filter AuditFilter, format 
 
 func (l *sqliteAuditLog) Close() error {
 	return l.db.Close()
+}
+
+func (l *sqliteAuditLog) chainHead(ctx context.Context) (int64, string, error) {
+	var seq int64
+	var hash sql.NullString
+	err := l.db.QueryRowContext(ctx,
+		`SELECT seq, entry_hash FROM audit_log WHERE seq IS NOT NULL AND seq > 0 ORDER BY seq DESC LIMIT 1`,
+	).Scan(&seq, &hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, "", nil
+	}
+	if err != nil {
+		return 0, "", err
+	}
+	return seq, hash.String, nil
 }

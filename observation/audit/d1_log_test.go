@@ -30,6 +30,9 @@ type auditMockRow struct {
 	ResultHash   string
 	DurationNs   float64
 	Metadata     string
+	Seq          float64
+	PrevHash     string
+	EntryHash    string
 }
 
 func newAuditMockDB() *auditMockDB {
@@ -111,6 +114,9 @@ func dispatchAudit(db *auditMockDB, sql string, params []any) []map[string]any {
 			ResultHash:   str(7),
 			DurationNs:   num(8),
 			Metadata:     str(9),
+			Seq:          num(10),
+			PrevHash:     str(11),
+			EntryHash:    str(12),
 		}
 		// Upsert: replace existing entry with same ID.
 		for i, existing := range db.rows {
@@ -129,16 +135,19 @@ func dispatchAudit(db *auditMockDB, sql string, params []any) []map[string]any {
 		var rows []map[string]any
 		for _, r := range db.rows {
 			rows = append(rows, map[string]any{
-				"id":                    r.ID,
-				"timestamp":             r.Timestamp,
-				"agent_id":              r.AgentID,
-				"action":                r.Action,
-				"tool":                  r.Tool,
-				"tool_args":             r.ToolArgs,
-				"capabilities_granted":  r.Capabilities,
-				"result_hash":           r.ResultHash,
-				"duration_ns":           r.DurationNs,
-				"metadata":              r.Metadata,
+				"id":                   r.ID,
+				"timestamp":            r.Timestamp,
+				"agent_id":             r.AgentID,
+				"action":               r.Action,
+				"tool":                 r.Tool,
+				"tool_args":            r.ToolArgs,
+				"capabilities_granted": r.Capabilities,
+				"result_hash":          r.ResultHash,
+				"duration_ns":          r.DurationNs,
+				"metadata":             r.Metadata,
+				"seq":                  r.Seq,
+				"prev_hash":            r.PrevHash,
+				"entry_hash":           r.EntryHash,
 			})
 		}
 		return rows
