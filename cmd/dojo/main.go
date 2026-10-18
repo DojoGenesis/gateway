@@ -10,7 +10,7 @@
 //	dojo skill publish [--first-party] <dir> — Package and publish a skill from a directory
 //	dojo skill info <name> [version]       — Show skill metadata
 //	dojo skill package-all [--first-party] <plugins-dir> — Batch-package all SKILL.md files under a directory
-//	dojo tunnel [port]                     — Start a cloudflared tunnel to expose localhost:<port> (default 8080)
+//	dojo tunnel [port]                     — Start a cloudflared tunnel to expose localhost:<port> (default 8090, the bridge)
 //	dojo tunnel stop                       — Stop the running tunnel
 package main
 
@@ -291,7 +291,7 @@ func printUsage() {
 
 Usage:
   dojo skill <action> [args]    Manage skills
-  dojo tunnel [port]            Start a cloudflared tunnel (default port: 8080)
+  dojo tunnel [port]            Start a cloudflared tunnel (default port: 8090, the bridge)
   dojo tunnel stop              Stop the running tunnel
   dojo bridge                   Start Channel Bridge with NATS bus (production)
   dojo version                  Print version
@@ -312,7 +312,7 @@ Skill Actions:
   package-all [--first-party] <plugins-dir>  Batch-package all skills (--first-party: DojoGenesis's own, may use reserved names)
 
 Tunnel:
-  dojo tunnel                   Expose http://localhost:8080 via cloudflared
+  dojo tunnel                   Expose http://localhost:8090 via cloudflared
   dojo tunnel 3000              Expose http://localhost:3000 via cloudflared
   dojo tunnel stop              Kill any running cloudflared tunnel
 
