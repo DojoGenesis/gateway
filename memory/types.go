@@ -7,7 +7,10 @@ import (
 )
 
 var (
-	ErrMemoryNotFound         = errors.New("memory not found")
+	ErrMemoryNotFound = errors.New("memory not found")
+	// ErrMemoryOwnerConflict is returned when a store reuses the ID of a
+	// memory that belongs to a different owner. Nothing is written.
+	ErrMemoryOwnerConflict    = errors.New("memory id belongs to a different owner")
 	ErrProjectNotFound        = errors.New("project not found")
 	ErrSeedNotFound           = errors.New("seed not found")
 	ErrSeedNotEditable        = errors.New("seed is not editable")
@@ -36,6 +39,10 @@ type Memory struct {
 	ContextType string                 `json:"context_type"`
 	CreatedAt   time.Time              `json:"created_at"`
 	UpdatedAt   time.Time              `json:"updated_at"`
+	// OwnerID is the authenticated subject (JWT sub) the memory belongs to.
+	// LegacyOwnerID ("") marks rows written before DGS-163 or by internal
+	// callers with no subject. See owner_scope.go.
+	OwnerID string `json:"owner_id,omitempty"`
 }
 
 // SearchResult represents a memory search result with similarity scoring.
@@ -79,8 +86,11 @@ type MemoryFilter struct {
 	Type         string
 	ContextType  string
 	CreatedAfter *time.Time
-	Limit        int
-	Offset       int
+	// OwnerID, when non-nil, restricts results to that owner. nil means every
+	// owner, which only internal callers and an explicit AllOwners scope use.
+	OwnerID *string
+	Limit   int
+	Offset  int
 }
 
 // SeedFilter specifies criteria for listing seeds.

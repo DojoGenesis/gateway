@@ -150,8 +150,14 @@ var toolPolicies = map[string]toolPolicy{
 	"list_artifacts":         userTool("database read"),
 	"list_artifact_versions": userTool("database read"),
 	"export_artifact":        userTool("database read re-encoded in memory"),
-	"memory_search":          userTool("database read"),
-	"memory_get":             userTool("database read by memory id; no file path is read"),
+
+	// ── Memory: not owner-scoped ─────────────────────────────────────────
+	// These read the memories table across every owner, because the tool
+	// context carries no caller subject to scope them by. Since DGS-163 the
+	// /v1/memory routes are owner-scoped, so leaving these user-callable would
+	// reopen the cross-user read that change closes. Admin-only until scoped.
+	"memory_search": adminTool("searches every owner's memories; not owner-scoped (DGS-163)"),
+	"memory_get":    adminTool("reads any owner's memory by id; not owner-scoped (DGS-163)"),
 }
 
 // unclassifiedToolPolicy applies to any tool the table does not name.

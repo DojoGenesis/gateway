@@ -33,6 +33,13 @@ func newMemoryTestServer(t *testing.T) (*Server, *gin.Engine) {
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("request_id", "test-request-id")
+		// Stand-in for AuthMiddleware, which puts the JWT subject here. The
+		// /v1/memory handlers scope every call to it (DGS-163).
+		subject := c.GetHeader(testSubjectHeader)
+		if subject == "" {
+			subject = "test-user"
+		}
+		c.Set("user_id", subject)
 		c.Next()
 	})
 
@@ -52,7 +59,16 @@ func newMemoryTestServer(t *testing.T) (*Server, *gin.Engine) {
 	return s, router
 }
 
+// testSubjectHeader lets a test pick the authenticated subject per request.
+const testSubjectHeader = "X-Test-Subject"
+
 func doJSON(t *testing.T, router *gin.Engine, method, path string, body interface{}) *httptest.ResponseRecorder {
+	t.Helper()
+	return doJSONAs(t, router, "", method, path, body)
+}
+
+// doJSONAs is doJSON as a given subject; "" means the default test subject.
+func doJSONAs(t *testing.T, router *gin.Engine, subject, method, path string, body interface{}) *httptest.ResponseRecorder {
 	t.Helper()
 	var buf bytes.Buffer
 	if body != nil {
@@ -61,6 +77,9 @@ func doJSON(t *testing.T, router *gin.Engine, method, path string, body interfac
 	req, err := http.NewRequest(method, path, &buf)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
+	if subject != "" {
+		req.Header.Set(testSubjectHeader, subject)
+	}
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	return w
