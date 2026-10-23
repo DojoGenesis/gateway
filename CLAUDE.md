@@ -6,7 +6,7 @@
 
 Self-hosted agentic AI runtime: multi-provider LLM routing, DAG orchestration, content-addressable skill storage (CAS), MCP host, real-time SSE, portal auth — one Go binary. Hard dependency for the whole DojoGenesis platform. Primary client is the `dojo` CLI at `C:\Users\cruzr\cli\`.
 
-**Folder / canonical-name note:** This Windows checkout lives at `C:\Users\cruzr\dojo-AgenticGateway\`. The canonical registry name is `AgenticGatewayByDojoGenesis`. GitHub remotes are `origin → TresPies-source/AgenticGatewayByDojoGenesis` and `dojogenesis → DojoGenesis/gateway`. Go module path (confirmed in `go.mod`): `github.com/DojoGenesis/gateway`.
+**Folder / canonical-name note:** This Windows checkout lives at `C:\Users\cruzr\dojo-AgenticGateway\`. The canonical registry name is `AgenticGatewayByDojoGenesis`. GitHub remotes are `origin → DojoGenesis/gateway` and `tres-archive → TresPies-source/AgenticGatewayByDojoGenesis` (archived read-only 2026-10-22, DGS-180; fetch only). Go module path (confirmed in `go.mod`): `github.com/DojoGenesis/gateway`.
 
 Workspace nexus is NOT auto-loaded here (flat Windows layout). Read `C:\Users\cruzr\zenflow-projects\CLAUDE.md` for cross-repo context.
 
@@ -51,7 +51,7 @@ go vet ./...
 
 **MCP Apps:** disabled by default. Enable via `MCP_APPS_ENABLED=true`.
 
-**Remotes:** `origin → TresPies-source/AgenticGatewayByDojoGenesis` · `dojogenesis → DojoGenesis/gateway`. Push to DojoGenesis org requires `gh auth switch` to DojoGenesis account.
+**Remotes:** `origin → DojoGenesis/gateway` · `tres-archive → TresPies-source/AgenticGatewayByDojoGenesis` (archived 2026-10-22, read-only). Pushing to `origin` requires `gh auth switch` to the DojoGenesis account.
 
 ---
 
@@ -75,7 +75,7 @@ go vet ./...
 - **Two-handler-path rule (above):** grep `s.router.` AND `wfHandler.RegisterRoutes` before any handler work. Failing this is the single biggest source of handler bugs in this repo.
 - **Port 7340:** any config, test, healthcheck, or curl example that references 8080 is wrong.
 - **Memory/CAS absolute paths:** relative DB paths create silent duplicate databases on deploy restarts. Always use absolute paths or the env-var overrides.
-- **DojoGenesis push needs account switch:** `gh auth switch --user DojoGenesis` (or equivalent) before pushing to `dojogenesis` remote. The `origin` remote pushes to TresPies-source.
+- **Push needs the DojoGenesis account:** `gh auth switch --user DojoGenesis` before pushing to `origin` (DojoGenesis/gateway), then switch back. `tres-archive` is the archived TresPies copy; pushes to it fail.
 - **SPA must be built before binary:** `make build-spa` (Workflow Builder) and `make build-chat-spa` (Chat UI) must run before `make build` if those SPAs have changed, or the embedded dist will be stale.
 
 ---
